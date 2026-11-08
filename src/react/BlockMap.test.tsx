@@ -55,6 +55,16 @@ describe("<BlockMap>", () => {
     spy.mockRestore();
   });
 
+  it("exposes setRanges through the ref", () => {
+    const instance = createInstance();
+    const spy = vi.spyOn(core, "createBlockMap").mockReturnValue(instance);
+    const ref = createRef<BlockMapHandle>();
+    render(<BlockMap ref={ref} totalBlocks={10} />);
+    act(() => ref.current?.setRanges([[0, 1]]));
+    expect(instance.setRanges).toHaveBeenCalledWith([[0, 1]]);
+    spy.mockRestore();
+  });
+
   it("applies ranges with setRanges and does not call setBlocks", () => {
     const instance = createInstance();
     const spy = vi.spyOn(core, "createBlockMap").mockReturnValue(instance);
@@ -95,6 +105,7 @@ describe("<BlockMap>", () => {
       totalBlocks: 10,
       partial: "gradient",
     });
+    expect(second.setBlocks).toHaveBeenCalled();
     spy.mockRestore();
   });
 });

@@ -63,6 +63,7 @@ describe("normalizeRanges", () => {
         [1.5, 4],
         [Number.NaN, 3],
         [20, 15],
+        [200, 300],
       ]),
     ).toEqual([]);
   });
@@ -70,6 +71,18 @@ describe("normalizeRanges", () => {
   it("reads flat Uint32Array pairs and ignores an odd trailing element", () => {
     expect(flat(new Uint32Array([0, 2, 4, 6]))).toEqual([0, 2, 4, 6]);
     expect(flat(new Uint32Array([0, 2, 4]))).toEqual([0, 2]);
+  });
+
+  it("reads a plain flat number array as pairs", () => {
+    expect(flat([0, 2, 4, 6])).toEqual([0, 2, 4, 6]);
+  });
+
+  it("reads a flat typed array other than Uint32Array", () => {
+    expect(flat(new Uint16Array([0, 2]))).toEqual([0, 2]);
+  });
+
+  it("drops a flat pair entirely beyond totalBlocks", () => {
+    expect(flat([200, 300])).toEqual([]);
   });
 });
 

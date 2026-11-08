@@ -1,7 +1,7 @@
 import { createBitset } from "./bitset";
 import { createBins } from "./bins";
 import type { Bins, BlockRange } from "./bins";
-import { RANGE_PAIR } from "./constants";
+import { MAX_BLOCKS, RANGE_PAIR } from "./constants";
 import { normalizeRanges, rangesLength } from "./ranges";
 import type { RangeInput } from "./ranges";
 
@@ -30,6 +30,11 @@ const isValidIndex = (index: number, totalBlocks: number): boolean =>
 export const createBlockState = (totalBlocks: number): BlockState => {
   if (!Number.isInteger(totalBlocks) || totalBlocks < 1) {
     throw new RangeError(`totalBlocks must be a positive integer, got ${totalBlocks}`);
+  }
+  if (totalBlocks > MAX_BLOCKS) {
+    throw new RangeError(
+      `totalBlocks must fit in an unsigned 32-bit integer (<= ${MAX_BLOCKS}), got ${totalBlocks}`,
+    );
   }
 
   const bitset = createBitset(totalBlocks);

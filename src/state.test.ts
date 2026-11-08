@@ -6,6 +6,10 @@ describe("createBlockState", () => {
     expect(() => createBlockState(1.5)).toThrow(RangeError);
   });
 
+  it("rejects totalBlocks beyond the 32-bit limit", () => {
+    expect(() => createBlockState(2 ** 32)).toThrow(RangeError);
+  });
+
   it("starts with no bins and no progress", () => {
     const state = createBlockState(100);
     expect(state.binCount).toBe(0);
@@ -99,6 +103,16 @@ describe("createBlockState", () => {
     expect(Array.from(dirty)).toEqual([0]);
     expect(state.countOf(0)).toBe(3);
     expect(state.progress().completed).toBe(3);
+  });
+
+  it("replaceRanges with an empty input clears previous state", () => {
+    const state = createBlockState(10);
+    state.resize(3);
+    state.replaceRanges([[0, 7]]);
+    state.replaceRanges([]);
+    expect(state.progress().completed).toBe(0);
+    expect([0, 1, 2].map(state.countOf)).toEqual([0, 0, 0]);
+    expect(state.has(0)).toBe(false);
   });
 
   it("replaceRanges before resize is rebuilt correctly on resize", () => {

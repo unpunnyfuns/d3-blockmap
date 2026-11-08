@@ -14,7 +14,7 @@ export type BlockMapProps = {
   style?: CSSProperties;
 };
 
-export type BlockMapHandle = Pick<BlockMapInstance, "addBlocks" | "getProgress">;
+export type BlockMapHandle = Pick<BlockMapInstance, "addBlocks" | "setRanges" | "getProgress">;
 
 const EMPTY_BLOCKS: readonly number[] = [];
 const EMPTY_PROGRESS = { completed: 0, total: 0 };
@@ -51,6 +51,7 @@ export const BlockMap = forwardRef<BlockMapHandle, BlockMapProps>(
       ref,
       () => ({
         addBlocks: (indices) => instanceRef.current?.addBlocks(indices),
+        setRanges: (ranges) => instanceRef.current?.setRanges(ranges),
         getProgress: () =>
           instanceRef.current?.getProgress() ?? { ...EMPTY_PROGRESS, total: totalBlocks },
       }),

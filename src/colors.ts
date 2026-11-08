@@ -64,7 +64,7 @@ export const readTheme = (el: HTMLElement): Theme => {
   };
 };
 
-export const createColorScale = (theme: Theme, partial: PartialStyle = "gradient"): ColorScale => {
+export const createColorScale = (theme: Theme, partial: PartialStyle = "coverage"): ColorScale => {
   const table = new Uint8ClampedArray(COLOR_TABLE_SIZE * BYTES_PER_PIXEL);
   const missing = parseOr(theme.missing, DEFAULT_THEME.missing);
   const complete = parseOr(theme.complete, DEFAULT_THEME.complete);

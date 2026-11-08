@@ -53,12 +53,12 @@ describe("createColorScale", () => {
     expect(Array.from(scale(0.9999))).not.toEqual([255, 255, 255, 255]);
   });
 
-  it("gradient is the default and differs from coverage", () => {
+  it("coverage is the default and differs from gradient", () => {
     expect(Array.from(createColorScale(theme)(0.5))).toEqual(
-      Array.from(createColorScale(theme, "gradient")(0.5)),
+      Array.from(createColorScale(theme, "coverage")(0.5)),
     );
     expect(Array.from(createColorScale(theme)(0.5))).not.toEqual(
-      Array.from(createColorScale(theme, "coverage")(0.5)),
+      Array.from(createColorScale(theme, "gradient")(0.5)),
     );
   });
 });

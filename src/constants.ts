@@ -26,3 +26,4 @@ export const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
 export const RANGE_PAIR = 2;
 export const FULL_BYTE = 0xff;
+export const MAX_BLOCKS = 0xffffffff;

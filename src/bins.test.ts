@@ -95,6 +95,16 @@ describe("createBins", () => {
     expect(Array.from(viaRange.counts)).toEqual(Array.from(viaRebuild.counts));
   });
 
+  it("addRange with more bins than blocks matches rebuild over the same range", () => {
+    const viaRange = createBins(3, 10);
+    viaRange.addRange(0, 3);
+    expect(viaRange.counts.reduce((sum, n) => sum + n, 0)).toBe(3);
+
+    const viaRebuild = createBins(3, 10);
+    viaRebuild.rebuild((start, end) => end - start);
+    expect(Array.from(viaRange.counts)).toEqual(Array.from(viaRebuild.counts));
+  });
+
   it("addRange is a no-op with zero bins or an empty span", () => {
     expect(() => createBins(10, 0).addRange(0, 10)).not.toThrow();
     const bins = createBins(10, 3);

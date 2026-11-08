@@ -1,3 +1,5 @@
+import { rgb } from "d3-color";
+import { DEFAULT_THEME } from "./constants";
 import { createBlockMap } from "./blockMap";
 
 type ResizeCallback = (entries: ResizeObserverEntry[]) => void;
@@ -207,6 +209,36 @@ describe("createBlockMap", () => {
     expect(Math.abs(r - g)).toBeLessThan(3);
     expect(Math.abs(g - b)).toBeLessThan(3);
     expect(Array.from(image.data.subarray(4, 8))).toEqual([0, 0, 0, 255]);
+    map.destroy();
+  });
+
+  it("discrete mode paints each block as its own segment across more bins than blocks", () => {
+    const container = mount();
+    const map = createBlockMap(container, { totalBlocks: 128 });
+    triggerResize(100);
+    map.setRanges([
+      [0, 32],
+      [96, 128],
+    ]);
+    expect(map.getProgress().completed).toBe(64);
+
+    const image = puts.at(-1) as ImageData;
+    expect(image.width).toBe(200);
+    const complete = rgb(DEFAULT_THEME.complete);
+    const missing = rgb(DEFAULT_THEME.missing);
+    expect(Array.from(image.data.subarray(0, 4))).toEqual([
+      complete.r,
+      complete.g,
+      complete.b,
+      255,
+    ]);
+    const columnOffset = 100 * 4;
+    expect(Array.from(image.data.subarray(columnOffset, columnOffset + 4))).toEqual([
+      missing.r,
+      missing.g,
+      missing.b,
+      255,
+    ]);
     map.destroy();
   });
 });

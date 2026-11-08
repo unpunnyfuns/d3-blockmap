@@ -1,13 +1,16 @@
 import { RANGE_PAIR } from "./constants";
 
 export type BlockRangeTuple = readonly [start: number, end: number];
-export type RangeInput = ArrayLike<BlockRangeTuple> | Uint32Array;
+export type RangeInput = ArrayLike<BlockRangeTuple> | ArrayLike<number>;
 
 type Pair = [number, number];
 
+const isFlatPairs = (input: RangeInput): input is ArrayLike<number> =>
+  ArrayBuffer.isView(input) || typeof input[0] === "number";
+
 const readPairs = (input: RangeInput): Pair[] => {
   const pairs: Pair[] = [];
-  if (input instanceof Uint32Array) {
+  if (isFlatPairs(input)) {
     const pairCount = Math.floor(input.length / RANGE_PAIR);
     for (let i = 0; i < pairCount; i += 1) {
       pairs.push([input[i * RANGE_PAIR], input[i * RANGE_PAIR + 1]]);
