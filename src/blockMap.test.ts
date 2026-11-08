@@ -192,7 +192,7 @@ describe("createBlockMap", () => {
     map.destroy();
   });
 
-  it("coverage style paints a half-covered bin as a blend of missing and complete", () => {
+  it("coverage style paints a half-covered bin as the partial colour", () => {
     vi.spyOn(window, "getComputedStyle").mockReturnValue({
       position: "static",
       getPropertyValue: (name: string) =>
@@ -204,10 +204,10 @@ describe("createBlockMap", () => {
     map.setRanges([[0, 5]]);
     const image = puts.at(-1) as ImageData;
     const [r, g, b] = Array.from(image.data.subarray(0, 4));
-    expect(r).toBeGreaterThan(100);
-    expect(r).toBeLessThan(160);
-    expect(Math.abs(r - g)).toBeLessThan(3);
-    expect(Math.abs(g - b)).toBeLessThan(3);
+    expect(r).toBeGreaterThan(200);
+    expect(g).toBeGreaterThan(100);
+    expect(g).toBeLessThan(200);
+    expect(b).toBeLessThan(10);
     expect(Array.from(image.data.subarray(4, 8))).toEqual([0, 0, 0, 255]);
     map.destroy();
   });

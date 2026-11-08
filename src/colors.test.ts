@@ -5,6 +5,7 @@ const theme = {
   missing: "#000000",
   partialLow: "#ff0000",
   partialHigh: "#0000ff",
+  partial: "#ff0000",
   complete: "#ffffff",
 };
 
@@ -36,14 +37,29 @@ describe("createColorScale", () => {
     expect(Array.from(scale(1))).toEqual(Array.from(createColorScale(DEFAULT_THEME)(1)));
   });
 
-  it("coverage style blends missing toward complete", () => {
+  it("coverage style blends missing toward partial toward complete", () => {
     const scale = createColorScale(theme, "coverage");
     const [r, g, b, a] = scale(0.5);
     expect(a).toBe(255);
+    expect(r).toBeGreaterThan(200);
+    expect(g).toBeLessThan(60);
+    expect(b).toBeLessThan(60);
+  });
+
+  it("coverage style is dark red a quarter of the way through", () => {
+    const scale = createColorScale(theme, "coverage");
+    const [r, g] = scale(0.25);
     expect(r).toBeGreaterThan(100);
     expect(r).toBeLessThan(160);
-    expect(Math.abs(r - g)).toBeLessThan(3);
-    expect(Math.abs(g - b)).toBeLessThan(3);
+    expect(g).toBeLessThan(30);
+  });
+
+  it("coverage style is light red three-quarters of the way through", () => {
+    const scale = createColorScale(theme, "coverage");
+    const [r, g] = scale(0.75);
+    expect(r).toBeGreaterThan(200);
+    expect(g).toBeGreaterThan(100);
+    expect(g).toBeLessThan(160);
   });
 
   it("coverage style keeps exact and distinct endpoints", () => {

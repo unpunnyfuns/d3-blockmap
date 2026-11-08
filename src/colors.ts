@@ -1,10 +1,11 @@
 import { rgb } from "d3-color";
-import { interpolateRgb } from "d3-interpolate";
+import { interpolateRgb, piecewise } from "d3-interpolate";
 import {
   BYTES_PER_PIXEL,
   COLOR_TABLE_SIZE,
   CSS_VAR_COMPLETE,
   CSS_VAR_MISSING,
+  CSS_VAR_PARTIAL,
   CSS_VAR_PARTIAL_HIGH,
   CSS_VAR_PARTIAL_LOW,
   DARK_SCHEME_QUERY,
@@ -17,6 +18,7 @@ export type Theme = {
   missing: string;
   partialLow: string;
   partialHigh: string;
+  partial: string;
   complete: string;
 };
 
@@ -28,6 +30,7 @@ const THEME_VARS: Record<keyof Theme, string> = {
   missing: CSS_VAR_MISSING,
   partialLow: CSS_VAR_PARTIAL_LOW,
   partialHigh: CSS_VAR_PARTIAL_HIGH,
+  partial: CSS_VAR_PARTIAL,
   complete: CSS_VAR_COMPLETE,
 };
 
@@ -60,6 +63,7 @@ export const readTheme = (el: HTMLElement): Theme => {
     missing: read("missing"),
     partialLow: read("partialLow"),
     partialHigh: read("partialHigh"),
+    partial: read("partial"),
     complete: read("complete"),
   };
 };
@@ -70,7 +74,11 @@ export const createColorScale = (theme: Theme, partial: PartialStyle = "coverage
   const complete = parseOr(theme.complete, DEFAULT_THEME.complete);
   const partialScale =
     partial === "coverage"
-      ? interpolateRgb(missing, complete)
+      ? piecewise(interpolateRgb, [
+          missing,
+          parseOr(theme.partial, DEFAULT_THEME.partial),
+          complete,
+        ])
       : interpolateRgb(
           parseOr(theme.partialLow, DEFAULT_THEME.partialLow),
           parseOr(theme.partialHigh, DEFAULT_THEME.partialHigh),

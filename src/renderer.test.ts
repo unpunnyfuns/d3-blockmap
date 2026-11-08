@@ -7,6 +7,7 @@ const theme = {
   missing: "#000000",
   partialLow: "#ff0000",
   partialHigh: "#0000ff",
+  partial: "#ff0000",
   complete: "#ffffff",
 };
 

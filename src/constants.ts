@@ -12,12 +12,14 @@ export const CANVAS_ROWS = 1;
 export const CSS_VAR_MISSING = "--block-missing";
 export const CSS_VAR_PARTIAL_LOW = "--block-partial-low";
 export const CSS_VAR_PARTIAL_HIGH = "--block-partial-high";
+export const CSS_VAR_PARTIAL = "--block-partial";
 export const CSS_VAR_COMPLETE = "--block-complete";
 
 export const DEFAULT_THEME = {
   missing: "#2b2b2b",
   partialLow: "#5b3a00",
   partialHigh: "#e0a500",
+  partial: "#e0a500",
   complete: "#2ecc71",
 } as const;
 
