@@ -164,4 +164,49 @@ describe("createPieceMap", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
     expect(() => createPieceMap(mount(), { totalBlocks: 10 })).toThrow(/2d/);
   });
+
+  it("setRanges replaces state and repaints", () => {
+    const container = mount();
+    const map = createPieceMap(container, { totalBlocks: 10, initialBlocks: [9] });
+    triggerResize(5);
+    const before = puts.length;
+    map.setRanges([
+      [0, 2],
+      [4, 7],
+    ]);
+    expect(map.getProgress()).toEqual({ completed: 5, total: 10 });
+    expect(puts.length).toBe(before + 1);
+    map.destroy();
+  });
+
+  it("applies initialRanges then initialBlocks", () => {
+    const container = mount();
+    const map = createPieceMap(container, {
+      totalBlocks: 10,
+      initialRanges: new Uint32Array([0, 2]),
+      initialBlocks: [1, 5],
+    });
+    expect(map.getProgress().completed).toBe(3);
+    map.destroy();
+  });
+
+  it("coverage style paints a half-covered bin as a blend of missing and complete", () => {
+    vi.spyOn(window, "getComputedStyle").mockReturnValue({
+      position: "static",
+      getPropertyValue: (name: string) =>
+        ({ "--piece-missing": "#000000", "--piece-complete": "#ffffff" })[name] ?? "",
+    } as unknown as CSSStyleDeclaration);
+    const container = mount();
+    const map = createPieceMap(container, { totalBlocks: 100, partial: "coverage" });
+    triggerResize(5);
+    map.setRanges([[0, 5]]);
+    const image = puts.at(-1) as ImageData;
+    const [r, g, b] = Array.from(image.data.subarray(0, 4));
+    expect(r).toBeGreaterThan(100);
+    expect(r).toBeLessThan(160);
+    expect(Math.abs(r - g)).toBeLessThan(3);
+    expect(Math.abs(g - b)).toBeLessThan(3);
+    expect(Array.from(image.data.subarray(4, 8))).toEqual([0, 0, 0, 255]);
+    map.destroy();
+  });
 });

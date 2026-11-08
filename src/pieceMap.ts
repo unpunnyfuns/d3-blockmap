@@ -1,7 +1,9 @@
 import { createColorScale, readTheme, watchTheme } from "./colors";
+import type { PartialStyle } from "./colors";
 import { CANVAS_ROWS } from "./constants";
 import { createRenderer } from "./renderer";
 import type { Renderer } from "./renderer";
+import type { RangeInput } from "./ranges";
 import { createPieceState } from "./state";
 import type { Progress } from "./state";
 import { createTooltip, formatBinTooltip, formatBlockTooltip } from "./tooltip";
@@ -9,10 +11,13 @@ import { createTooltip, formatBinTooltip, formatBlockTooltip } from "./tooltip";
 export type PieceMapOptions = {
   totalBlocks: number;
   initialBlocks?: ArrayLike<number>;
+  initialRanges?: RangeInput;
+  partial?: PartialStyle;
 };
 
 export type PieceMap = {
   setBlocks(indices: ArrayLike<number>): void;
+  setRanges(ranges: RangeInput): void;
   addBlocks(indices: ArrayLike<number>): void;
   getProgress(): Progress;
   destroy(): void;
@@ -45,7 +50,7 @@ export const createPieceMap = (container: HTMLElement, options: PieceMapOptions)
   let dprMedia: MediaQueryList | undefined;
 
   const applyTheme = (): void => {
-    renderer.setColors(createColorScale(readTheme(container)));
+    renderer.setColors(createColorScale(readTheme(container), options.partial));
   };
 
   const layout = (): void => {
@@ -96,12 +101,18 @@ export const createPieceMap = (container: HTMLElement, options: PieceMapOptions)
   const unwatchTheme = watchTheme(applyTheme);
   watchDpr();
   applyTheme();
+  if (options.initialRanges) state.replaceRanges(options.initialRanges);
   if (options.initialBlocks) renderer.markDirty(state.add(options.initialBlocks));
 
   return {
     setBlocks: (indices) => {
       if (destroyed) return;
       state.replace(indices);
+      renderer.markAllDirty();
+    },
+    setRanges: (ranges) => {
+      if (destroyed) return;
+      state.replaceRanges(ranges);
       renderer.markAllDirty();
     },
     addBlocks: (indices) => {

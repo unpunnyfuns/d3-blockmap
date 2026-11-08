@@ -7,6 +7,7 @@ import type { PieceMapHandle } from "./PieceMap";
 
 const createInstance = (): PieceMapInstance => ({
   setBlocks: vi.fn(),
+  setRanges: vi.fn(),
   addBlocks: vi.fn(),
   getProgress: vi.fn(() => ({ completed: 0, total: 0 })),
   destroy: vi.fn(),
