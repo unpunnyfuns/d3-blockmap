@@ -14,6 +14,12 @@ export const CSS_VAR_PARTIAL_LOW = "--blockmap-partial-low";
 export const CSS_VAR_PARTIAL_HIGH = "--blockmap-partial-high";
 export const CSS_VAR_PARTIAL = "--blockmap-partial";
 export const CSS_VAR_COMPLETE = "--blockmap-complete";
+export const CSS_VAR_HIGHLIGHT = "--blockmap-highlight";
+export const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+export const ZOOM_STEP = 1.25;
+export const DRAG_THRESHOLD_PX = 3;
+export const BLINK_INTERVAL_MS = 500;
+export const MIN_VIEW_LENGTH = 1;
 
 export const DEFAULT_THEME = {
   missing: "#2b2b2b",
@@ -21,6 +27,7 @@ export const DEFAULT_THEME = {
   partialHigh: "#e0a500",
   partial: "#e0a500",
   complete: "#2ecc71",
+  highlight: "#ff4d4f",
 } as const;
 
 export const THEME_ATTRIBUTES = ["class", "style", "data-theme"] as const;

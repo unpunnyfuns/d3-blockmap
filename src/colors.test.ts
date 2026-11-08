@@ -87,7 +87,13 @@ describe("readTheme", () => {
     vi.spyOn(window, "getComputedStyle").mockReturnValue({
       getPropertyValue: (name: string) => (name === "--blockmap-complete" ? " #123456 " : ""),
     } as unknown as CSSStyleDeclaration);
-    expect(readTheme(el)).toEqual({ ...DEFAULT_THEME, complete: "#123456" });
+    expect(readTheme(el)).toEqual({
+      missing: DEFAULT_THEME.missing,
+      partialLow: DEFAULT_THEME.partialLow,
+      partialHigh: DEFAULT_THEME.partialHigh,
+      partial: DEFAULT_THEME.partial,
+      complete: "#123456",
+    });
     vi.restoreAllMocks();
     el.remove();
   });
