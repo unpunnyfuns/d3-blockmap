@@ -34,6 +34,7 @@ beforeEach(() => {
   });
   vi.stubGlobal("cancelAnimationFrame", () => {});
   vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: false,
     addEventListener: (_type: string, listener: () => void) => {
       mediaListeners.push({ query, listener });
     },
@@ -239,6 +240,107 @@ describe("createBlockMap", () => {
       missing.b,
       255,
     ]);
+    map.destroy();
+  });
+
+  it("setView repaints and reports changes only when the view changes", () => {
+    const container = mount();
+    const onViewChange = vi.fn();
+    const map = createBlockMap(container, { totalBlocks: 1000, onViewChange });
+    triggerResize(50);
+    const before = puts.length;
+    map.setView({ start: 100, end: 200 });
+    expect(map.getView()).toEqual({ start: 100, end: 200 });
+    expect(onViewChange).toHaveBeenCalledWith({ start: 100, end: 200 });
+    expect(puts.length).toBe(before + 1);
+    map.setView({ start: 100, end: 200 });
+    expect(onViewChange).toHaveBeenCalledTimes(1);
+    map.resetView();
+    expect(map.getView()).toEqual({ start: 0, end: 1000 });
+    expect(onViewChange).toHaveBeenCalledTimes(2);
+    map.destroy();
+  });
+
+  it("applies an initial view without reporting it", () => {
+    const container = mount();
+    const onViewChange = vi.fn();
+    const map = createBlockMap(container, {
+      totalBlocks: 1000,
+      view: { start: 10, end: 20 },
+      onViewChange,
+    });
+    expect(map.getView()).toEqual({ start: 10, end: 20 });
+    expect(onViewChange).not.toHaveBeenCalled();
+    map.destroy();
+  });
+
+  it("ctrl+wheel zooms by default and does nothing when interactive is false", () => {
+    const zoomable = mount();
+    const map = createBlockMap(zoomable, { totalBlocks: 1000 });
+    triggerResize(50);
+    const canvas = zoomable.querySelector("canvas") as HTMLCanvasElement;
+    const wheel = new WheelEvent("wheel", { deltaY: -100, bubbles: true, cancelable: true });
+    Object.defineProperty(wheel, "ctrlKey", { value: true });
+    Object.defineProperty(wheel, "offsetX", { value: 25 });
+    canvas.dispatchEvent(wheel);
+    expect(map.getView()).toEqual({ start: 100, end: 900 });
+    map.destroy();
+
+    const fixed = mount();
+    const still = createBlockMap(fixed, { totalBlocks: 1000, interactive: false });
+    triggerResize(50);
+    const canvas2 = fixed.querySelector("canvas") as HTMLCanvasElement;
+    const wheel2 = new WheelEvent("wheel", { deltaY: -100, bubbles: true, cancelable: true });
+    Object.defineProperty(wheel2, "ctrlKey", { value: true });
+    Object.defineProperty(wheel2, "offsetX", { value: 25 });
+    canvas2.dispatchEvent(wheel2);
+    expect(still.getView()).toEqual({ start: 0, end: 1000 });
+    still.destroy();
+  });
+
+  it("setHighlight paints incomplete bins with the highlight colour and starts a blink timer", () => {
+    const setInterval = vi.spyOn(window, "setInterval");
+    const clearInterval = vi.spyOn(window, "clearInterval");
+    const container = mount();
+    const map = createBlockMap(container, { totalBlocks: 10 });
+    triggerResize(5);
+    map.addBlocks([0]);
+    map.setHighlight(true);
+    const image = puts.at(-1) as ImageData;
+    expect(Array.from(image.data.subarray(0, 4))).toEqual([46, 204, 113, 255]);
+    expect(Array.from(image.data.subarray(4, 8))).toEqual([255, 77, 79, 255]);
+    expect(setInterval).toHaveBeenCalledTimes(1);
+    map.setHighlight(false);
+    expect(clearInterval).toHaveBeenCalledTimes(1);
+    map.destroy();
+  });
+
+  it("highlight is steady under reduced motion", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("reduced-motion"),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    const setInterval = vi.spyOn(window, "setInterval");
+    const container = mount();
+    const map = createBlockMap(container, { totalBlocks: 10 });
+    triggerResize(5);
+    map.setHighlight(true);
+    expect(setInterval).not.toHaveBeenCalled();
+    expect(Array.from((puts.at(-1) as ImageData).data.subarray(0, 4))).toEqual([255, 77, 79, 255]);
+    map.destroy();
+  });
+
+  it("tooltip shows absolute block ranges under a view", () => {
+    const container = mount();
+    const map = createBlockMap(container, { totalBlocks: 1000, view: { start: 500, end: 600 } });
+    triggerResize(5);
+    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+    const tooltip = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
+    const move = new MouseEvent("pointermove", { bubbles: true });
+    Object.defineProperty(move, "offsetX", { value: 0 });
+    canvas.dispatchEvent(move);
+    expect(tooltip.textContent).toBe("Blocks 500–509 · 0 / 10 (0%)");
     map.destroy();
   });
 });

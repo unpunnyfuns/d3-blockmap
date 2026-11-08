@@ -3,3 +3,4 @@ export type { BlockMap, BlockMapOptions } from "./blockMap";
 export type { Progress } from "./state";
 export type { PartialStyle, Theme } from "./colors";
 export type { BlockRangeTuple, RangeInput } from "./ranges";
+export type { BlockView } from "./view";

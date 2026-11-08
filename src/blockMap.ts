@@ -1,24 +1,34 @@
-import { createColorScale, readTheme, watchTheme } from "./colors";
-import type { PartialStyle } from "./colors";
-import { CANVAS_ROWS } from "./constants";
+import { createColorScale, highlightColor, readTheme, watchTheme } from "./colors";
+import type { PartialStyle, Theme } from "./colors";
+import { CANVAS_ROWS, REDUCED_MOTION_QUERY } from "./constants";
+import { attachInteraction } from "./interaction";
 import { createRenderer } from "./renderer";
 import type { Renderer } from "./renderer";
 import type { RangeInput } from "./ranges";
 import { createBlockState } from "./state";
 import type { Progress } from "./state";
 import { createTooltip, formatBinTooltip, formatBlockTooltip } from "./tooltip";
+import { fullView, viewLength } from "./view";
+import type { BlockView } from "./view";
 
 export type BlockMapOptions = {
   totalBlocks: number;
   initialBlocks?: ArrayLike<number>;
   initialRanges?: RangeInput;
   partial?: PartialStyle;
+  view?: BlockView;
+  interactive?: boolean;
+  onViewChange?: (view: BlockView) => void;
 };
 
 export type BlockMap = {
   setBlocks(indices: ArrayLike<number>): void;
   setRanges(ranges: RangeInput): void;
   addBlocks(indices: ArrayLike<number>): void;
+  setView(view: BlockView): void;
+  resetView(): void;
+  getView(): BlockView;
+  setHighlight(on: boolean): void;
   getProgress(): Progress;
   destroy(): void;
 };
@@ -30,6 +40,7 @@ const dprQuery = (dpr: number): string => `(resolution: ${dpr}dppx)`;
 
 export const createBlockMap = (container: HTMLElement, options: BlockMapOptions): BlockMap => {
   const state = createBlockState(options.totalBlocks);
+  if (options.view) state.setView(options.view);
 
   const canvas = document.createElement("canvas");
   Object.assign(canvas.style, { display: "block", width: FULL, height: FULL });
@@ -48,10 +59,28 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   let cssWidth = 0;
   let dpr = devicePixelRatio;
   let dprMedia: MediaQueryList | undefined;
+  let theme: Theme = readTheme(container);
+  let highlightOn = false;
+  let dragging = false;
+
+  const blinkAllowed = (): boolean => !matchMedia(REDUCED_MOTION_QUERY).matches;
+
+  const applyHighlight = (): void => {
+    renderer.setHighlight(highlightOn, highlightColor(theme), blinkAllowed());
+  };
 
   const applyTheme = (): void => {
-    renderer.setColors(createColorScale(readTheme(container), options.partial));
+    theme = readTheme(container);
+    renderer.setColors(createColorScale(theme, options.partial));
+    if (highlightOn) applyHighlight();
   };
+
+  const setView = (view: BlockView): void => {
+    if (!state.setView(view)) return;
+    renderer.markAllDirty();
+    options.onViewChange?.(state.getView());
+  };
+  const resetView = (): void => setView(fullView(state.totalBlocks));
 
   const layout = (): void => {
     const binCount = Math.round(cssWidth * dpr);
@@ -82,15 +111,17 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   resizeObserver.observe(container);
 
   const onPointerMove = (event: PointerEvent): void => {
-    const { binCount, totalBlocks } = state;
+    if (dragging) return;
+    const { binCount, view } = state;
     if (binCount === 0) return;
     const column = Math.min(binCount - 1, Math.max(0, Math.floor(event.offsetX * dpr)));
+    const length = viewLength(view);
     const text =
-      totalBlocks < binCount
-        ? (() => {
-            const block = Math.floor((column * totalBlocks) / binCount);
-            return formatBlockTooltip(block, state.has(block));
-          })()
+      length < binCount
+        ? formatBlockTooltip(
+            view.start + Math.floor((column * length) / binCount),
+            state.has(view.start + Math.floor((column * length) / binCount)),
+          )
         : formatBinTooltip(state.rangeOf(column), state.countOf(column));
     tooltip.show(event.offsetX, text);
   };
@@ -98,6 +129,24 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
 
   canvas.addEventListener("pointermove", onPointerMove);
   canvas.addEventListener("pointerleave", onPointerLeave);
+  const detachInteraction =
+    options.interactive === false
+      ? undefined
+      : attachInteraction(canvas, {
+          getView: () => state.view,
+          setView,
+          resetView,
+          getBinCount: () => state.binCount,
+          getDpr: () => dpr,
+          getTotalBlocks: () => state.totalBlocks,
+          onDragStart: () => {
+            dragging = true;
+            tooltip.hide();
+          },
+          onDragEnd: () => {
+            dragging = false;
+          },
+        });
   const unwatchTheme = watchTheme(applyTheme);
   watchDpr();
   applyTheme();
@@ -119,6 +168,20 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       if (destroyed) return;
       renderer.markDirty(state.add(indices));
     },
+    setView: (view) => {
+      if (destroyed) return;
+      setView(view);
+    },
+    resetView: () => {
+      if (destroyed) return;
+      resetView();
+    },
+    getView: () => state.getView(),
+    setHighlight: (on) => {
+      if (destroyed) return;
+      highlightOn = on;
+      applyHighlight();
+    },
     getProgress: () => (destroyed ? { completed: 0, total: state.totalBlocks } : state.progress()),
     destroy: () => {
       if (destroyed) return;
@@ -128,6 +191,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       dprMedia?.removeEventListener("change", onDprChange);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerleave", onPointerLeave);
+      detachInteraction?.();
       renderer.destroy();
       tooltip.destroy();
       canvas.remove();

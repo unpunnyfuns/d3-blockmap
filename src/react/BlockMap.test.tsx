@@ -9,6 +9,10 @@ const createInstance = (): BlockMapInstance => ({
   setBlocks: vi.fn(),
   setRanges: vi.fn(),
   addBlocks: vi.fn(),
+  setView: vi.fn(),
+  resetView: vi.fn(),
+  getView: vi.fn(() => ({ start: 0, end: 0 })),
+  setHighlight: vi.fn(),
   getProgress: vi.fn(() => ({ completed: 0, total: 0 })),
   destroy: vi.fn(),
 });
