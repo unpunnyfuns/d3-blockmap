@@ -34,6 +34,33 @@ describe("createColorScale", () => {
     const scale = createColorScale({ ...theme, complete: "not-a-colour" });
     expect(Array.from(scale(1))).toEqual(Array.from(createColorScale(DEFAULT_THEME)(1)));
   });
+
+  it("coverage style blends missing toward complete", () => {
+    const scale = createColorScale(theme, "coverage");
+    const [r, g, b, a] = scale(0.5);
+    expect(a).toBe(255);
+    expect(r).toBeGreaterThan(100);
+    expect(r).toBeLessThan(160);
+    expect(Math.abs(r - g)).toBeLessThan(3);
+    expect(Math.abs(g - b)).toBeLessThan(3);
+  });
+
+  it("coverage style keeps exact and distinct endpoints", () => {
+    const scale = createColorScale(theme, "coverage");
+    expect(Array.from(scale(0))).toEqual([0, 0, 0, 255]);
+    expect(Array.from(scale(1))).toEqual([255, 255, 255, 255]);
+    expect(Array.from(scale(0.0001))).not.toEqual([0, 0, 0, 255]);
+    expect(Array.from(scale(0.9999))).not.toEqual([255, 255, 255, 255]);
+  });
+
+  it("gradient is the default and differs from coverage", () => {
+    expect(Array.from(createColorScale(theme)(0.5))).toEqual(
+      Array.from(createColorScale(theme, "gradient")(0.5)),
+    );
+    expect(Array.from(createColorScale(theme)(0.5))).not.toEqual(
+      Array.from(createColorScale(theme, "coverage")(0.5)),
+    );
+  });
 });
 
 describe("readTheme", () => {

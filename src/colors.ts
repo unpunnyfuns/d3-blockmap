@@ -22,6 +22,8 @@ export type Theme = {
 
 export type ColorScale = (fraction: number) => Uint8ClampedArray;
 
+export type PartialStyle = "gradient" | "coverage";
+
 const THEME_VARS: Record<keyof Theme, string> = {
   missing: CSS_VAR_MISSING,
   partialLow: CSS_VAR_PARTIAL_LOW,
@@ -62,17 +64,22 @@ export const readTheme = (el: HTMLElement): Theme => {
   };
 };
 
-export const createColorScale = (theme: Theme): ColorScale => {
+export const createColorScale = (theme: Theme, partial: PartialStyle = "gradient"): ColorScale => {
   const table = new Uint8ClampedArray(COLOR_TABLE_SIZE * BYTES_PER_PIXEL);
-  const partial = interpolateRgb(
-    parseOr(theme.partialLow, DEFAULT_THEME.partialLow),
-    parseOr(theme.partialHigh, DEFAULT_THEME.partialHigh),
-  );
+  const missing = parseOr(theme.missing, DEFAULT_THEME.missing);
+  const complete = parseOr(theme.complete, DEFAULT_THEME.complete);
+  const partialScale =
+    partial === "coverage"
+      ? interpolateRgb(missing, complete)
+      : interpolateRgb(
+          parseOr(theme.partialLow, DEFAULT_THEME.partialLow),
+          parseOr(theme.partialHigh, DEFAULT_THEME.partialHigh),
+        );
 
-  writeColor(table, 0, parseOr(theme.missing, DEFAULT_THEME.missing));
-  writeColor(table, LAST_INDEX, parseOr(theme.complete, DEFAULT_THEME.complete));
+  writeColor(table, 0, missing);
+  writeColor(table, LAST_INDEX, complete);
   for (let i = FIRST_PARTIAL_INDEX; i <= LAST_PARTIAL_INDEX; i += 1) {
-    writeColor(table, i, partial(i / LAST_INDEX));
+    writeColor(table, i, partialScale(i / LAST_INDEX));
   }
 
   return (fraction) => {
