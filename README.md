@@ -19,6 +19,10 @@ npm i d3-blockmap
 
 ## Usage
 
+```html
+<div id="pieces" style="height: 12px"></div>
+```
+
 ```ts
 import { createPieceMap } from 'd3-blockmap';
 
@@ -75,6 +79,19 @@ Colours are read from CSS custom properties on the container at start and on the
 
 Fully missing and fully complete bins use the exact endpoint colours; partial bins interpolate between the two partial colours.
 
+#### Tooltip
+
+The tooltip element carries the attribute `data-piece-tooltip` and ships unstyled apart from positioning. Style it yourself:
+
+```css
+[data-piece-tooltip] {
+  background: #111;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+```
+
 ### Behaviour
 
 - Bin count equals rendered width in device pixels. Blocks map to bins by `floor(index × binCount / totalBlocks)`.
@@ -82,6 +99,7 @@ Fully missing and fully complete bins use the exact endpoint colours; partial bi
 - Hovering shows block range, count, and percentage for the column.
 - Resize and `devicePixelRatio` changes rebuild bins from the internal bitset in one pass.
 - The container is set to `position: relative` if it is static, so the tooltip can be positioned inside it.
+- The container must have a height; the canvas fills it via `width: 100%; height: 100%`.
 
 ## Development
 
