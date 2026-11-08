@@ -4,37 +4,67 @@ import type { PartialStyle } from "../colors";
 import { createBlockMap } from "../blockMap";
 import type { BlockMap as BlockMapInstance, BlockMapOptions } from "../blockMap";
 import type { RangeInput } from "../ranges";
+import type { BlockView } from "../view";
 
 export type BlockMapProps = {
   totalBlocks: number;
   blocks?: ArrayLike<number>;
   ranges?: RangeInput;
   partial?: PartialStyle;
+  view?: BlockView;
+  interactive?: boolean;
+  onViewChange?: (view: BlockView) => void;
+  highlight?: boolean;
   className?: string;
   style?: CSSProperties;
 };
 
-export type BlockMapHandle = Pick<BlockMapInstance, "addBlocks" | "setRanges" | "getProgress">;
+export type BlockMapHandle = Pick<
+  BlockMapInstance,
+  "addBlocks" | "setRanges" | "setView" | "resetView" | "getView" | "setHighlight" | "getProgress"
+>;
 
 const EMPTY_BLOCKS: readonly number[] = [];
 const EMPTY_PROGRESS = { completed: 0, total: 0 };
+const EMPTY_VIEW: BlockView = { start: 0, end: 0 };
 
 export const BlockMap = forwardRef<BlockMapHandle, BlockMapProps>(
-  ({ totalBlocks, blocks, ranges, partial, className, style }, ref) => {
+  (
+    {
+      totalBlocks,
+      blocks,
+      ranges,
+      partial,
+      view,
+      interactive,
+      onViewChange,
+      highlight,
+      className,
+      style,
+    },
+    ref,
+  ) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const instanceRef = useRef<BlockMapInstance>(null);
+    const onViewChangeRef = useRef(onViewChange);
+    onViewChangeRef.current = onViewChange;
 
     useEffect(() => {
       const container = containerRef.current;
       if (!container) return undefined;
-      const options: BlockMapOptions = partial ? { totalBlocks, partial } : { totalBlocks };
+      const options: BlockMapOptions = {
+        totalBlocks,
+        onViewChange: (next) => onViewChangeRef.current?.(next),
+      };
+      if (partial) options.partial = partial;
+      if (interactive !== undefined) options.interactive = interactive;
       const instance = createBlockMap(container, options);
       instanceRef.current = instance;
       return () => {
         instance.destroy();
         instanceRef.current = null;
       };
-    }, [totalBlocks, partial]);
+    }, [totalBlocks, partial, interactive]);
 
     useEffect(() => {
       const instance = instanceRef.current;
@@ -45,13 +75,25 @@ export const BlockMap = forwardRef<BlockMapHandle, BlockMapProps>(
         return;
       }
       instance.setBlocks(blocks ?? EMPTY_BLOCKS);
-    }, [totalBlocks, partial, ranges, blocks]);
+    }, [totalBlocks, partial, interactive, ranges, blocks]);
+
+    useEffect(() => {
+      if (view !== undefined) instanceRef.current?.setView(view);
+    }, [totalBlocks, partial, interactive, view]);
+
+    useEffect(() => {
+      instanceRef.current?.setHighlight(highlight ?? false);
+    }, [totalBlocks, partial, interactive, highlight]);
 
     useImperativeHandle(
       ref,
       () => ({
         addBlocks: (indices) => instanceRef.current?.addBlocks(indices),
-        setRanges: (ranges) => instanceRef.current?.setRanges(ranges),
+        setRanges: (next) => instanceRef.current?.setRanges(next),
+        setView: (next) => instanceRef.current?.setView(next),
+        resetView: () => instanceRef.current?.resetView(),
+        getView: () => instanceRef.current?.getView() ?? EMPTY_VIEW,
+        setHighlight: (on) => instanceRef.current?.setHighlight(on),
         getProgress: () =>
           instanceRef.current?.getProgress() ?? { ...EMPTY_PROGRESS, total: totalBlocks },
       }),
