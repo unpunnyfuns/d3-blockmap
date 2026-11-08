@@ -72,6 +72,29 @@ describe("createPieceMap", () => {
     map.destroy();
   });
 
+  it("does not repaint on an identical resize", () => {
+    const container = mount();
+    const map = createPieceMap(container, { totalBlocks: 100 });
+    triggerResize(50);
+    expect(puts).toHaveLength(1);
+    expect(puts[0]?.width).toBe(100);
+    triggerResize(50);
+    expect(puts).toHaveLength(1);
+    map.destroy();
+  });
+
+  it("shrinks bin count and repaints when width decreases", () => {
+    const container = mount();
+    const map = createPieceMap(container, { totalBlocks: 100 });
+    triggerResize(50);
+    map.addBlocks([0, 1, 2]);
+    triggerResize(20);
+    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+    expect(canvas.width).toBe(40);
+    expect(puts.at(-1)?.width).toBe(40);
+    map.destroy();
+  });
+
   it("re-reads devicePixelRatio on resolution change and re-arms", () => {
     const container = mount();
     const map = createPieceMap(container, { totalBlocks: 100 });
@@ -128,6 +151,13 @@ describe("createPieceMap", () => {
     expect(() => map.addBlocks([1])).not.toThrow();
     expect(() => map.destroy()).not.toThrow();
     expect(removed).toContain("(resolution: 2dppx)");
+  });
+
+  it("returns zeroed progress after destroy", () => {
+    const container = mount();
+    const map = createPieceMap(container, { totalBlocks: 10, initialBlocks: [0, 1] });
+    map.destroy();
+    expect(map.getProgress()).toEqual({ completed: 0, total: 10 });
   });
 
   it("throws when the 2d context is unavailable", () => {

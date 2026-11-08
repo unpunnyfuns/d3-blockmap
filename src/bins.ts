@@ -28,6 +28,7 @@ export const createBins = (totalBlocks: number, binCount: number): Bins => {
     },
     rebuild: (has) => {
       counts.fill(0);
+      if (binCount === 0) return;
       for (let index = 0; index < totalBlocks; index += 1) {
         if (has(index)) counts[binOf(index)] += 1;
       }

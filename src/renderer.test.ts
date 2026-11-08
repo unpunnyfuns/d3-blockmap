@@ -135,6 +135,26 @@ describe("createRenderer", () => {
     expect(puts).toHaveLength(3);
   });
 
+  it("ignores a stale dirty bin when the source shrinks before paint", () => {
+    const source = {
+      totalBlocks: 8,
+      binCount: 8,
+      fraction: () => 0.5,
+      has: () => false,
+    };
+    const { ctx, puts } = createStubContext();
+    const { scheduler, flush } = createManualScheduler();
+    const renderer = createRenderer(ctx, source, scheduler);
+    renderer.setColors(createColorScale(theme));
+    renderer.markDirty([0]);
+    flush();
+
+    renderer.markDirty([7]);
+    source.binCount = 4;
+    expect(() => flush()).not.toThrow();
+    expect(puts.at(-1)?.width).toBe(4);
+  });
+
   it("skips painting with zero bins and cancels on destroy", () => {
     const source: RenderSource = {
       totalBlocks: 10,

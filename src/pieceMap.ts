@@ -1,4 +1,5 @@
 import { createColorScale, readTheme, watchTheme } from "./colors";
+import { CANVAS_ROWS } from "./constants";
 import { createRenderer } from "./renderer";
 import type { Renderer } from "./renderer";
 import { createPieceState } from "./state";
@@ -17,7 +18,6 @@ export type PieceMap = {
   destroy(): void;
 };
 
-const CANVAS_HEIGHT_PX = 1;
 const FULL = "100%";
 const CONTEXT_ID = "2d";
 
@@ -28,7 +28,7 @@ export const createPieceMap = (container: HTMLElement, options: PieceMapOptions)
 
   const canvas = document.createElement("canvas");
   Object.assign(canvas.style, { display: "block", width: FULL, height: FULL });
-  canvas.height = CANVAS_HEIGHT_PX;
+  canvas.height = CANVAS_ROWS;
   container.append(canvas);
 
   const ctx = canvas.getContext(CONTEXT_ID);
@@ -50,6 +50,7 @@ export const createPieceMap = (container: HTMLElement, options: PieceMapOptions)
 
   const layout = (): void => {
     const binCount = Math.round(cssWidth * dpr);
+    if (binCount === state.binCount) return;
     canvas.width = binCount;
     state.resize(binCount);
     renderer.markAllDirty();
@@ -95,7 +96,7 @@ export const createPieceMap = (container: HTMLElement, options: PieceMapOptions)
   const unwatchTheme = watchTheme(applyTheme);
   watchDpr();
   applyTheme();
-  if (options.initialBlocks) state.add(options.initialBlocks);
+  if (options.initialBlocks) renderer.markDirty(state.add(options.initialBlocks));
 
   return {
     setBlocks: (indices) => {
@@ -107,7 +108,7 @@ export const createPieceMap = (container: HTMLElement, options: PieceMapOptions)
       if (destroyed) return;
       renderer.markDirty(state.add(indices));
     },
-    getProgress: () => state.progress(),
+    getProgress: () => (destroyed ? { completed: 0, total: state.totalBlocks } : state.progress()),
     destroy: () => {
       if (destroyed) return;
       destroyed = true;

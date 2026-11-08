@@ -80,7 +80,10 @@ export const createRenderer = (
         writeColumn(target, bin, colors(source.fraction(bin)));
       return;
     }
-    dirty.forEach((bin) => writeColumn(target, bin, colors(source.fraction(bin))));
+    for (const bin of dirty) {
+      if (bin >= target.width) continue;
+      writeColumn(target, bin, colors(source.fraction(bin)));
+    }
   };
 
   const paint = (): void => {

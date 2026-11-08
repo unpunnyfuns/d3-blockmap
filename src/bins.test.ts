@@ -38,6 +38,12 @@ describe("createBins", () => {
     expect(Array.from(bins.counts)).toEqual([0, 0, 0]);
   });
 
+  it("rebuild on zero bins does not throw and leaves counts empty", () => {
+    const bins = createBins(10, 0);
+    expect(() => bins.rebuild(() => true)).not.toThrow();
+    expect(bins.counts.length).toBe(0);
+  });
+
   it("handles more bins than blocks", () => {
     const bins = createBins(3, 10);
     expect(bins.binOf(2)).toBe(6);
