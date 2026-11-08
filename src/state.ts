@@ -4,6 +4,7 @@ import type { Bins, BlockRange } from "./bins";
 import { MAX_BLOCKS, RANGE_PAIR } from "./constants";
 import { normalizeRanges, rangesLength } from "./ranges";
 import type { RangeInput } from "./ranges";
+import { fullView } from "./view";
 
 export type Progress = { completed: number; total: number };
 
@@ -38,7 +39,7 @@ export const createBlockState = (totalBlocks: number): BlockState => {
   }
 
   const bitset = createBitset(totalBlocks);
-  let bins: Bins = createBins(totalBlocks, 0);
+  let bins: Bins = createBins(fullView(totalBlocks), 0);
 
   const add = (indices: ArrayLike<number>): Uint32Array => {
     const hasBins = bins.binCount > 0;
@@ -60,7 +61,7 @@ export const createBlockState = (totalBlocks: number): BlockState => {
       return bins.binCount;
     },
     resize: (binCount) => {
-      bins = createBins(totalBlocks, binCount);
+      bins = createBins(fullView(totalBlocks), binCount);
       bins.rebuild(bitset.countRange);
     },
     add,

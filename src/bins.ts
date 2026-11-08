@@ -1,6 +1,9 @@
+import type { BlockView } from "./view";
+
 export type BlockRange = { start: number; end: number };
 
 export type Bins = {
+  readonly view: BlockView;
   readonly binCount: number;
   readonly counts: Uint32Array;
   binOf(index: number): number;
@@ -10,12 +13,14 @@ export type Bins = {
   addRange(start: number, end: number): void;
 };
 
-export const createBins = (totalBlocks: number, binCount: number): Bins => {
+export const createBins = (view: BlockView, binCount: number): Bins => {
+  const { start: viewStart, end: viewEnd } = view;
+  const length = viewEnd - viewStart;
   const counts = new Uint32Array(binCount);
-  const binOf = (index: number): number => Math.floor((index * binCount) / totalBlocks);
+  const binOf = (index: number): number => Math.floor(((index - viewStart) * binCount) / length);
   const rangeOf = (bin: number): BlockRange => ({
-    start: Math.ceil((bin * totalBlocks) / binCount),
-    end: Math.ceil(((bin + 1) * totalBlocks) / binCount),
+    start: viewStart + Math.ceil((bin * length) / binCount),
+    end: viewStart + Math.ceil(((bin + 1) * length) / binCount),
   });
   const sizeOf = (bin: number): number => {
     const { start, end } = rangeOf(bin);
@@ -23,6 +28,7 @@ export const createBins = (totalBlocks: number, binCount: number): Bins => {
   };
 
   return {
+    view,
     binCount,
     counts,
     binOf,
@@ -36,7 +42,9 @@ export const createBins = (totalBlocks: number, binCount: number): Bins => {
         counts[bin] = countInRange(start, end);
       }
     },
-    addRange: (start, end) => {
+    addRange: (rawStart, rawEnd) => {
+      const start = Math.max(rawStart, viewStart);
+      const end = Math.min(rawEnd, viewEnd);
       if (binCount === 0 || end <= start) return;
       const first = binOf(start);
       const last = binOf(end - 1);
