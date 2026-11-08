@@ -73,4 +73,57 @@ describe("createBitset", () => {
     expect(bits.set(3)).toBe(false);
     expect(bits.count).toBe(10);
   });
+
+  it("countRange counts bits within one byte", () => {
+    const bits = createBitset(8);
+    bits.fill(1, 4);
+    expect(bits.countRange(0, 8)).toBe(3);
+    expect(bits.countRange(1, 4)).toBe(3);
+    expect(bits.countRange(2, 3)).toBe(1);
+  });
+
+  it("countRange counts bits across byte boundaries", () => {
+    const bits = createBitset(20);
+    bits.fill(3, 13);
+    expect(bits.countRange(0, 20)).toBe(10);
+    expect(bits.countRange(3, 13)).toBe(10);
+    expect(bits.countRange(5, 15)).toBe(8);
+  });
+
+  it("countRange counts whole bytes", () => {
+    const bits = createBitset(24);
+    bits.fill(0, 16);
+    expect(bits.countRange(0, 24)).toBe(16);
+    expect(bits.countRange(8, 16)).toBe(8);
+  });
+
+  it("countRange returns 0 for an empty span", () => {
+    const bits = createBitset(16);
+    bits.fill(0, 16);
+    expect(bits.countRange(5, 5)).toBe(0);
+    expect(bits.countRange(5, 3)).toBe(0);
+  });
+
+  it("countRange matches brute-force has() count over random fills", () => {
+    const size = 200;
+    for (let trial = 0; trial < 5; trial += 1) {
+      const bits = createBitset(size);
+      const spans: Array<[number, number]> = [];
+      for (let i = 0; i < 6; i += 1) {
+        const start = Math.floor(Math.random() * size);
+        const end = Math.min(size, start + Math.floor(Math.random() * 30));
+        spans.push([start, end]);
+        bits.fill(start, end);
+      }
+      for (let i = 0; i < 10; i += 1) {
+        const start = Math.floor(Math.random() * size);
+        const end = Math.floor(Math.random() * size);
+        const lo = Math.min(start, end);
+        const hi = Math.max(start, end);
+        let expected = 0;
+        for (let idx = lo; idx < hi; idx += 1) if (bits.has(idx)) expected += 1;
+        expect(bits.countRange(lo, hi)).toBe(expected);
+      }
+    }
+  });
 });

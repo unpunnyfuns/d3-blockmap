@@ -56,7 +56,7 @@ export const createBlockState = (totalBlocks: number): BlockState => {
     },
     resize: (binCount) => {
       bins = createBins(totalBlocks, binCount);
-      bins.rebuild(bitset.has);
+      bins.rebuild(bitset.countRange);
     },
     add,
     replace: (indices) => {

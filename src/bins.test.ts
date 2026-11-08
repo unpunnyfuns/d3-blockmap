@@ -32,15 +32,20 @@ describe("createBins", () => {
   it("rebuild counts set blocks per bin in one pass", () => {
     const bins = createBins(10, 3);
     const set = new Set([0, 1, 4, 9]);
-    bins.rebuild((i) => set.has(i));
+    const countInRange = (start: number, end: number): number => {
+      let n = 0;
+      for (let i = start; i < end; i += 1) if (set.has(i)) n += 1;
+      return n;
+    };
+    bins.rebuild(countInRange);
     expect(Array.from(bins.counts)).toEqual([2, 1, 1]);
-    bins.rebuild(() => false);
+    bins.rebuild(() => 0);
     expect(Array.from(bins.counts)).toEqual([0, 0, 0]);
   });
 
   it("rebuild on zero bins does not throw and leaves counts empty", () => {
     const bins = createBins(10, 0);
-    expect(() => bins.rebuild(() => true)).not.toThrow();
+    expect(() => bins.rebuild((start, end) => end - start)).not.toThrow();
     expect(bins.counts.length).toBe(0);
   });
 
@@ -79,7 +84,14 @@ describe("createBins", () => {
     const viaRange = createBins(100, 7);
     ranges.forEach(([s, e]) => viaRange.addRange(s, e));
     const viaRebuild = createBins(100, 7);
-    viaRebuild.rebuild((i) => ranges.some(([s, e]) => i >= s && i < e));
+    const countInRange = (start: number, end: number): number => {
+      let n = 0;
+      for (let i = start; i < end; i += 1) {
+        if (ranges.some(([s, e]) => i >= s && i < e)) n += 1;
+      }
+      return n;
+    };
+    viaRebuild.rebuild(countInRange);
     expect(Array.from(viaRange.counts)).toEqual(Array.from(viaRebuild.counts));
   });
 
