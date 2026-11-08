@@ -10,6 +10,20 @@ describe("formatBinTooltip", () => {
   it("collapses a single-block range", () => {
     expect(formatBinTooltip({ start: 5, end: 6 }, 1)).toBe("Block 5 · 1 / 1 (100%)");
   });
+
+  it("shows 0% for empty bin", () => {
+    expect(formatBinTooltip({ start: 0, end: 1250 }, 0)).toBe("Blocks 0–1,249 · 0 / 1,250 (0%)");
+  });
+
+  it("shows >99.9% for nearly full bin", () => {
+    expect(formatBinTooltip({ start: 0, end: 2500 }, 2499)).toBe(
+      "Blocks 0–2,499 · 2,499 / 2,500 (>99.9%)",
+    );
+  });
+
+  it("shows <0.1% for sparse bin", () => {
+    expect(formatBinTooltip({ start: 0, end: 2500 }, 1)).toBe("Blocks 0–2,499 · 1 / 2,500 (<0.1%)");
+  });
 });
 
 describe("formatBlockTooltip", () => {
@@ -34,6 +48,23 @@ describe("createTooltip", () => {
     expect(el.style.display).toBe("none");
     tooltip.destroy();
     expect(container.querySelector("[data-piece-tooltip]")).toBeNull();
+    container.remove();
+  });
+
+  it("sets container to relative positioning", () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    createTooltip(container);
+    expect(container.style.position).toBe("relative");
+    container.remove();
+  });
+
+  it("preserves existing container positioning", () => {
+    const container = document.createElement("div");
+    container.style.position = "absolute";
+    document.body.append(container);
+    createTooltip(container);
+    expect(container.style.position).toBe("absolute");
     container.remove();
   });
 });

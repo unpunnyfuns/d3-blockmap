@@ -7,20 +7,30 @@ export type Tooltip = {
   destroy(): void;
 };
 
+const LOCALE = "en-US";
 const TOOLTIP_ATTRIBUTE = "data-piece-tooltip";
 const SEPARATOR = " · ";
 const EN_DASH = "–";
 
-const countFormat = new Intl.NumberFormat("en-US");
-const percentFormat = new Intl.NumberFormat("en-US", {
-  minimumFractionDigits: 0,
-  maximumFractionDigits: PERCENT_FRACTION_DIGITS,
-});
+const countFormat = new Intl.NumberFormat(LOCALE);
+
+const MIN_PARTIAL_STEP = 1 / 10 ** PERCENT_FRACTION_DIGITS;
+const MAX_PARTIAL = (PERCENT - MIN_PARTIAL_STEP).toFixed(PERCENT_FRACTION_DIGITS);
+const MIN_PARTIAL = MIN_PARTIAL_STEP.toFixed(PERCENT_FRACTION_DIGITS);
+const MAX_FIXED = PERCENT.toFixed(PERCENT_FRACTION_DIGITS);
+const MIN_FIXED = (0).toFixed(PERCENT_FRACTION_DIGITS);
 
 const formatPercent = (count: number, size: number): string => {
-  const value = size === 0 ? 0 : (count / size) * PERCENT;
-  const text =
-    value === PERCENT ? percentFormat.format(value) : value.toFixed(PERCENT_FRACTION_DIGITS);
+  if (count === 0) return "0%";
+  if (count === size) return "100%";
+  const value = (count / size) * PERCENT;
+  const text = value.toFixed(PERCENT_FRACTION_DIGITS);
+  if (text === MAX_FIXED) {
+    return `>${MAX_PARTIAL}%`;
+  }
+  if (text === MIN_FIXED) {
+    return `<${MIN_PARTIAL}%`;
+  }
   return `${text}%`;
 };
 
@@ -48,7 +58,8 @@ export const createTooltip = (container: HTMLElement): Tooltip => {
     whiteSpace: "nowrap",
     transform: "translateY(-100%)",
   });
-  if (getComputedStyle(container).position === "static") container.style.position = "relative";
+  const pos = getComputedStyle(container).position;
+  if (pos === "static" || !pos) container.style.position = "relative";
   container.append(el);
 
   return {
