@@ -19,6 +19,8 @@ npm i d3-blockmap
 
 ## Usage
 
+![Demo](demo/screenshot-ranges.png)
+
 ```html
 <div id="blocks" style="height: 12px"></div>
 ```
@@ -49,23 +51,25 @@ ref.current?.addBlocks(newIndices);
 
 A new `blocks` array identity triggers `setBlocks`; keep the reference stable between renders unless the full set changed. `ranges` (`RangeInput`) behaves the same way via `setRanges`. When both `ranges` and `blocks` are given, ranges are applied first and blocks are added on top; any identity change of either prop re-applies the `ranges` snapshot and then adds `blocks` on top again, so keep both references stable between renders. `partial` (`"gradient" | "coverage"`) recreates the underlying instance when its value changes.
 
+`BlockMapHandle` also exposes an imperative `setRanges(ranges)`, bypassing React state, for high-frequency snapshots where re-rendering on every tick would be wasteful. Do not combine it with the `ranges` prop; the prop's own effect will re-apply and fight the imperative calls.
+
 ## API
 
 ### `createBlockMap(container, options)`
 
 | Option | Type | Notes |
 |---|---|---|
-| `totalBlocks` | `number` | Positive integer. No fixed upper bound; memory is 1 bit per block plus one counter per pixel. |
+| `totalBlocks` | `number` | Positive integer up to 2^32 − 1 (indices are stored as unsigned 32-bit). Memory is 1 bit per block plus one counter per pixel. |
 | `initialBlocks` | `ArrayLike<number>` | Optional. Indices already complete. |
 | `initialRanges` | `RangeInput` | Optional. `[start, end)` tuples or a flat `Uint32Array` of pairs. Applied before `initialBlocks`. |
-| `partial` | `"gradient" \| "coverage"` | Default `"gradient"`. `"coverage"` blends missing to complete so range edges look crisp. |
+| `partial` | `"gradient" \| "coverage"` | Default `"coverage"`. `"gradient"` is opt-in and blends between the two partial colours instead of missing-to-complete. |
 
 Returns:
 
 | Method | Description |
 |---|---|
 | `setBlocks(indices)` | Replace all state. |
-| `setRanges(ranges)` | Replace all state from a snapshot of `[start, end)` tuples. Any sizes, unsorted and overlapping allowed. O(ranges + bins). |
+| `setRanges(ranges)` | Replace all state from a snapshot of `[start, end)` tuples. Any sizes, unsorted and overlapping allowed. O(ranges log ranges + bins + totalBlocks / 8). |
 | `addBlocks(indices)` | Add newly completed indices. O(indices). Duplicates and out-of-range skipped. |
 | `getProgress()` | `{ completed, total }`. |
 | `destroy()` | Remove canvas, tooltip, observers. Idempotent. |
@@ -81,7 +85,7 @@ Colours are read from CSS custom properties on the container at start and on the
 | `--block-partial-high` | `#e0a500` |
 | `--block-complete` | `#2ecc71` |
 
-Fully missing and fully complete bins use the exact endpoint colours; partial bins interpolate between the two partial colours. `partial: "coverage"` instead interpolates partial bins between `--block-missing` and `--block-complete`, so it relies on those two differing; the two partial colour variables are unused in that style.
+Fully missing and fully complete bins use the exact endpoint colours; by default (`partial: "coverage"`), partial bins interpolate between `--block-missing` and `--block-complete`, so it relies on those two differing. `partial: "gradient"` is opt-in and interpolates partial bins between `--block-partial-low` and `--block-partial-high` instead; those two variables apply only to `"gradient"`.
 
 #### Tooltip
 

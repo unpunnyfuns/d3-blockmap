@@ -168,3 +168,16 @@ exclusive-end convention.
   with a colour between missing and complete.
 - `react/PieceMap.test.tsx`: `ranges` prop applies `setRanges`; `blocks`
   undefined does not call `setBlocks`; `partial` change recreates.
+
+## Implementation notes
+
+- The API was renamed from `PieceMap` to `BlockMap` to match the package
+  name; all types and factories above ship as `BlockMap*`.
+- The React wrapper applies `addBlocks` (not `setBlocks`) after `setRanges`
+  when both the `ranges` and `blocks` props are given, so the blocks on top
+  of a ranges snapshot are additive rather than a full replace.
+- `coverage` is the default `partial` style; `gradient` is opt-in.
+- `totalBlocks` is capped at 2^32 − 1 since indices are stored as unsigned
+  32-bit values.
+- `BlockMapHandle` exposes an imperative `setRanges` for high-frequency
+  snapshot updates outside the `ranges` prop.
