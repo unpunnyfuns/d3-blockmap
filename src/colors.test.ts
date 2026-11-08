@@ -21,13 +21,14 @@ describe("createColorScale", () => {
     expect(Array.from(scale(0.9999))).not.toEqual([255, 255, 255, 255]);
   });
 
-  it("interpolates partials between low and high", () => {
-    const scale = createColorScale(theme);
-    const [r, , b] = scale(0.5);
+  it("gradient interpolates partials between low and high", () => {
+    const scale = createColorScale(theme, "gradient");
+    const [r, g, b] = scale(0.5);
     expect(r).toBeGreaterThan(100);
     expect(r).toBeLessThan(160);
     expect(b).toBeGreaterThan(100);
     expect(b).toBeLessThan(160);
+    expect(g).toBe(0);
   });
 
   it("falls back to defaults for unparsable colours", () => {
