@@ -1,6 +1,12 @@
-import { createColorScale } from "./colors";
+import { createColorScale, highlightColor } from "./colors";
 import { createRenderer } from "./renderer";
-import type { Canvas2dLike, ImageDataLike, RenderSource, Scheduler } from "./renderer";
+import type {
+  Canvas2dLike,
+  ImageDataLike,
+  IntervalTimer,
+  RenderSource,
+  Scheduler,
+} from "./renderer";
 import { createBlockState } from "./state";
 
 const theme = {
@@ -9,6 +15,7 @@ const theme = {
   partialHigh: "#0000ff",
   partial: "#ff0000",
   complete: "#ffffff",
+  highlight: "#00ff00",
 };
 
 const createStubContext = () => {
@@ -46,6 +53,26 @@ const createManualScheduler = () => {
     callbacks.forEach((callback) => callback());
   };
   return { scheduler, flush, pending: () => queue.size };
+};
+
+const createManualTimer = () => {
+  const timers = new Map<number, () => void>();
+  let next = 1;
+  const cleared: number[] = [];
+  const timer: IntervalTimer = {
+    set: (callback) => {
+      const id = next;
+      next += 1;
+      timers.set(id, callback);
+      return id;
+    },
+    clear: (id) => {
+      cleared.push(id);
+      timers.delete(id);
+    },
+  };
+  const tick = () => timers.forEach((callback) => callback());
+  return { timer, tick, cleared, active: () => timers.size };
 };
 
 const pixel = (image: ImageDataLike, column: number) =>
@@ -138,8 +165,8 @@ describe("createRenderer", () => {
 
   it("ignores a stale dirty bin when the source shrinks before paint", () => {
     const source = {
-      totalBlocks: 8,
       binCount: 8,
+      view: { start: 0, end: 8 },
       fraction: () => 0.5,
       has: () => false,
     };
@@ -158,8 +185,8 @@ describe("createRenderer", () => {
 
   it("skips painting with zero bins and cancels on destroy", () => {
     const source: RenderSource = {
-      totalBlocks: 10,
       binCount: 0,
+      view: { start: 0, end: 10 },
       fraction: () => 0,
       has: () => false,
     };
@@ -173,5 +200,85 @@ describe("createRenderer", () => {
     renderer.markAllDirty();
     renderer.destroy();
     expect(pending()).toBe(0);
+  });
+
+  it("highlight paints incomplete bins with the highlight colour while phase is on", () => {
+    const state = createBlockState(10);
+    state.resize(5);
+    state.add([0, 1, 4]);
+    const { ctx, puts } = createStubContext();
+    const { scheduler, flush } = createManualScheduler();
+    const { timer, tick, active } = createManualTimer();
+    const renderer = createRenderer(ctx, state, scheduler, timer);
+    renderer.setColors(createColorScale(theme));
+    renderer.setHighlight(true, highlightColor(theme), true);
+    flush();
+    let image = puts.at(-1) as ImageDataLike;
+    expect(pixel(image, 0)).toEqual([255, 255, 255, 255]);
+    expect(pixel(image, 1)).toEqual([0, 255, 0, 255]);
+    expect(pixel(image, 2)).toEqual([0, 255, 0, 255]);
+    expect(active()).toBe(1);
+    tick();
+    flush();
+    image = puts.at(-1) as ImageDataLike;
+    expect(pixel(image, 1)).toEqual([0, 0, 0, 255]);
+    expect(pixel(image, 2)).not.toEqual([0, 255, 0, 255]);
+    renderer.setHighlight(false, highlightColor(theme), true);
+    expect(active()).toBe(0);
+    flush();
+    expect(pixel(puts.at(-1) as ImageDataLike, 1)).toEqual([0, 0, 0, 255]);
+  });
+
+  it("highlight without blink is steady and starts no timer", () => {
+    const state = createBlockState(10);
+    state.resize(5);
+    const { ctx, puts } = createStubContext();
+    const { scheduler, flush } = createManualScheduler();
+    const { timer, active } = createManualTimer();
+    const renderer = createRenderer(ctx, state, scheduler, timer);
+    renderer.setColors(createColorScale(theme));
+    renderer.setHighlight(true, highlightColor(theme), false);
+    flush();
+    expect(active()).toBe(0);
+    expect(pixel(puts.at(-1) as ImageDataLike, 3)).toEqual([0, 255, 0, 255]);
+    renderer.destroy();
+  });
+
+  it("discrete mode paints over the view and highlights missing blocks", () => {
+    const state = createBlockState(100);
+    state.resize(9);
+    state.setView({ start: 50, end: 53 });
+    state.add([51]);
+    const { ctx, puts } = createStubContext();
+    const { scheduler, flush } = createManualScheduler();
+    const { timer } = createManualTimer();
+    const renderer = createRenderer(ctx, state, scheduler, timer);
+    renderer.setColors(createColorScale(theme));
+    flush();
+    let image = puts.at(-1) as ImageDataLike;
+    expect([0, 3, 6].map((c) => pixel(image, c))).toEqual([
+      [0, 0, 0, 255],
+      [255, 255, 255, 255],
+      [0, 0, 0, 255],
+    ]);
+    renderer.setHighlight(true, highlightColor(theme), false);
+    flush();
+    image = puts.at(-1) as ImageDataLike;
+    expect(pixel(image, 0)).toEqual([0, 255, 0, 255]);
+    expect(pixel(image, 3)).toEqual([255, 255, 255, 255]);
+  });
+
+  it("destroy clears the blink timer", () => {
+    const state = createBlockState(10);
+    state.resize(5);
+    const { ctx } = createStubContext();
+    const { scheduler } = createManualScheduler();
+    const { timer, active } = createManualTimer();
+    const renderer = createRenderer(ctx, state, scheduler, timer);
+    renderer.setColors(createColorScale(theme));
+    renderer.setHighlight(true, highlightColor(theme), true);
+    expect(active()).toBe(1);
+    renderer.destroy();
+    expect(active()).toBe(0);
   });
 });

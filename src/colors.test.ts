@@ -1,5 +1,5 @@
 import { DEFAULT_THEME } from "./constants";
-import { createColorScale, readTheme, watchTheme } from "./colors";
+import { createColorScale, highlightColor, readTheme, watchTheme } from "./colors";
 
 const theme = {
   missing: "#000000",
@@ -7,6 +7,7 @@ const theme = {
   partialHigh: "#0000ff",
   partial: "#ff0000",
   complete: "#ffffff",
+  highlight: "#00ff00",
 };
 
 describe("createColorScale", () => {
@@ -93,9 +94,22 @@ describe("readTheme", () => {
       partialHigh: DEFAULT_THEME.partialHigh,
       partial: DEFAULT_THEME.partial,
       complete: "#123456",
+      highlight: DEFAULT_THEME.highlight,
     });
     vi.restoreAllMocks();
     el.remove();
+  });
+});
+
+describe("highlightColor", () => {
+  it("returns RGBA bytes for the highlight colour", () => {
+    expect(Array.from(highlightColor(theme))).toEqual([0, 255, 0, 255]);
+  });
+
+  it("falls back to the default when unparsable", () => {
+    expect(Array.from(highlightColor({ ...theme, highlight: "nope" }))).toEqual(
+      Array.from(highlightColor({ ...theme, highlight: DEFAULT_THEME.highlight })),
+    );
   });
 });
 

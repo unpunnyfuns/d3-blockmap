@@ -4,6 +4,7 @@ import {
   BYTES_PER_PIXEL,
   COLOR_TABLE_SIZE,
   CSS_VAR_COMPLETE,
+  CSS_VAR_HIGHLIGHT,
   CSS_VAR_MISSING,
   CSS_VAR_PARTIAL,
   CSS_VAR_PARTIAL_HIGH,
@@ -20,6 +21,7 @@ export type Theme = {
   partialHigh: string;
   partial: string;
   complete: string;
+  highlight: string;
 };
 
 export type ColorScale = (fraction: number) => Uint8ClampedArray;
@@ -32,6 +34,7 @@ const THEME_VARS: Record<keyof Theme, string> = {
   partialHigh: CSS_VAR_PARTIAL_HIGH,
   partial: CSS_VAR_PARTIAL,
   complete: CSS_VAR_COMPLETE,
+  highlight: CSS_VAR_HIGHLIGHT,
 };
 
 const LAST_INDEX = COLOR_TABLE_SIZE - 1;
@@ -65,6 +68,7 @@ export const readTheme = (el: HTMLElement): Theme => {
     partialHigh: read("partialHigh"),
     partial: read("partial"),
     complete: read("complete"),
+    highlight: read("highlight"),
   };
 };
 
@@ -97,6 +101,11 @@ export const createColorScale = (theme: Theme, partial: PartialStyle = "coverage
     const offset = index * BYTES_PER_PIXEL;
     return table.subarray(offset, offset + BYTES_PER_PIXEL);
   };
+};
+
+export const highlightColor = (theme: Theme): Uint8ClampedArray => {
+  const color = rgb(parseOr(theme.highlight, DEFAULT_THEME.highlight));
+  return Uint8ClampedArray.of(color.r, color.g, color.b, OPAQUE_ALPHA);
 };
 
 export const watchTheme = (onChange: () => void): (() => void) => {
