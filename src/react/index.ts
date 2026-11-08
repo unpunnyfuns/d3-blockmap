@@ -1,2 +1,2 @@
-export { PieceMap } from "./PieceMap";
-export type { PieceMapHandle, PieceMapProps } from "./PieceMap";
+export { BlockMap } from "./BlockMap";
+export type { BlockMapHandle, BlockMapProps } from "./BlockMap";

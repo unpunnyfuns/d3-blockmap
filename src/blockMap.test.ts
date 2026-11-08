@@ -1,4 +1,4 @@
-import { createPieceMap } from "./pieceMap";
+import { createBlockMap } from "./blockMap";
 
 type ResizeCallback = (entries: ResizeObserverEntry[]) => void;
 type MediaListener = { query: string; listener: () => void };
@@ -59,10 +59,10 @@ const mount = () => {
   return container;
 };
 
-describe("createPieceMap", () => {
+describe("createBlockMap", () => {
   it("appends a canvas and sizes bins to width times dpr", () => {
     const container = mount();
-    const map = createPieceMap(container, { totalBlocks: 100 });
+    const map = createBlockMap(container, { totalBlocks: 100 });
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     expect(canvas).not.toBeNull();
     triggerResize(50);
@@ -74,7 +74,7 @@ describe("createPieceMap", () => {
 
   it("does not repaint on an identical resize", () => {
     const container = mount();
-    const map = createPieceMap(container, { totalBlocks: 100 });
+    const map = createBlockMap(container, { totalBlocks: 100 });
     triggerResize(50);
     expect(puts).toHaveLength(1);
     expect(puts[0]?.width).toBe(100);
@@ -85,7 +85,7 @@ describe("createPieceMap", () => {
 
   it("shrinks bin count and repaints when width decreases", () => {
     const container = mount();
-    const map = createPieceMap(container, { totalBlocks: 100 });
+    const map = createBlockMap(container, { totalBlocks: 100 });
     triggerResize(50);
     map.addBlocks([0, 1, 2]);
     triggerResize(20);
@@ -97,7 +97,7 @@ describe("createPieceMap", () => {
 
   it("re-reads devicePixelRatio on resolution change and re-arms", () => {
     const container = mount();
-    const map = createPieceMap(container, { totalBlocks: 100 });
+    const map = createBlockMap(container, { totalBlocks: 100 });
     triggerResize(50);
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     expect(canvas.width).toBe(100);
@@ -116,7 +116,7 @@ describe("createPieceMap", () => {
 
   it("applies initialBlocks, setBlocks and addBlocks to progress", () => {
     const container = mount();
-    const map = createPieceMap(container, { totalBlocks: 10, initialBlocks: [0, 1] });
+    const map = createBlockMap(container, { totalBlocks: 10, initialBlocks: [0, 1] });
     expect(map.getProgress()).toEqual({ completed: 2, total: 10 });
     map.addBlocks([1, 2]);
     expect(map.getProgress().completed).toBe(3);
@@ -127,11 +127,11 @@ describe("createPieceMap", () => {
 
   it("shows a tooltip for the hovered column and hides on leave", () => {
     const container = mount();
-    const map = createPieceMap(container, { totalBlocks: 100 });
+    const map = createBlockMap(container, { totalBlocks: 100 });
     triggerResize(5);
     map.addBlocks([0, 1, 2, 3, 4]);
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
-    const tooltip = container.querySelector("[data-piece-tooltip]") as HTMLElement;
+    const tooltip = container.querySelector("[data-block-tooltip]") as HTMLElement;
     const move = new MouseEvent("pointermove", { bubbles: true });
     Object.defineProperty(move, "offsetX", { value: 0 });
     canvas.dispatchEvent(move);
@@ -144,10 +144,10 @@ describe("createPieceMap", () => {
 
   it("destroy removes elements and makes methods no-ops", () => {
     const container = mount();
-    const map = createPieceMap(container, { totalBlocks: 10 });
+    const map = createBlockMap(container, { totalBlocks: 10 });
     map.destroy();
     expect(container.querySelector("canvas")).toBeNull();
-    expect(container.querySelector("[data-piece-tooltip]")).toBeNull();
+    expect(container.querySelector("[data-block-tooltip]")).toBeNull();
     expect(() => map.addBlocks([1])).not.toThrow();
     expect(() => map.destroy()).not.toThrow();
     expect(removed).toContain("(resolution: 2dppx)");
@@ -155,19 +155,19 @@ describe("createPieceMap", () => {
 
   it("returns zeroed progress after destroy", () => {
     const container = mount();
-    const map = createPieceMap(container, { totalBlocks: 10, initialBlocks: [0, 1] });
+    const map = createBlockMap(container, { totalBlocks: 10, initialBlocks: [0, 1] });
     map.destroy();
     expect(map.getProgress()).toEqual({ completed: 0, total: 10 });
   });
 
   it("throws when the 2d context is unavailable", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
-    expect(() => createPieceMap(mount(), { totalBlocks: 10 })).toThrow(/2d/);
+    expect(() => createBlockMap(mount(), { totalBlocks: 10 })).toThrow(/2d/);
   });
 
   it("setRanges replaces state and repaints", () => {
     const container = mount();
-    const map = createPieceMap(container, { totalBlocks: 10, initialBlocks: [9] });
+    const map = createBlockMap(container, { totalBlocks: 10, initialBlocks: [9] });
     triggerResize(5);
     const before = puts.length;
     map.setRanges([
@@ -181,7 +181,7 @@ describe("createPieceMap", () => {
 
   it("applies initialRanges then initialBlocks", () => {
     const container = mount();
-    const map = createPieceMap(container, {
+    const map = createBlockMap(container, {
       totalBlocks: 10,
       initialRanges: new Uint32Array([0, 2]),
       initialBlocks: [1, 5],
@@ -194,10 +194,10 @@ describe("createPieceMap", () => {
     vi.spyOn(window, "getComputedStyle").mockReturnValue({
       position: "static",
       getPropertyValue: (name: string) =>
-        ({ "--piece-missing": "#000000", "--piece-complete": "#ffffff" })[name] ?? "",
+        ({ "--block-missing": "#000000", "--block-complete": "#ffffff" })[name] ?? "",
     } as unknown as CSSStyleDeclaration);
     const container = mount();
-    const map = createPieceMap(container, { totalBlocks: 100, partial: "coverage" });
+    const map = createBlockMap(container, { totalBlocks: 100, partial: "coverage" });
     triggerResize(5);
     map.setRanges([[0, 5]]);
     const image = puts.at(-1) as ImageData;

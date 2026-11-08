@@ -1,6 +1,6 @@
 # d3-blockmap
 
-Canvas piece map for download progress across millions of opaque blocks. One column per device pixel, D3 colour interpolation, dirty-column blitting once per frame.
+Canvas block map for download progress across millions of opaque blocks. One column per device pixel, D3 colour interpolation, dirty-column blitting once per frame.
 
 ## Install
 
@@ -12,26 +12,26 @@ npm i d3-blockmap
 
 | Export | From | Purpose |
 |---|---|---|
-| `createPieceMap(container, options)` | `d3-blockmap` | Vanilla factory. Returns `PieceMap`. |
-| `PieceMap`, `PieceMapOptions`, `Progress`, `Theme`, `BlockRangeTuple`, `RangeInput`, `PartialStyle` | `d3-blockmap` | Types. |
-| `<PieceMap>` | `d3-blockmap/react` | React wrapper, `forwardRef` to `PieceMapHandle`. |
-| `PieceMapProps`, `PieceMapHandle` | `d3-blockmap/react` | Types. |
+| `createBlockMap(container, options)` | `d3-blockmap` | Vanilla factory. Returns `BlockMap`. |
+| `BlockMap`, `BlockMapOptions`, `Progress`, `Theme`, `BlockRangeTuple`, `RangeInput`, `PartialStyle` | `d3-blockmap` | Types. |
+| `<BlockMap>` | `d3-blockmap/react` | React wrapper, `forwardRef` to `BlockMapHandle`. |
+| `BlockMapProps`, `BlockMapHandle` | `d3-blockmap/react` | Types. |
 
 ## Usage
 
 ```html
-<div id="pieces" style="height: 12px"></div>
+<div id="blocks" style="height: 12px"></div>
 ```
 
 ```ts
-import { createPieceMap } from 'd3-blockmap';
+import { createBlockMap } from 'd3-blockmap';
 
-const map = createPieceMap(document.querySelector('#pieces')!, {
+const map = createBlockMap(document.querySelector('#blocks')!, {
   totalBlocks: 10_000_000,
   initialBlocks: downloadedSoFar,
 });
 
-socket.on('pieces', (indices: Uint32Array) => map.addBlocks(indices));
+socket.on('blocks', (indices: Uint32Array) => map.addBlocks(indices));
 map.setRanges([[0, 123], [256, 1024]]);
 map.getProgress(); // { completed, total }
 map.destroy();
@@ -39,11 +39,11 @@ map.destroy();
 
 ```tsx
 import { useRef } from 'react';
-import { PieceMap } from 'd3-blockmap/react';
-import type { PieceMapHandle } from 'd3-blockmap/react';
+import { BlockMap } from 'd3-blockmap/react';
+import type { BlockMapHandle } from 'd3-blockmap/react';
 
-const ref = useRef<PieceMapHandle>(null);
-<PieceMap ref={ref} totalBlocks={total} blocks={initial} style={{ height: 12 }} />;
+const ref = useRef<BlockMapHandle>(null);
+<BlockMap ref={ref} totalBlocks={total} blocks={initial} style={{ height: 12 }} />;
 ref.current?.addBlocks(newIndices);
 ```
 
@@ -51,7 +51,7 @@ A new `blocks` array identity triggers `setBlocks`; keep the reference stable be
 
 ## API
 
-### `createPieceMap(container, options)`
+### `createBlockMap(container, options)`
 
 | Option | Type | Notes |
 |---|---|---|
@@ -76,19 +76,19 @@ Colours are read from CSS custom properties on the container at start and on the
 
 | Property | Default |
 |---|---|
-| `--piece-missing` | `#2b2b2b` |
-| `--piece-partial-low` | `#5b3a00` |
-| `--piece-partial-high` | `#e0a500` |
-| `--piece-complete` | `#2ecc71` |
+| `--block-missing` | `#2b2b2b` |
+| `--block-partial-low` | `#5b3a00` |
+| `--block-partial-high` | `#e0a500` |
+| `--block-complete` | `#2ecc71` |
 
-Fully missing and fully complete bins use the exact endpoint colours; partial bins interpolate between the two partial colours. `partial: "coverage"` instead interpolates partial bins between `--piece-missing` and `--piece-complete`, so it relies on those two differing; the two partial colour variables are unused in that style.
+Fully missing and fully complete bins use the exact endpoint colours; partial bins interpolate between the two partial colours. `partial: "coverage"` instead interpolates partial bins between `--block-missing` and `--block-complete`, so it relies on those two differing; the two partial colour variables are unused in that style.
 
 #### Tooltip
 
-The tooltip element carries the attribute `data-piece-tooltip` and ships unstyled apart from positioning. Style it yourself:
+The tooltip element carries the attribute `data-block-tooltip` and ships unstyled apart from positioning. Style it yourself:
 
 ```css
-[data-piece-tooltip] {
+[data-block-tooltip] {
   background: #111;
   padding: 4px 8px;
   border-radius: 4px;

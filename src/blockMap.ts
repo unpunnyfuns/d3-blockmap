@@ -4,18 +4,18 @@ import { CANVAS_ROWS } from "./constants";
 import { createRenderer } from "./renderer";
 import type { Renderer } from "./renderer";
 import type { RangeInput } from "./ranges";
-import { createPieceState } from "./state";
+import { createBlockState } from "./state";
 import type { Progress } from "./state";
 import { createTooltip, formatBinTooltip, formatBlockTooltip } from "./tooltip";
 
-export type PieceMapOptions = {
+export type BlockMapOptions = {
   totalBlocks: number;
   initialBlocks?: ArrayLike<number>;
   initialRanges?: RangeInput;
   partial?: PartialStyle;
 };
 
-export type PieceMap = {
+export type BlockMap = {
   setBlocks(indices: ArrayLike<number>): void;
   setRanges(ranges: RangeInput): void;
   addBlocks(indices: ArrayLike<number>): void;
@@ -28,8 +28,8 @@ const CONTEXT_ID = "2d";
 
 const dprQuery = (dpr: number): string => `(resolution: ${dpr}dppx)`;
 
-export const createPieceMap = (container: HTMLElement, options: PieceMapOptions): PieceMap => {
-  const state = createPieceState(options.totalBlocks);
+export const createBlockMap = (container: HTMLElement, options: BlockMapOptions): BlockMap => {
+  const state = createBlockState(options.totalBlocks);
 
   const canvas = document.createElement("canvas");
   Object.assign(canvas.style, { display: "block", width: FULL, height: FULL });

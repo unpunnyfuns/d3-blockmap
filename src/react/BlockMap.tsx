@@ -1,11 +1,11 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { CSSProperties } from "react";
 import type { PartialStyle } from "../colors";
-import { createPieceMap } from "../pieceMap";
-import type { PieceMap as PieceMapInstance, PieceMapOptions } from "../pieceMap";
+import { createBlockMap } from "../blockMap";
+import type { BlockMap as BlockMapInstance, BlockMapOptions } from "../blockMap";
 import type { RangeInput } from "../ranges";
 
-export type PieceMapProps = {
+export type BlockMapProps = {
   totalBlocks: number;
   blocks?: ArrayLike<number>;
   ranges?: RangeInput;
@@ -14,21 +14,21 @@ export type PieceMapProps = {
   style?: CSSProperties;
 };
 
-export type PieceMapHandle = Pick<PieceMapInstance, "addBlocks" | "getProgress">;
+export type BlockMapHandle = Pick<BlockMapInstance, "addBlocks" | "getProgress">;
 
 const EMPTY_BLOCKS: readonly number[] = [];
 const EMPTY_PROGRESS = { completed: 0, total: 0 };
 
-export const PieceMap = forwardRef<PieceMapHandle, PieceMapProps>(
+export const BlockMap = forwardRef<BlockMapHandle, BlockMapProps>(
   ({ totalBlocks, blocks, ranges, partial, className, style }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const instanceRef = useRef<PieceMapInstance>(null);
+    const instanceRef = useRef<BlockMapInstance>(null);
 
     useEffect(() => {
       const container = containerRef.current;
       if (!container) return undefined;
-      const options: PieceMapOptions = partial ? { totalBlocks, partial } : { totalBlocks };
-      const instance = createPieceMap(container, options);
+      const options: BlockMapOptions = partial ? { totalBlocks, partial } : { totalBlocks };
+      const instance = createBlockMap(container, options);
       instanceRef.current = instance;
       return () => {
         instance.destroy();
@@ -61,4 +61,4 @@ export const PieceMap = forwardRef<PieceMapHandle, PieceMapProps>(
   },
 );
 
-PieceMap.displayName = "PieceMap";
+BlockMap.displayName = "BlockMap";

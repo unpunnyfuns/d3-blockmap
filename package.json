@@ -1,7 +1,7 @@
 {
   "name": "d3-blockmap",
   "version": "0.1.0",
-  "description": "Canvas piece map for millions of download blocks, D3 scales and colours",
+  "description": "Canvas block map for millions of download blocks, D3 scales and colours",
   "license": "MIT",
   "files": [
     "dist"
@@ -61,7 +61,7 @@
     "d3",
     "canvas",
     "progress",
-    "piece-map",
+    "block-map",
     "bittorrent"
   ]
 }

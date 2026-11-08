@@ -5,17 +5,17 @@
 <title>d3-blockmap demo</title>
 <style>
   :root {
-    --piece-missing: #1f2430;
-    --piece-partial-low: #5a3d12;
-    --piece-partial-high: #f0b429;
-    --piece-complete: #3ddc84;
+    --block-missing: #1f2430;
+    --block-partial-low: #5a3d12;
+    --block-partial-high: #f0b429;
+    --block-complete: #3ddc84;
     color-scheme: dark;
   }
   html[data-theme="light"] {
-    --piece-missing: #e3e6ec;
-    --piece-partial-low: #ffd9a8;
-    --piece-partial-high: #ff8c00;
-    --piece-complete: #1a9e4b;
+    --block-missing: #e3e6ec;
+    --block-partial-low: #ffd9a8;
+    --block-partial-high: #ff8c00;
+    --block-complete: #1a9e4b;
     color-scheme: light;
   }
   body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 32px; background: Canvas; color: CanvasText; }
@@ -24,7 +24,7 @@
   .label { display: flex; justify-content: space-between; margin-bottom: 6px; color: GrayText; }
   .map { height: 24px; }
   .map canvas { border-radius: 3px; }
-  [data-piece-tooltip] { background: #000c; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-top: -6px; }
+  [data-block-tooltip] { background: #000c; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-top: -6px; }
   button { margin-right: 8px; }
 </style>
 </head>
@@ -55,16 +55,16 @@
 } }
 </script>
 <script type="module">
-import { createPieceMap } from "d3-blockmap";
+import { createBlockMap } from "d3-blockmap";
 
 const BIG = 10_000_000;
 const SMALL = 40;
 const BATCH = 2_500;
 const FRONTS = 6;
 
-const big = createPieceMap(document.querySelector("#big"), { totalBlocks: BIG });
-const small = createPieceMap(document.querySelector("#small"), { totalBlocks: SMALL, initialBlocks: [0, 1, 2, 7, 8, 20, 21, 22, 23, 39] });
-const rangeMap = createPieceMap(document.querySelector("#ranges"), {
+const big = createBlockMap(document.querySelector("#big"), { totalBlocks: BIG });
+const small = createBlockMap(document.querySelector("#small"), { totalBlocks: SMALL, initialBlocks: [0, 1, 2, 7, 8, 20, 21, 22, 23, 39] });
+const rangeMap = createBlockMap(document.querySelector("#ranges"), {
   totalBlocks: BIG,
   partial: "coverage",
 });

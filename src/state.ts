@@ -7,7 +7,7 @@ import type { RangeInput } from "./ranges";
 
 export type Progress = { completed: number; total: number };
 
-export type PieceState = {
+export type BlockState = {
   readonly totalBlocks: number;
   readonly binCount: number;
   resize(binCount: number): void;
@@ -27,7 +27,7 @@ const EMPTY_DIRTY = new Uint32Array(0);
 const isValidIndex = (index: number, totalBlocks: number): boolean =>
   Number.isInteger(index) && index >= 0 && index < totalBlocks;
 
-export const createPieceState = (totalBlocks: number): PieceState => {
+export const createBlockState = (totalBlocks: number): BlockState => {
   if (!Number.isInteger(totalBlocks) || totalBlocks < 1) {
     throw new RangeError(`totalBlocks must be a positive integer, got ${totalBlocks}`);
   }

@@ -8,7 +8,7 @@ export type Tooltip = {
 };
 
 const LOCALE = "en-US";
-const TOOLTIP_ATTRIBUTE = "data-piece-tooltip";
+const TOOLTIP_ATTRIBUTE = "data-block-tooltip";
 const SEPARATOR = " · ";
 const EN_DASH = "–";
 

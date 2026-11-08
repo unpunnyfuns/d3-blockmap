@@ -9,10 +9,10 @@ export const PERCENT_FRACTION_DIGITS = 1;
 export const TOOLTIP_OFFSET_PX = 8;
 export const CANVAS_ROWS = 1;
 
-export const CSS_VAR_MISSING = "--piece-missing";
-export const CSS_VAR_PARTIAL_LOW = "--piece-partial-low";
-export const CSS_VAR_PARTIAL_HIGH = "--piece-partial-high";
-export const CSS_VAR_COMPLETE = "--piece-complete";
+export const CSS_VAR_MISSING = "--block-missing";
+export const CSS_VAR_PARTIAL_LOW = "--block-partial-low";
+export const CSS_VAR_PARTIAL_HIGH = "--block-partial-high";
+export const CSS_VAR_COMPLETE = "--block-complete";
 
 export const DEFAULT_THEME = {
   missing: "#2b2b2b",

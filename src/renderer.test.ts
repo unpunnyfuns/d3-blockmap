@@ -1,7 +1,7 @@
 import { createColorScale } from "./colors";
 import { createRenderer } from "./renderer";
 import type { Canvas2dLike, ImageDataLike, RenderSource, Scheduler } from "./renderer";
-import { createPieceState } from "./state";
+import { createBlockState } from "./state";
 
 const theme = {
   missing: "#000000",
@@ -52,7 +52,7 @@ const pixel = (image: ImageDataLike, column: number) =>
 
 describe("createRenderer", () => {
   it("paints one column per bin, once per frame", () => {
-    const state = createPieceState(10);
+    const state = createBlockState(10);
     state.resize(5);
     const { ctx, puts } = createStubContext();
     const { scheduler, flush, pending } = createManualScheduler();
@@ -75,7 +75,7 @@ describe("createRenderer", () => {
   });
 
   it("markAllDirty paints every bin including missing ones", () => {
-    const state = createPieceState(10);
+    const state = createBlockState(10);
     state.resize(5);
     const { ctx, puts } = createStubContext();
     const { scheduler, flush } = createManualScheduler();
@@ -88,7 +88,7 @@ describe("createRenderer", () => {
   });
 
   it("reallocates the image when bin count changes", () => {
-    const state = createPieceState(10);
+    const state = createBlockState(10);
     state.resize(5);
     const { ctx, puts } = createStubContext();
     const { scheduler, flush } = createManualScheduler();
@@ -103,7 +103,7 @@ describe("createRenderer", () => {
   });
 
   it("paints discrete block spans when blocks are fewer than bins", () => {
-    const state = createPieceState(3);
+    const state = createBlockState(3);
     state.resize(9);
     const { ctx, puts } = createStubContext();
     const { scheduler, flush } = createManualScheduler();
@@ -118,7 +118,7 @@ describe("createRenderer", () => {
   });
 
   it("does not stall repaints when the scheduler runs synchronously", () => {
-    const state = createPieceState(10);
+    const state = createBlockState(10);
     state.resize(5);
     const { ctx, puts } = createStubContext();
     const scheduler: Scheduler = {

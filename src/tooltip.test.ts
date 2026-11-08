@@ -38,7 +38,7 @@ describe("createTooltip", () => {
     const container = document.createElement("div");
     document.body.append(container);
     const tooltip = createTooltip(container);
-    const el = container.querySelector("[data-piece-tooltip]") as HTMLElement;
+    const el = container.querySelector("[data-block-tooltip]") as HTMLElement;
     expect(el.style.display).toBe("none");
     tooltip.show(42, "hello");
     expect(el.style.display).toBe("block");
@@ -47,7 +47,7 @@ describe("createTooltip", () => {
     tooltip.hide();
     expect(el.style.display).toBe("none");
     tooltip.destroy();
-    expect(container.querySelector("[data-piece-tooltip]")).toBeNull();
+    expect(container.querySelector("[data-block-tooltip]")).toBeNull();
     container.remove();
   });
 

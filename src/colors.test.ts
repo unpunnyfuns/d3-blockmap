@@ -68,7 +68,7 @@ describe("readTheme", () => {
     const el = document.createElement("div");
     document.body.append(el);
     vi.spyOn(window, "getComputedStyle").mockReturnValue({
-      getPropertyValue: (name: string) => (name === "--piece-complete" ? " #123456 " : ""),
+      getPropertyValue: (name: string) => (name === "--block-complete" ? " #123456 " : ""),
     } as unknown as CSSStyleDeclaration);
     expect(readTheme(el)).toEqual({ ...DEFAULT_THEME, complete: "#123456" });
     vi.restoreAllMocks();
