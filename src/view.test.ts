@@ -1,3 +1,4 @@
+import { ZOOM_STEP } from "./constants";
 import { clampView, fullView, panView, sameView, viewLength, zoomView } from "./view";
 
 describe("view helpers", () => {
@@ -29,6 +30,24 @@ describe("view helpers", () => {
   it("zoomView clamps to the full range and to one block", () => {
     expect(zoomView({ start: 250, end: 750 }, 500, 10, 1000)).toEqual({ start: 0, end: 1000 });
     expect(zoomView({ start: 10, end: 12 }, 11, 0.1, 1000)).toEqual({ start: 11, end: 12 });
+  });
+
+  it("zoomView floors the next length when zooming in, reaching one block within three steps", () => {
+    let view = { start: 0, end: 3 };
+    const factor = 1 / ZOOM_STEP;
+    const lengths: number[] = [];
+    for (let step = 0; step < 3; step += 1) {
+      view = zoomView(view, view.start, factor, 1000);
+      lengths.push(viewLength(view));
+    }
+    expect(lengths.length).toBe(3);
+    expect(lengths.slice(-1)).toEqual([1]);
+    expect(lengths.indexOf(1)).toBeLessThan(3);
+  });
+
+  it("zoomView ceils the next length when zooming out, growing past one block", () => {
+    const view = zoomView({ start: 42, end: 43 }, 42, ZOOM_STEP, 1000);
+    expect(viewLength(view)).toBe(2);
   });
 
   it("panView shifts and clamps", () => {

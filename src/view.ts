@@ -25,7 +25,11 @@ export const zoomView = (
   totalBlocks: number,
 ): BlockView => {
   const length = viewLength(view);
-  const nextLength = Math.max(MIN_VIEW_LENGTH, Math.min(totalBlocks, Math.round(length * factor)));
+  const scaled = length * factor;
+  const nextLength = Math.max(
+    MIN_VIEW_LENGTH,
+    Math.min(totalBlocks, factor < 1 ? Math.floor(scaled) : Math.ceil(scaled)),
+  );
   const ratio = (anchor - view.start) / length;
   const start = Math.round(anchor - ratio * nextLength);
   return clampView({ start, end: start + nextLength }, totalBlocks);

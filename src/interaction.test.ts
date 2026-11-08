@@ -68,6 +68,20 @@ describe("attachInteraction", () => {
     expect(canvas.style.cursor).toBe("");
   });
 
+  it("ignores ctrl+wheel while a drag is active", () => {
+    const canvas = document.createElement("canvas");
+    const { deps, calls } = createDeps({ start: 100, end: 200 });
+    attachInteraction(canvas, deps);
+    fire(canvas, "pointerdown", { button: PRIMARY_BUTTON }, { offsetX: 50, pointerId: 1 });
+    fire(canvas, "pointermove", {}, { offsetX: 60, pointerId: 1 });
+    expect(deps.onDragStart).toHaveBeenCalledTimes(1);
+    const before = calls.length;
+    const event = fire(canvas, "wheel", { deltaY: -100 }, { offsetX: 50, ctrlKey: true });
+    expect(event.defaultPrevented).toBe(false);
+    expect(calls.length).toBe(before);
+    fire(canvas, "pointerup", {}, { pointerId: 1 });
+  });
+
   it("double click resets and dispose removes listeners", () => {
     const canvas = document.createElement("canvas");
     const { deps, calls } = createDeps();

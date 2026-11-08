@@ -30,6 +30,7 @@ export const attachInteraction = (
 
   const onWheel = (event: WheelEvent): void => {
     if (!(event.ctrlKey || event.metaKey)) return;
+    if (drag?.active) return;
     if (deps.getBinCount() === 0) return;
     event.preventDefault();
     const view = deps.getView();

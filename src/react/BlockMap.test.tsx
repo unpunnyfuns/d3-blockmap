@@ -157,4 +157,20 @@ describe("<BlockMap>", () => {
     expect(ref.current?.getView()).toEqual({ start: 0, end: 0 });
     spy.mockRestore();
   });
+
+  it("re-applies the current view and highlight props to the new instance after an interactive-triggered recreate", () => {
+    const first = createInstance();
+    const second = createInstance();
+    const spy = vi
+      .spyOn(core, "createBlockMap")
+      .mockReturnValueOnce(first)
+      .mockReturnValueOnce(second);
+    const view = { start: 2, end: 6 };
+    const { rerender } = render(<BlockMap totalBlocks={10} view={view} highlight interactive />);
+    rerender(<BlockMap totalBlocks={10} view={view} highlight interactive={false} />);
+    expect(first.destroy).toHaveBeenCalledTimes(1);
+    expect(second.setView).toHaveBeenCalledWith(view);
+    expect(second.setHighlight).toHaveBeenCalledWith(true);
+    spy.mockRestore();
+  });
 });

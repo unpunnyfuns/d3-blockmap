@@ -268,6 +268,63 @@ describe("createRenderer", () => {
     expect(pixel(image, 3)).toEqual([255, 255, 255, 255]);
   });
 
+  it("setHighlightColor swaps the colour mid-blink without resetting the timer or phase", () => {
+    const state = createBlockState(10);
+    state.resize(5);
+    const { ctx, puts } = createStubContext();
+    const { scheduler, flush } = createManualScheduler();
+    const { timer, tick, active } = createManualTimer();
+    const renderer = createRenderer(ctx, state, scheduler, timer);
+    renderer.setColors(createColorScale(theme));
+    renderer.setHighlight(true, highlightColor(theme), true);
+    flush();
+    expect(active()).toBe(1);
+    expect(pixel(puts.at(-1) as ImageDataLike, 0)).toEqual([0, 255, 0, 255]);
+
+    const newColor = new Uint8ClampedArray([9, 9, 9, 255]);
+    renderer.setHighlightColor(newColor);
+    flush();
+    expect(active()).toBe(1);
+    expect(pixel(puts.at(-1) as ImageDataLike, 0)).toEqual([9, 9, 9, 255]);
+
+    tick();
+    flush();
+    expect(pixel(puts.at(-1) as ImageDataLike, 0)).toEqual([0, 0, 0, 255]);
+    renderer.destroy();
+  });
+
+  it("setHighlightColor is a no-op when no highlight is active", () => {
+    const state = createBlockState(10);
+    state.resize(5);
+    const { ctx, puts } = createStubContext();
+    const { scheduler, flush } = createManualScheduler();
+    const renderer = createRenderer(ctx, state, scheduler);
+    renderer.setColors(createColorScale(theme));
+    flush();
+    const before = puts.length;
+    renderer.setHighlightColor(new Uint8ClampedArray([9, 9, 9, 255]));
+    flush();
+    expect(puts.length).toBe(before);
+  });
+
+  it("setHighlight(false) when already off does not repaint", () => {
+    const state = createBlockState(10);
+    state.resize(5);
+    const { ctx, puts } = createStubContext();
+    const { scheduler, flush } = createManualScheduler();
+    const { timer } = createManualTimer();
+    const renderer = createRenderer(ctx, state, scheduler, timer);
+    renderer.setColors(createColorScale(theme));
+    flush();
+    const before = puts.length;
+    renderer.setHighlight(false, highlightColor(theme), true);
+    flush();
+    expect(puts.length).toBe(before);
+    renderer.setHighlight(false, highlightColor(theme), true);
+    flush();
+    expect(puts.length).toBe(before);
+  });
+
   it("destroy clears the blink timer", () => {
     const state = createBlockState(10);
     state.resize(5);

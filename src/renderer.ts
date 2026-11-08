@@ -34,6 +34,7 @@ export type IntervalTimer = {
 export type Renderer = {
   setColors(scale: ColorScale): void;
   setHighlight(on: boolean, color: Uint8ClampedArray, blink: boolean): void;
+  setHighlightColor(color: Uint8ClampedArray): void;
   markDirty(bins: ArrayLike<number>): void;
   markAllDirty(): void;
   destroy(): void;
@@ -147,6 +148,7 @@ export const createRenderer = (
       markAllDirty();
     },
     setHighlight: (on, color, blink) => {
+      if (!on && highlight === undefined) return;
       stopBlink();
       highlight = on ? color : undefined;
       phase = on;
@@ -156,6 +158,11 @@ export const createRenderer = (
           markAllDirty();
         }, BLINK_INTERVAL_MS);
       }
+      markAllDirty();
+    },
+    setHighlightColor: (color) => {
+      if (highlight === undefined) return;
+      highlight = color;
       markAllDirty();
     },
     markDirty: (bins) => {

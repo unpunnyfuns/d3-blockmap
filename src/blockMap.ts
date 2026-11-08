@@ -8,7 +8,7 @@ import type { RangeInput } from "./ranges";
 import { createBlockState } from "./state";
 import type { Progress } from "./state";
 import { createTooltip, formatBinTooltip, formatBlockTooltip } from "./tooltip";
-import { fullView, viewLength } from "./view";
+import { clampView, fullView, sameView, viewLength } from "./view";
 import type { BlockView } from "./view";
 
 export type BlockMapOptions = {
@@ -35,15 +35,24 @@ export type BlockMap = {
 
 const FULL = "100%";
 const CONTEXT_ID = "2d";
+const NO_FRAME = 0;
 
 const dprQuery = (dpr: number): string => `(resolution: ${dpr}dppx)`;
+
+const discreteBlock = (column: number, length: number, binCount: number, start: number): number =>
+  start + Math.ceil(((column + 1) * length) / binCount) - 1;
 
 export const createBlockMap = (container: HTMLElement, options: BlockMapOptions): BlockMap => {
   const state = createBlockState(options.totalBlocks);
   if (options.view) state.setView(options.view);
 
   const canvas = document.createElement("canvas");
-  Object.assign(canvas.style, { display: "block", width: FULL, height: FULL });
+  Object.assign(canvas.style, {
+    display: "block",
+    width: FULL,
+    height: FULL,
+    touchAction: "none",
+  });
   canvas.height = CANVAS_ROWS;
   container.append(canvas);
 
@@ -72,13 +81,30 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   const applyTheme = (): void => {
     theme = readTheme(container);
     renderer.setColors(createColorScale(theme, options.partial));
-    if (highlightOn) applyHighlight();
+    if (highlightOn) renderer.setHighlightColor(highlightColor(theme));
+  };
+
+  let pendingView: BlockView | undefined;
+  let viewFrame = NO_FRAME;
+
+  const getView = (): BlockView => ({ ...(pendingView ?? state.view) });
+
+  const commitView = (): void => {
+    viewFrame = NO_FRAME;
+    const next = pendingView;
+    pendingView = undefined;
+    if (!next || !state.setView(next)) return;
+    renderer.markAllDirty();
+    options.onViewChange?.(state.getView());
   };
 
   const setView = (view: BlockView): void => {
-    if (!state.setView(view)) return;
-    renderer.markAllDirty();
-    options.onViewChange?.(state.getView());
+    if (!Number.isFinite(view.start) || !Number.isFinite(view.end)) return;
+    const clamped = clampView(view, state.totalBlocks);
+    if (sameView(clamped, pendingView ?? state.view)) return;
+    const hasPendingFrame = pendingView !== undefined;
+    pendingView = clamped;
+    if (!hasPendingFrame) viewFrame = requestAnimationFrame(commitView);
   };
   const resetView = (): void => setView(fullView(state.totalBlocks));
 
@@ -116,13 +142,13 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     if (binCount === 0) return;
     const column = Math.min(binCount - 1, Math.max(0, Math.floor(event.offsetX * dpr)));
     const length = viewLength(view);
-    const text =
-      length < binCount
-        ? formatBlockTooltip(
-            view.start + Math.floor((column * length) / binCount),
-            state.has(view.start + Math.floor((column * length) / binCount)),
-          )
-        : formatBinTooltip(state.rangeOf(column), state.countOf(column));
+    let text: string;
+    if (length < binCount) {
+      const block = discreteBlock(column, length, binCount, view.start);
+      text = formatBlockTooltip(block, state.has(block));
+    } else {
+      text = formatBinTooltip(state.rangeOf(column), state.countOf(column));
+    }
     tooltip.show(event.offsetX, text);
   };
   const onPointerLeave = (): void => tooltip.hide();
@@ -133,7 +159,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     options.interactive === false
       ? undefined
       : attachInteraction(canvas, {
-          getView: () => state.view,
+          getView,
           setView,
           resetView,
           getBinCount: () => state.binCount,
@@ -176,7 +202,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       if (destroyed) return;
       resetView();
     },
-    getView: () => state.getView(),
+    getView,
     setHighlight: (on) => {
       if (destroyed) return;
       highlightOn = on;
@@ -186,6 +212,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
+      if (viewFrame !== NO_FRAME) cancelAnimationFrame(viewFrame);
       resizeObserver.disconnect();
       unwatchTheme();
       dprMedia?.removeEventListener("change", onDprChange);

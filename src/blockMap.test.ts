@@ -331,6 +331,73 @@ describe("createBlockMap", () => {
     map.destroy();
   });
 
+  it("discrete tooltip reports the exact block the renderer painted at every column", () => {
+    const container = mount();
+    const totalBlocks = 7;
+    const map = createBlockMap(container, { totalBlocks });
+    triggerResize(50);
+    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+    const tooltip = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
+    const binCount = 100;
+    const boundaries = Array.from({ length: totalBlocks + 1 }, (_, b) =>
+      Math.floor((b * binCount) / totalBlocks),
+    );
+    const expectedBlockFor = (column: number): number => {
+      let block = 0;
+      while (boundaries[block + 1] <= column) block += 1;
+      return block;
+    };
+    const checkColumns = [14, 15, 28, 29, 42, 43];
+    const checked = new Set<number>();
+    for (let column = 0; column < binCount; column += 1) {
+      const move = new MouseEvent("pointermove", { bubbles: true });
+      Object.defineProperty(move, "offsetX", { value: column / 2 });
+      canvas.dispatchEvent(move);
+      const expectedBlock = expectedBlockFor(column);
+      expect(tooltip.textContent).toBe(`Block ${expectedBlock} · missing`);
+      if (checkColumns.includes(column)) checked.add(column);
+    }
+    expect(checked.size).toBe(checkColumns.length);
+    map.destroy();
+  });
+
+  it("coalesces rapid setView calls into one commit per animation frame", () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      frames.push(cb);
+      return frames.length;
+    });
+    const flush = () => {
+      while (frames.length > 0) {
+        const pending = frames.slice();
+        frames.length = 0;
+        pending.forEach((cb) => cb(0));
+      }
+    };
+    const container = mount();
+    const onViewChange = vi.fn();
+    const map = createBlockMap(container, { totalBlocks: 1000, onViewChange });
+    triggerResize(50);
+    flush();
+    const before = puts.length;
+
+    map.setView({ start: 10, end: 20 });
+    map.setView({ start: 20, end: 30 });
+    map.setView({ start: 30, end: 40 });
+
+    expect(map.getView()).toEqual({ start: 30, end: 40 });
+    expect(onViewChange).not.toHaveBeenCalled();
+    expect(puts.length).toBe(before);
+
+    flush();
+
+    expect(map.getView()).toEqual({ start: 30, end: 40 });
+    expect(onViewChange).toHaveBeenCalledTimes(1);
+    expect(onViewChange).toHaveBeenCalledWith({ start: 30, end: 40 });
+    expect(puts.length).toBe(before + 1);
+    map.destroy();
+  });
+
   it("tooltip shows absolute block ranges under a view", () => {
     const container = mount();
     const map = createBlockMap(container, { totalBlocks: 1000, view: { start: 500, end: 600 } });

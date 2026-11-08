@@ -26,7 +26,6 @@ export type BlockMapHandle = Pick<
 
 const EMPTY_BLOCKS: readonly number[] = [];
 const EMPTY_PROGRESS = { completed: 0, total: 0 };
-const EMPTY_VIEW: BlockView = { start: 0, end: 0 };
 
 export const BlockMap = forwardRef<BlockMapHandle, BlockMapProps>(
   (
@@ -58,6 +57,7 @@ export const BlockMap = forwardRef<BlockMapHandle, BlockMapProps>(
       };
       if (partial) options.partial = partial;
       if (interactive !== undefined) options.interactive = interactive;
+      if (view) options.view = view;
       const instance = createBlockMap(container, options);
       instanceRef.current = instance;
       return () => {
@@ -92,7 +92,7 @@ export const BlockMap = forwardRef<BlockMapHandle, BlockMapProps>(
         setRanges: (next) => instanceRef.current?.setRanges(next),
         setView: (next) => instanceRef.current?.setView(next),
         resetView: () => instanceRef.current?.resetView(),
-        getView: () => instanceRef.current?.getView() ?? EMPTY_VIEW,
+        getView: () => instanceRef.current?.getView() ?? { start: 0, end: totalBlocks },
         setHighlight: (on) => instanceRef.current?.setHighlight(on),
         getProgress: () =>
           instanceRef.current?.getProgress() ?? { ...EMPTY_PROGRESS, total: totalBlocks },
