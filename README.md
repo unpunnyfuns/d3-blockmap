@@ -55,7 +55,7 @@ A new `blocks` array identity triggers `setBlocks`; keep the reference stable be
 
 | Option | Type | Notes |
 |---|---|---|
-| `totalBlocks` | `number` | Positive integer, up to ~10M. |
+| `totalBlocks` | `number` | Positive integer. No fixed upper bound; memory is 1 bit per block plus one counter per pixel. |
 | `initialBlocks` | `ArrayLike<number>` | Optional. Indices already complete. |
 | `initialRanges` | `RangeInput` | Optional. `[start, end)` tuples or a flat `Uint32Array` of pairs. Applied before `initialBlocks`. |
 | `partial` | `"gradient" \| "coverage"` | Default `"gradient"`. `"coverage"` blends missing to complete so range edges look crisp. |
@@ -102,6 +102,7 @@ The tooltip element carries the attribute `data-block-tooltip` and ships unstyle
 - When `totalBlocks` is less than the width, each block is drawn as a discrete segment.
 - Hovering shows block range, count, and percentage for the column.
 - Resize and `devicePixelRatio` changes rebuild bins from the internal bitset in one pass.
+- Resize rebuilds bin counts with a byte-level popcount over the bitset, O(totalBlocks / 8 + bins).
 - The container is set to `position: relative` if it is static, so the tooltip can be positioned inside it.
 - The container must have a height; the canvas fills it via `width: 100%; height: 100%`.
 - Range ends are exclusive. Tuples are clamped to the block range; empty or inverted tuples are dropped; overlapping and touching tuples merge.
