@@ -13,8 +13,7 @@ npm i d3-blockmap
 | Export | From | Purpose |
 |---|---|---|
 | `createPieceMap(container, options)` | `d3-blockmap` | Vanilla factory. Returns `PieceMap`. |
-| `PieceMap`, `PieceMapOptions`, `Progress`, `Theme` | `d3-blockmap` | Types. |
-| `BlockRangeTuple`, `RangeInput`, `PartialStyle` | `d3-blockmap` | Types. |
+| `PieceMap`, `PieceMapOptions`, `Progress`, `Theme`, `BlockRangeTuple`, `RangeInput`, `PartialStyle` | `d3-blockmap` | Types. |
 | `<PieceMap>` | `d3-blockmap/react` | React wrapper, `forwardRef` to `PieceMapHandle`. |
 | `PieceMapProps`, `PieceMapHandle` | `d3-blockmap/react` | Types. |
 
