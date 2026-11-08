@@ -29,8 +29,8 @@
     "build": "tsup",
     "test:watch": "vitest",
     "lint": "oxlint src",
-    "format": "oxfmt",
-    "format:check": "oxfmt --check",
+    "format": "oxfmt src",
+    "format:check": "oxfmt --check src",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
