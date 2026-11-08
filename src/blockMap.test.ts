@@ -133,7 +133,7 @@ describe("createBlockMap", () => {
     triggerResize(5);
     map.addBlocks([0, 1, 2, 3, 4]);
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
-    const tooltip = container.querySelector("[data-block-tooltip]") as HTMLElement;
+    const tooltip = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
     const move = new MouseEvent("pointermove", { bubbles: true });
     Object.defineProperty(move, "offsetX", { value: 0 });
     canvas.dispatchEvent(move);
@@ -149,7 +149,7 @@ describe("createBlockMap", () => {
     const map = createBlockMap(container, { totalBlocks: 10 });
     map.destroy();
     expect(container.querySelector("canvas")).toBeNull();
-    expect(container.querySelector("[data-block-tooltip]")).toBeNull();
+    expect(container.querySelector("[data-blockmap-tooltip]")).toBeNull();
     expect(() => map.addBlocks([1])).not.toThrow();
     expect(() => map.destroy()).not.toThrow();
     expect(removed).toContain("(resolution: 2dppx)");
@@ -196,7 +196,7 @@ describe("createBlockMap", () => {
     vi.spyOn(window, "getComputedStyle").mockReturnValue({
       position: "static",
       getPropertyValue: (name: string) =>
-        ({ "--block-missing": "#000000", "--block-complete": "#ffffff" })[name] ?? "",
+        ({ "--blockmap-missing": "#000000", "--blockmap-complete": "#ffffff" })[name] ?? "",
     } as unknown as CSSStyleDeclaration);
     const container = mount();
     const map = createBlockMap(container, { totalBlocks: 100, partial: "coverage" });

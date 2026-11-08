@@ -80,20 +80,20 @@ Colours are read from CSS custom properties on the container at start and on the
 
 | Property | Default |
 |---|---|
-| `--block-missing` | `#2b2b2b` |
-| `--block-partial-low` | `#5b3a00` |
-| `--block-partial-high` | `#e0a500` |
-| `--block-partial` | `#e0a500` |
-| `--block-complete` | `#2ecc71` |
+| `--blockmap-missing` | `#2b2b2b` |
+| `--blockmap-partial-low` | `#5b3a00` |
+| `--blockmap-partial-high` | `#e0a500` |
+| `--blockmap-partial` | `#e0a500` |
+| `--blockmap-complete` | `#2ecc71` |
 
-Fully missing and fully complete bins use the exact endpoint colours. By default (`partial: "coverage"`), partial bins fade `--block-missing` → `--block-partial` → `--block-complete` by bin fill fraction. `partial: "gradient"` is opt-in and interpolates partial bins between `--block-partial-low` and `--block-partial-high` instead; those two variables apply only to `"gradient"`.
+Fully missing and fully complete bins use the exact endpoint colours. By default (`partial: "coverage"`), partial bins fade `--blockmap-missing` → `--blockmap-partial` → `--blockmap-complete` by bin fill fraction. `partial: "gradient"` is opt-in and interpolates partial bins between `--blockmap-partial-low` and `--blockmap-partial-high` instead; those two variables apply only to `"gradient"`.
 
 #### Tooltip
 
-The tooltip element carries the attribute `data-block-tooltip` and ships unstyled apart from positioning. Style it yourself:
+The tooltip element carries the attribute `data-blockmap-tooltip` and ships unstyled apart from positioning. Style it yourself:
 
 ```css
-[data-block-tooltip] {
+[data-blockmap-tooltip] {
   background: #111;
   padding: 4px 8px;
   border-radius: 4px;

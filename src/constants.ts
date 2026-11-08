@@ -9,11 +9,11 @@ export const PERCENT_FRACTION_DIGITS = 1;
 export const TOOLTIP_OFFSET_PX = 8;
 export const CANVAS_ROWS = 1;
 
-export const CSS_VAR_MISSING = "--block-missing";
-export const CSS_VAR_PARTIAL_LOW = "--block-partial-low";
-export const CSS_VAR_PARTIAL_HIGH = "--block-partial-high";
-export const CSS_VAR_PARTIAL = "--block-partial";
-export const CSS_VAR_COMPLETE = "--block-complete";
+export const CSS_VAR_MISSING = "--blockmap-missing";
+export const CSS_VAR_PARTIAL_LOW = "--blockmap-partial-low";
+export const CSS_VAR_PARTIAL_HIGH = "--blockmap-partial-high";
+export const CSS_VAR_PARTIAL = "--blockmap-partial";
+export const CSS_VAR_COMPLETE = "--blockmap-complete";
 
 export const DEFAULT_THEME = {
   missing: "#2b2b2b",

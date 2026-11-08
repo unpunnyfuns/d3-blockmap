@@ -5,19 +5,19 @@
 <title>d3-blockmap demo</title>
 <style>
   :root {
-    --block-missing: #1f2430;
-    --block-partial-low: #5a3d12;
-    --block-partial-high: #f0b429;
-    --block-partial: #f0b429;
-    --block-complete: #3ddc84;
+    --blockmap-missing: #1f2430;
+    --blockmap-partial-low: #5a3d12;
+    --blockmap-partial-high: #f0b429;
+    --blockmap-partial: #f0b429;
+    --blockmap-complete: #3ddc84;
     color-scheme: dark;
   }
   html[data-theme="light"] {
-    --block-missing: #e3e6ec;
-    --block-partial-low: #ffd9a8;
-    --block-partial-high: #ff8c00;
-    --block-partial: #ff8c00;
-    --block-complete: #1a9e4b;
+    --blockmap-missing: #e3e6ec;
+    --blockmap-partial-low: #ffd9a8;
+    --blockmap-partial-high: #ff8c00;
+    --blockmap-partial: #ff8c00;
+    --blockmap-complete: #1a9e4b;
     color-scheme: light;
   }
   body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 32px; background: Canvas; color: CanvasText; }
@@ -26,7 +26,7 @@
   .label { display: flex; justify-content: space-between; margin-bottom: 6px; color: GrayText; }
   .map { height: 24px; }
   .map canvas { border-radius: 3px; }
-  [data-block-tooltip] { background: #000c; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-top: -6px; }
+  [data-blockmap-tooltip] { background: #000c; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-top: -6px; }
   button { margin-right: 8px; }
 </style>
 </head>
