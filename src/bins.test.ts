@@ -50,4 +50,43 @@ describe("createBins", () => {
     expect(bins.sizeOf(0)).toBe(1);
     expect(bins.sizeOf(1)).toBe(0);
   });
+
+  it("addRange within one bin adds the span length", () => {
+    const bins = createBins(10, 3);
+    bins.addRange(1, 3);
+    expect(Array.from(bins.counts)).toEqual([2, 0, 0]);
+  });
+
+  it("addRange spanning two bins splits at the bin edge", () => {
+    const bins = createBins(10, 3);
+    bins.addRange(3, 5);
+    expect(Array.from(bins.counts)).toEqual([1, 1, 0]);
+  });
+
+  it("addRange spanning all bins fills full middle bins", () => {
+    const bins = createBins(10, 3);
+    bins.addRange(0, 10);
+    expect(Array.from(bins.counts)).toEqual([4, 3, 3]);
+  });
+
+  it("addRange matches rebuild for the same set", () => {
+    const ranges: Array<[number, number]> = [
+      [0, 7],
+      [20, 21],
+      [33, 60],
+      [95, 100],
+    ];
+    const viaRange = createBins(100, 7);
+    ranges.forEach(([s, e]) => viaRange.addRange(s, e));
+    const viaRebuild = createBins(100, 7);
+    viaRebuild.rebuild((i) => ranges.some(([s, e]) => i >= s && i < e));
+    expect(Array.from(viaRange.counts)).toEqual(Array.from(viaRebuild.counts));
+  });
+
+  it("addRange is a no-op with zero bins or an empty span", () => {
+    expect(() => createBins(10, 0).addRange(0, 10)).not.toThrow();
+    const bins = createBins(10, 3);
+    bins.addRange(4, 4);
+    expect(Array.from(bins.counts)).toEqual([0, 0, 0]);
+  });
 });

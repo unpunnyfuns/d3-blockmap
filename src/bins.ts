@@ -7,6 +7,7 @@ export type Bins = {
   rangeOf(bin: number): BlockRange;
   sizeOf(bin: number): number;
   rebuild(has: (index: number) => boolean): void;
+  addRange(start: number, end: number): void;
 };
 
 export const createBins = (totalBlocks: number, binCount: number): Bins => {
@@ -16,22 +17,35 @@ export const createBins = (totalBlocks: number, binCount: number): Bins => {
     start: Math.ceil((bin * totalBlocks) / binCount),
     end: Math.ceil(((bin + 1) * totalBlocks) / binCount),
   });
+  const sizeOf = (bin: number): number => {
+    const { start, end } = rangeOf(bin);
+    return end - start;
+  };
 
   return {
     binCount,
     counts,
     binOf,
     rangeOf,
-    sizeOf: (bin) => {
-      const { start, end } = rangeOf(bin);
-      return end - start;
-    },
+    sizeOf,
     rebuild: (has) => {
       counts.fill(0);
       if (binCount === 0) return;
       for (let index = 0; index < totalBlocks; index += 1) {
         if (has(index)) counts[binOf(index)] += 1;
       }
+    },
+    addRange: (start, end) => {
+      if (binCount === 0 || end <= start) return;
+      const first = binOf(start);
+      const last = binOf(end - 1);
+      if (first === last) {
+        counts[first] += end - start;
+        return;
+      }
+      counts[first] += rangeOf(first).end - start;
+      for (let bin = first + 1; bin < last; bin += 1) counts[bin] += sizeOf(bin);
+      counts[last] += end - rangeOf(last).start;
     },
   };
 };
