@@ -117,6 +117,24 @@ describe("createRenderer", () => {
     expect([6, 7, 8].map((c) => pixel(image, c))).toEqual(Array(3).fill([0, 0, 0, 255]));
   });
 
+  it("does not stall repaints when the scheduler runs synchronously", () => {
+    const state = createPieceState(10);
+    state.resize(5);
+    const { ctx, puts } = createStubContext();
+    const scheduler: Scheduler = {
+      request: (callback) => {
+        callback();
+        return 1;
+      },
+      cancel: () => {},
+    };
+    const renderer = createRenderer(ctx, state, scheduler);
+    renderer.setColors(createColorScale(theme));
+    renderer.markDirty(state.add([0]));
+    renderer.markDirty(state.add([1]));
+    expect(puts).toHaveLength(3);
+  });
+
   it("skips painting with zero bins and cancels on destroy", () => {
     const source: RenderSource = {
       totalBlocks: 10,

@@ -46,6 +46,7 @@ export const createRenderer = (
   let image: ImageDataLike | undefined;
   let scale: ColorScale | undefined;
   let frame = NO_FRAME;
+  let scheduled = false;
   let allDirty = false;
   const dirty = new Set<number>();
 
@@ -83,6 +84,7 @@ export const createRenderer = (
   };
 
   const paint = (): void => {
+    scheduled = false;
     frame = NO_FRAME;
     const target = ensureImage();
     if (!target || !scale) {
@@ -98,7 +100,9 @@ export const createRenderer = (
   };
 
   const schedule = (): void => {
-    if (frame === NO_FRAME) frame = scheduler.request(paint);
+    if (scheduled) return;
+    scheduled = true;
+    frame = scheduler.request(paint);
   };
 
   return {
@@ -116,7 +120,8 @@ export const createRenderer = (
       schedule();
     },
     destroy: () => {
-      if (frame !== NO_FRAME) scheduler.cancel(frame);
+      if (scheduled) scheduler.cancel(frame);
+      scheduled = false;
       frame = NO_FRAME;
       dirty.clear();
     },
