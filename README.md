@@ -80,7 +80,7 @@ Returns:
 | `setView(view)` | Clamp and apply a view window; repaints and calls `onViewChange` if it changed. |
 | `resetView()` | Back to the full range. |
 | `getView()` | Current `{ start, end }`. |
-| `setHighlight(on)` | Blink every incomplete bin between its colour and `--blockmap-highlight` at 2 Hz. Steady under `prefers-reduced-motion`. |
+| `setHighlight(on)` | Blink every incomplete bin between its colour and `--blockmap-highlight` at 1 Hz (toggles every 500 ms). Steady under `prefers-reduced-motion`. |
 | `destroy()` | Remove canvas, tooltip, observers. Idempotent. |
 
 ### Theming
@@ -113,16 +113,18 @@ The tooltip element carries the attribute `data-blockmap-tooltip` and ships unst
 
 ### Behaviour
 
-- Bin count equals rendered width in device pixels. Blocks map to bins by `floor(index × binCount / totalBlocks)`.
-- When `totalBlocks` is less than the width, each block is drawn as a discrete segment.
+- Bin count equals rendered width in device pixels. Blocks map to bins by `floor((index − view.start) × binCount / viewLength)`.
+- Each block is drawn as a discrete segment when the view is narrower than the pixel width.
 - Hovering shows block range, count, and percentage for the column.
 - Resize and `devicePixelRatio` changes rebuild bins from the internal bitset in one pass.
-- Resize rebuilds bin counts with a byte-level popcount over the bitset, O(totalBlocks / 8 + bins).
+- Resize and view changes rebuild bin counts over the current view with a byte-level popcount, O(viewLength / 8 + bins).
 - The container is set to `position: relative` if it is static, so the tooltip can be positioned inside it.
 - The container must have a height; the canvas fills it via `width: 100%; height: 100%`.
 - Range ends are exclusive. Tuples are clamped to the block range; empty or inverted tuples are dropped; overlapping and touching tuples merge.
 - Zooming keeps the block under the cursor at the same column; the view is clamped to the block range with a minimum of one block.
 - Bins are computed over the current view, so zooming far enough in switches to discrete per-block segments.
+- View changes from the API or interaction are coalesced to one rebuild per animation frame.
+- There is no keyboard affordance for zoom or pan yet.
 
 ## Development
 

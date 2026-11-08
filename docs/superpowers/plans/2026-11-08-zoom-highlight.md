@@ -1558,7 +1558,7 @@ A static server may already be running on port 4173 (`curl -s -o /dev/null -w "%
 | `setView(view)` | Clamp and apply a view window; repaints and calls `onViewChange` if it changed. |
 | `resetView()` | Back to the full range. |
 | `getView()` | Current `{ start, end }`. |
-| `setHighlight(on)` | Blink every incomplete bin between its colour and `--blockmap-highlight` at 2 Hz. Steady under `prefers-reduced-motion`. |
+| `setHighlight(on)` | Blink every incomplete bin between its colour and `--blockmap-highlight` at 1 Hz (toggles every 500 ms). Steady under `prefers-reduced-motion`. |
 ```
 - React section: document `view`, `interactive`, `onViewChange`, `highlight` props and the extended handle. Note that `interactive` recreates the instance.
 - Behaviour bullets: "Zooming keeps the block under the cursor at the same column; the view is clamped to the block range with a minimum of one block." and "Bins are computed over the current view, so zooming far enough in switches to discrete per-block segments."

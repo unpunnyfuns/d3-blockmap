@@ -169,6 +169,10 @@ document.querySelector("#reset").onclick = () => {
   small.setBlocks([]);
   seedRuns();
   rangeMap.setRanges([]);
+  maps.forEach((map) => map.resetView());
+  highlighted = false;
+  maps.forEach((map) => map.setHighlight(false));
+  document.querySelector("#highlight").textContent = "Highlight incomplete";
   running = true;
   document.querySelector("#toggle").textContent = "Pause";
 };
