@@ -125,4 +125,60 @@ describe("createBlockState", () => {
     state.resize(3);
     expect([0, 1, 2].map(state.countOf)).toEqual([2, 3, 0]);
   });
+
+  it("defaults to the full view", () => {
+    const state = createBlockState(100);
+    expect(state.getView()).toEqual({ start: 0, end: 100 });
+  });
+
+  it("setView rebuilds bins over the window", () => {
+    const state = createBlockState(100);
+    state.resize(5);
+    state.replaceRanges([[0, 50]]);
+    expect(state.setView({ start: 40, end: 60 })).toBe(true);
+    expect(state.getView()).toEqual({ start: 40, end: 60 });
+    expect([0, 1, 2, 3, 4].map(state.countOf)).toEqual([4, 4, 2, 0, 0]);
+    expect(state.rangeOf(0)).toEqual({ start: 40, end: 44 });
+    expect(state.progress().completed).toBe(50);
+  });
+
+  it("setView ignores same, inverted and non-finite input appropriately", () => {
+    const state = createBlockState(100);
+    state.resize(5);
+    expect(state.setView({ start: 0, end: 100 })).toBe(false);
+    expect(state.setView({ start: 60, end: 40 })).toBe(true);
+    expect(state.getView()).toEqual({ start: 40, end: 60 });
+    expect(state.setView({ start: Number.NaN, end: 10 })).toBe(false);
+    expect(state.getView()).toEqual({ start: 40, end: 60 });
+  });
+
+  it("add outside the view sets bits and progress but not bins", () => {
+    const state = createBlockState(100);
+    state.resize(5);
+    state.setView({ start: 40, end: 60 });
+    const dirty = state.add([10, 45]);
+    expect(Array.from(dirty)).toEqual([1]);
+    expect(state.has(10)).toBe(true);
+    expect(state.progress().completed).toBe(2);
+    expect([0, 1, 2, 3, 4].map(state.countOf)).toEqual([0, 1, 0, 0, 0]);
+  });
+
+  it("replaceRanges under a view clips bins but keeps full progress", () => {
+    const state = createBlockState(100);
+    state.resize(5);
+    state.setView({ start: 40, end: 60 });
+    state.replaceRanges([
+      [0, 44],
+      [58, 100],
+    ]);
+    expect([0, 1, 2, 3, 4].map(state.countOf)).toEqual([4, 0, 0, 0, 2]);
+    expect(state.progress().completed).toBe(86);
+  });
+
+  it("resize keeps the current view", () => {
+    const state = createBlockState(100);
+    state.setView({ start: 40, end: 60 });
+    state.resize(4);
+    expect(state.rangeOf(3)).toEqual({ start: 55, end: 60 });
+  });
 });

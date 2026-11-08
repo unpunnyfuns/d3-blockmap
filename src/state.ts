@@ -4,14 +4,18 @@ import type { Bins, BlockRange } from "./bins";
 import { MAX_BLOCKS, RANGE_PAIR } from "./constants";
 import { normalizeRanges, rangesLength } from "./ranges";
 import type { RangeInput } from "./ranges";
-import { fullView } from "./view";
+import { clampView, fullView, sameView } from "./view";
+import type { BlockView } from "./view";
 
 export type Progress = { completed: number; total: number };
 
 export type BlockState = {
   readonly totalBlocks: number;
   readonly binCount: number;
+  readonly view: BlockView;
   resize(binCount: number): void;
+  setView(view: BlockView): boolean;
+  getView(): BlockView;
   add(indices: ArrayLike<number>): Uint32Array;
   replace(indices: ArrayLike<number>): void;
   replaceRanges(input: RangeInput): void;
@@ -39,7 +43,10 @@ export const createBlockState = (totalBlocks: number): BlockState => {
   }
 
   const bitset = createBitset(totalBlocks);
-  let bins: Bins = createBins(fullView(totalBlocks), 0);
+  let view: BlockView = fullView(totalBlocks);
+  let bins: Bins = createBins(view, 0);
+
+  const inView = (index: number): boolean => index >= view.start && index < view.end;
 
   const add = (indices: ArrayLike<number>): Uint32Array => {
     const hasBins = bins.binCount > 0;
@@ -47,7 +54,7 @@ export const createBlockState = (totalBlocks: number): BlockState => {
     for (let i = 0; i < indices.length; i += 1) {
       const index = indices[i];
       if (!isValidIndex(index, totalBlocks) || !bitset.set(index)) continue;
-      if (!hasBins) continue;
+      if (!hasBins || !inView(index)) continue;
       const bin = bins.binOf(index);
       bins.counts[bin] += 1;
       dirty.add(bin);
@@ -60,10 +67,23 @@ export const createBlockState = (totalBlocks: number): BlockState => {
     get binCount() {
       return bins.binCount;
     },
+    get view() {
+      return view;
+    },
     resize: (binCount) => {
-      bins = createBins(fullView(totalBlocks), binCount);
+      bins = createBins(view, binCount);
       bins.rebuild(bitset.countRange);
     },
+    setView: (next) => {
+      if (!Number.isFinite(next.start) || !Number.isFinite(next.end)) return false;
+      const clamped = clampView(next, totalBlocks);
+      if (sameView(clamped, view)) return false;
+      view = clamped;
+      bins = createBins(view, bins.binCount);
+      bins.rebuild(bitset.countRange);
+      return true;
+    },
+    getView: () => ({ ...view }),
     add,
     replace: (indices) => {
       bitset.clear();
