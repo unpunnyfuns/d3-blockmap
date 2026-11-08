@@ -38,6 +38,10 @@
   <div class="label"><span>40 blocks, discrete mode</span><span id="small-progress"></span></div>
   <div id="small" class="map"></div>
 </section>
+<section>
+  <div class="label"><span>10,000,000 blocks, range snapshots, coverage style</span><span id="ranges-progress"></span></div>
+  <div id="ranges" class="map"></div>
+</section>
 <p>
   <button id="toggle">Pause</button>
   <button id="theme">Toggle theme</button>
@@ -60,6 +64,34 @@ const FRONTS = 6;
 
 const big = createPieceMap(document.querySelector("#big"), { totalBlocks: BIG });
 const small = createPieceMap(document.querySelector("#small"), { totalBlocks: SMALL, initialBlocks: [0, 1, 2, 7, 8, 20, 21, 22, 23, 39] });
+const rangeMap = createPieceMap(document.querySelector("#ranges"), {
+  totalBlocks: BIG,
+  partial: "coverage",
+});
+const RUN_SEED = 40;
+const RUN_MAX = 400;
+const RUN_START_LENGTH = 50_000;
+const RUN_GROWTH = 4_000;
+const NEW_RUN_EVERY = 20;
+const SNAPSHOT_EVERY = 5;
+const runs = [];
+const addRun = () =>
+  runs.push([Math.floor(Math.random() * BIG), Math.floor(Math.random() * RUN_START_LENGTH)]);
+const seedRuns = () => {
+  runs.length = 0;
+  for (let i = 0; i < RUN_SEED; i += 1) addRun();
+};
+seedRuns();
+let rangeTick = 0;
+const stepRanges = () => {
+  rangeTick += 1;
+  for (const run of runs) run[1] += Math.floor(Math.random() * RUN_GROWTH);
+  if (rangeTick % NEW_RUN_EVERY === 0 && runs.length < RUN_MAX) addRun();
+  if (rangeTick % SNAPSHOT_EVERY === 0) {
+    rangeMap.setRanges(runs.map(([start, length]) => [start, start + length]));
+    showProgress(rangeMap, document.querySelector("#ranges-progress"));
+  }
+};
 
 const fmt = new Intl.NumberFormat("en-US");
 const showProgress = (map, el) => {
@@ -84,6 +116,7 @@ const step = () => {
     if (smallTick % 30 === 0) small.addBlocks([Math.floor(Math.random() * SMALL)]);
     showProgress(big, document.querySelector("#big-progress"));
     showProgress(small, document.querySelector("#small-progress"));
+    stepRanges();
   }
   requestAnimationFrame(step);
 };
@@ -94,7 +127,12 @@ document.querySelector("#theme").onclick = () => {
   const html = document.documentElement;
   html.dataset.theme = html.dataset.theme === "light" ? "" : "light";
 };
-document.querySelector("#reset").onclick = () => { big.setBlocks([]); small.setBlocks([]); };
+document.querySelector("#reset").onclick = () => {
+  big.setBlocks([]);
+  small.setBlocks([]);
+  seedRuns();
+  rangeMap.setRanges([]);
+};
 </script>
 </body>
 </html>
