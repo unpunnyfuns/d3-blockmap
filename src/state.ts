@@ -1,6 +1,9 @@
 import { createBitset } from "./bitset";
 import { createBins } from "./bins";
 import type { Bins, BlockRange } from "./bins";
+import { RANGE_PAIR } from "./constants";
+import { normalizeRanges, rangesLength } from "./ranges";
+import type { RangeInput } from "./ranges";
 
 export type Progress = { completed: number; total: number };
 
@@ -10,6 +13,7 @@ export type PieceState = {
   resize(binCount: number): void;
   add(indices: ArrayLike<number>): Uint32Array;
   replace(indices: ArrayLike<number>): void;
+  replaceRanges(input: RangeInput): void;
   has(index: number): boolean;
   fraction(bin: number): number;
   countOf(bin: number): number;
@@ -59,6 +63,16 @@ export const createPieceState = (totalBlocks: number): PieceState => {
       bitset.clear();
       bins.counts.fill(0);
       add(indices);
+    },
+    replaceRanges: (input) => {
+      const flat = normalizeRanges(input, totalBlocks);
+      bitset.clear();
+      bins.counts.fill(0);
+      for (let i = 0; i < flat.length; i += RANGE_PAIR) {
+        bitset.fill(flat[i], flat[i + 1]);
+        bins.addRange(flat[i], flat[i + 1]);
+      }
+      bitset.setCount(rangesLength(flat));
     },
     has: bitset.has,
     fraction: (bin) => {

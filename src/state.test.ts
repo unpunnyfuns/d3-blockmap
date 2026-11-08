@@ -65,4 +65,50 @@ describe("createPieceState", () => {
     expect(state.rangeOf(1)).toEqual({ start: 4, end: 7 });
     expect(state.sizeOf(1)).toBe(3);
   });
+
+  it("replaceRanges sets bins, progress and membership", () => {
+    const state = createPieceState(10);
+    state.resize(3);
+    state.replaceRanges([
+      [0, 2],
+      [4, 7],
+    ]);
+    expect([0, 1, 2].map(state.countOf)).toEqual([2, 3, 0]);
+    expect(state.progress()).toEqual({ completed: 5, total: 10 });
+    expect(state.has(1)).toBe(true);
+    expect(state.has(2)).toBe(false);
+    expect(state.has(6)).toBe(true);
+    expect(state.has(7)).toBe(false);
+  });
+
+  it("replaceRanges clears previous state and accepts flat pairs", () => {
+    const state = createPieceState(10);
+    state.resize(2);
+    state.add([0, 1, 2, 3]);
+    state.replaceRanges(new Uint32Array([8, 10]));
+    expect([0, 1].map(state.countOf)).toEqual([0, 2]);
+    expect(state.progress().completed).toBe(2);
+    expect(state.has(0)).toBe(false);
+  });
+
+  it("add after replaceRanges dedupes against the ranges", () => {
+    const state = createPieceState(10);
+    state.resize(3);
+    state.replaceRanges([[0, 2]]);
+    const dirty = state.add([1, 2]);
+    expect(Array.from(dirty)).toEqual([0]);
+    expect(state.countOf(0)).toBe(3);
+    expect(state.progress().completed).toBe(3);
+  });
+
+  it("replaceRanges before resize is rebuilt correctly on resize", () => {
+    const state = createPieceState(10);
+    state.replaceRanges([
+      [0, 2],
+      [4, 7],
+    ]);
+    expect(state.progress().completed).toBe(5);
+    state.resize(3);
+    expect([0, 1, 2].map(state.countOf)).toEqual([2, 3, 0]);
+  });
 });
