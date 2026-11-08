@@ -23,3 +23,6 @@ export const DEFAULT_THEME = {
 
 export const THEME_ATTRIBUTES = ["class", "style", "data-theme"] as const;
 export const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
+
+export const RANGE_PAIR = 2;
+export const FULL_BYTE = 0xff;
