@@ -1,9 +1,12 @@
 import { createPieceMap } from "./pieceMap";
 
 type ResizeCallback = (entries: ResizeObserverEntry[]) => void;
+type MediaListener = { query: string; listener: () => void };
 
 const observers: ResizeCallback[] = [];
 const puts: ImageData[] = [];
+const mediaListeners: MediaListener[] = [];
+const removed: string[] = [];
 
 class StubResizeObserver {
   constructor(callback: ResizeCallback) {
@@ -19,6 +22,8 @@ const triggerResize = (width: number) =>
 beforeEach(() => {
   observers.length = 0;
   puts.length = 0;
+  mediaListeners.length = 0;
+  removed.length = 0;
   vi.stubGlobal("ResizeObserver", StubResizeObserver);
   vi.stubGlobal("devicePixelRatio", 2);
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
@@ -26,9 +31,13 @@ beforeEach(() => {
     return 1;
   });
   vi.stubGlobal("cancelAnimationFrame", () => {});
-  vi.stubGlobal("matchMedia", () => ({
-    addEventListener() {},
-    removeEventListener() {},
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    addEventListener: (_type: string, listener: () => void) => {
+      mediaListeners.push({ query, listener });
+    },
+    removeEventListener: (_type: string) => {
+      removed.push(query);
+    },
   }));
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
     createImageData: (width: number, height: number) =>
@@ -60,6 +69,25 @@ describe("createPieceMap", () => {
     expect(canvas.width).toBe(100);
     expect(canvas.height).toBe(1);
     expect(puts.at(-1)?.width).toBe(100);
+    map.destroy();
+  });
+
+  it("re-reads devicePixelRatio on resolution change and re-arms", () => {
+    const container = mount();
+    const map = createPieceMap(container, { totalBlocks: 100 });
+    triggerResize(50);
+    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+    expect(canvas.width).toBe(100);
+
+    vi.stubGlobal("devicePixelRatio", 3);
+    const resolutionListener = mediaListeners
+      .filter((entry) => entry.query.includes("resolution"))
+      .at(-1);
+    resolutionListener?.listener();
+
+    expect(canvas.width).toBe(150);
+    expect(mediaListeners.some((entry) => entry.query.includes("3dppx"))).toBe(true);
+    expect(removed).toContain("(resolution: 2dppx)");
     map.destroy();
   });
 
@@ -99,6 +127,7 @@ describe("createPieceMap", () => {
     expect(container.querySelector("[data-piece-tooltip]")).toBeNull();
     expect(() => map.addBlocks([1])).not.toThrow();
     expect(() => map.destroy()).not.toThrow();
+    expect(removed).toContain("(resolution: 2dppx)");
   });
 
   it("throws when the 2d context is unavailable", () => {
