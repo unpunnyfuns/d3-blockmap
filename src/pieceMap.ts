@@ -1,0 +1,124 @@
+import { createColorScale, readTheme, watchTheme } from "./colors";
+import { createRenderer } from "./renderer";
+import type { Renderer } from "./renderer";
+import { createPieceState } from "./state";
+import type { Progress } from "./state";
+import { createTooltip, formatBinTooltip, formatBlockTooltip } from "./tooltip";
+
+export type PieceMapOptions = {
+  totalBlocks: number;
+  initialBlocks?: ArrayLike<number>;
+};
+
+export type PieceMap = {
+  setBlocks(indices: ArrayLike<number>): void;
+  addBlocks(indices: ArrayLike<number>): void;
+  getProgress(): Progress;
+  destroy(): void;
+};
+
+const CANVAS_HEIGHT_PX = 1;
+const FULL = "100%";
+const CONTEXT_ID = "2d";
+
+const dprQuery = (dpr: number): string => `(resolution: ${dpr}dppx)`;
+
+export const createPieceMap = (container: HTMLElement, options: PieceMapOptions): PieceMap => {
+  const state = createPieceState(options.totalBlocks);
+
+  const canvas = document.createElement("canvas");
+  Object.assign(canvas.style, { display: "block", width: FULL, height: FULL });
+  canvas.height = CANVAS_HEIGHT_PX;
+  container.append(canvas);
+
+  const ctx = canvas.getContext(CONTEXT_ID);
+  if (!ctx) {
+    canvas.remove();
+    throw new Error(`Could not acquire a ${CONTEXT_ID} canvas context`);
+  }
+
+  const renderer: Renderer = createRenderer(ctx, state);
+  const tooltip = createTooltip(container);
+  let destroyed = false;
+  let cssWidth = 0;
+  let dpr = devicePixelRatio;
+  let dprMedia: MediaQueryList | undefined;
+
+  const applyTheme = (): void => {
+    renderer.setColors(createColorScale(readTheme(container)));
+  };
+
+  const layout = (): void => {
+    const binCount = Math.round(cssWidth * dpr);
+    canvas.width = binCount;
+    state.resize(binCount);
+    renderer.markAllDirty();
+  };
+
+  const onDprChange = (): void => {
+    dpr = devicePixelRatio;
+    layout();
+    watchDpr();
+  };
+
+  const watchDpr = (): void => {
+    dprMedia?.removeEventListener("change", onDprChange);
+    dprMedia = matchMedia(dprQuery(dpr));
+    dprMedia.addEventListener("change", onDprChange, { once: true });
+  };
+
+  const resizeObserver = new ResizeObserver((entries) => {
+    const entry = entries[0];
+    if (!entry) return;
+    cssWidth = entry.contentRect.width;
+    layout();
+  });
+  resizeObserver.observe(container);
+
+  const onPointerMove = (event: PointerEvent): void => {
+    const { binCount, totalBlocks } = state;
+    if (binCount === 0) return;
+    const column = Math.min(binCount - 1, Math.max(0, Math.floor(event.offsetX * dpr)));
+    const text =
+      totalBlocks < binCount
+        ? (() => {
+            const block = Math.floor((column * totalBlocks) / binCount);
+            return formatBlockTooltip(block, state.has(block));
+          })()
+        : formatBinTooltip(state.rangeOf(column), state.countOf(column));
+    tooltip.show(event.offsetX, text);
+  };
+  const onPointerLeave = (): void => tooltip.hide();
+
+  canvas.addEventListener("pointermove", onPointerMove);
+  canvas.addEventListener("pointerleave", onPointerLeave);
+  const unwatchTheme = watchTheme(applyTheme);
+  watchDpr();
+  applyTheme();
+  if (options.initialBlocks) state.add(options.initialBlocks);
+
+  return {
+    setBlocks: (indices) => {
+      if (destroyed) return;
+      state.replace(indices);
+      renderer.markAllDirty();
+    },
+    addBlocks: (indices) => {
+      if (destroyed) return;
+      renderer.markDirty(state.add(indices));
+    },
+    getProgress: () => state.progress(),
+    destroy: () => {
+      if (destroyed) return;
+      destroyed = true;
+      resizeObserver.disconnect();
+      unwatchTheme();
+      dprMedia?.removeEventListener("change", onDprChange);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerleave", onPointerLeave);
+      renderer.destroy();
+      tooltip.destroy();
+      canvas.remove();
+    },
+  };
+};
