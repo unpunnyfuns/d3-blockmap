@@ -13,7 +13,7 @@ npm i d3-blockmap
 | Export | From | Purpose |
 |---|---|---|
 | `createBlockMap(container, options)` | `d3-blockmap` | Vanilla factory. Returns `BlockMap`. |
-| `BlockMap`, `BlockMapOptions`, `Progress`, `Theme`, `BlockRangeTuple`, `RangeInput`, `PartialStyle` | `d3-blockmap` | Types. |
+| `BlockMap`, `BlockMapOptions`, `Progress`, `Theme`, `BlockRangeTuple`, `RangeInput`, `PartialStyle`, `BlockView` | `d3-blockmap` | Types. |
 | `<BlockMap>` | `d3-blockmap/react` | React wrapper, `forwardRef` to `BlockMapHandle`. |
 | `BlockMapProps`, `BlockMapHandle` | `d3-blockmap/react` | Types. |
 
@@ -51,7 +51,9 @@ ref.current?.addBlocks(newIndices);
 
 A new `blocks` array identity triggers `setBlocks`; keep the reference stable between renders unless the full set changed. `ranges` (`RangeInput`) behaves the same way via `setRanges`. When both `ranges` and `blocks` are given, ranges are applied first and blocks are added on top; any identity change of either prop re-applies the `ranges` snapshot and then adds `blocks` on top again, so keep both references stable between renders. `partial` (`"gradient" | "coverage"`) recreates the underlying instance when its value changes.
 
-`BlockMapHandle` also exposes an imperative `setRanges(ranges)`, bypassing React state, for high-frequency snapshots where re-rendering on every tick would be wasteful. Do not combine it with the `ranges` prop; the prop's own effect will re-apply and fight the imperative calls.
+`view` (`BlockView`) applies via `setView` when its identity changes. `interactive` (`boolean`, default `true`) recreates the underlying instance when its value changes, same as `partial`. `onViewChange` is called after the view changes by API or interaction; its identity does not trigger instance recreation, so inline closures are fine. `highlight` (`boolean`) toggles blinking on incomplete bins via `setHighlight`.
+
+`BlockMapHandle` also exposes an imperative `setRanges(ranges)`, bypassing React state, for high-frequency snapshots where re-rendering on every tick would be wasteful. Do not combine it with the `ranges` prop; the prop's own effect will re-apply and fight the imperative calls. The handle additionally exposes `setView(view)`, `resetView()`, `getView()`, and `setHighlight(on)` for the same imperative use case.
 
 ## API
 
@@ -63,6 +65,9 @@ A new `blocks` array identity triggers `setBlocks`; keep the reference stable be
 | `initialBlocks` | `ArrayLike<number>` | Optional. Indices already complete. |
 | `initialRanges` | `RangeInput` | Optional. `[start, end)` tuples or a flat `Uint32Array` of pairs. Applied before `initialBlocks`. |
 | `partial` | `"gradient" \| "coverage"` | Default `"coverage"`. `"gradient"` is opt-in and blends between the two partial colours instead of missing-to-complete. |
+| `view` | `BlockView` | Optional. Initial `{ start, end }` window in block indices, `end` exclusive. |
+| `interactive` | `boolean` | Default `true`. Ctrl+wheel or pinch zooms around the cursor, drag pans, double-click resets. |
+| `onViewChange` | `(view: BlockView) => void` | Called after the view changes by API or interaction. |
 
 Returns:
 
@@ -72,6 +77,10 @@ Returns:
 | `setRanges(ranges)` | Replace all state from a snapshot of `[start, end)` tuples. Any sizes, unsorted and overlapping allowed. O(ranges log ranges + bins + totalBlocks / 8). |
 | `addBlocks(indices)` | Add newly completed indices. O(indices). Duplicates and out-of-range skipped. |
 | `getProgress()` | `{ completed, total }`. |
+| `setView(view)` | Clamp and apply a view window; repaints and calls `onViewChange` if it changed. |
+| `resetView()` | Back to the full range. |
+| `getView()` | Current `{ start, end }`. |
+| `setHighlight(on)` | Blink every incomplete bin between its colour and `--blockmap-highlight` at 2 Hz. Steady under `prefers-reduced-motion`. |
 | `destroy()` | Remove canvas, tooltip, observers. Idempotent. |
 
 ### Theming
@@ -85,8 +94,9 @@ Colours are read from CSS custom properties on the container at start and on the
 | `--blockmap-partial-high` | `#e0a500` |
 | `--blockmap-partial` | `#e0a500` |
 | `--blockmap-complete` | `#2ecc71` |
+| `--blockmap-highlight` | `#ff4d4f` |
 
-Fully missing and fully complete bins use the exact endpoint colours. By default (`partial: "coverage"`), partial bins fade `--blockmap-missing` → `--blockmap-partial` → `--blockmap-complete` by bin fill fraction. `partial: "gradient"` is opt-in and interpolates partial bins between `--blockmap-partial-low` and `--blockmap-partial-high` instead; those two variables apply only to `"gradient"`.
+Fully missing and fully complete bins use the exact endpoint colours. By default (`partial: "coverage"`), partial bins fade `--blockmap-missing` → `--blockmap-partial` → `--blockmap-complete` by bin fill fraction. `partial: "gradient"` is opt-in and interpolates partial bins between `--blockmap-partial-low` and `--blockmap-partial-high` instead; those two variables apply only to `"gradient"`. `--blockmap-highlight` is the blink colour for incomplete bins while highlight is on (see `setHighlight` below).
 
 #### Tooltip
 
@@ -111,6 +121,8 @@ The tooltip element carries the attribute `data-blockmap-tooltip` and ships unst
 - The container is set to `position: relative` if it is static, so the tooltip can be positioned inside it.
 - The container must have a height; the canvas fills it via `width: 100%; height: 100%`.
 - Range ends are exclusive. Tuples are clamped to the block range; empty or inverted tuples are dropped; overlapping and touching tuples merge.
+- Zooming keeps the block under the cursor at the same column; the view is clamped to the block range with a minimum of one block.
+- Bins are computed over the current view, so zooming far enough in switches to discrete per-block segments.
 
 ## Development
 
