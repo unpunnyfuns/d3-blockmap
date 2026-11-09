@@ -80,7 +80,7 @@ describe("createRenderer", () => {
   it("ignores a stale dirty bin when the source shrinks before paint", () => {
     const source = {
       binCount: 8,
-      view: { start: 0, end: 8 },
+      getView: () => ({ start: 0, end: 8 }),
       fraction: () => 0.5,
       has: () => false,
     };
@@ -100,7 +100,7 @@ describe("createRenderer", () => {
   it("skips painting with zero bins and cancels on destroy", () => {
     const source: RenderSource = {
       binCount: 0,
-      view: { start: 0, end: 10 },
+      getView: () => ({ start: 0, end: 10 }),
       fraction: () => 0,
       has: () => false,
     };

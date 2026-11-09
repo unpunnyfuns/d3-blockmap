@@ -63,11 +63,10 @@ describe("createBlockState", () => {
     expect(state.has(9)).toBe(true);
   });
 
-  it("exposes rangeOf and sizeOf", () => {
+  it("exposes rangeOf", () => {
     const state = createBlockState(10);
     state.resize(3);
-    expect(state.rangeOf(1)).toEqual({ start: 4, end: 7 });
-    expect(state.sizeOf(1)).toBe(3);
+    expect(state.rangeOf(1)).toEqual([4, 7]);
   });
 
   it("replaceRanges sets bins, progress and membership", () => {
@@ -138,7 +137,7 @@ describe("createBlockState", () => {
     expect(state.setView({ start: 40, end: 60 })).toBe(true);
     expect(state.getView()).toEqual({ start: 40, end: 60 });
     expect([0, 1, 2, 3, 4].map(state.countOf)).toEqual([4, 4, 2, 0, 0]);
-    expect(state.rangeOf(0)).toEqual({ start: 40, end: 44 });
+    expect(state.rangeOf(0)).toEqual([40, 44]);
     expect(state.progress().completed).toBe(50);
   });
 
@@ -179,7 +178,7 @@ describe("createBlockState", () => {
     const state = createBlockState(100);
     state.setView({ start: 40, end: 60 });
     state.resize(4);
-    expect(state.rangeOf(3)).toEqual({ start: 55, end: 60 });
+    expect(state.rangeOf(3)).toEqual([55, 60]);
   });
 
   it("addRanges counts only newly completed blocks and recounts touched bins", () => {
@@ -242,7 +241,7 @@ describe("createBlockState", () => {
     expect(state.progress().completed).toBe(98);
     expect(state.has(42)).toBe(false);
     const expectedDirty = Array.from({ length: state.binCount }, (_, bin) => bin).filter((bin) => {
-      const { start, end } = state.rangeOf(bin);
+      const [start, end] = state.rangeOf(bin);
       return start < 44 && end > 42;
     });
     expect(Array.from(dirty)).toEqual(expectedDirty);

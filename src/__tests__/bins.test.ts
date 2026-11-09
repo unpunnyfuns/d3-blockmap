@@ -14,7 +14,7 @@ describe("createBins", () => {
     const bins = createBins(full(totalBlocks), binCount);
     let covered = 0;
     for (let bin = 0; bin < binCount; bin += 1) {
-      const { start, end } = bins.rangeOf(bin);
+      const [start, end] = bins.rangeOf(bin);
       expect(end).toBeGreaterThanOrEqual(start);
       for (let i = start; i < end; i += 1) expect(bins.binOf(i)).toBe(bin);
       if (start > 0) expect(bins.binOf(start - 1)).toBe(bin - 1);
@@ -22,8 +22,8 @@ describe("createBins", () => {
       covered += end - start;
     }
     expect(covered).toBe(totalBlocks);
-    expect(bins.rangeOf(0).start).toBe(0);
-    expect(bins.rangeOf(binCount - 1).end).toBe(totalBlocks);
+    expect(bins.rangeOf(0)[0]).toBe(0);
+    expect(bins.rangeOf(binCount - 1)[1]).toBe(totalBlocks);
   });
 
   it("sizeOf equals range length", () => {
@@ -117,9 +117,8 @@ describe("createBins", () => {
   it("maps indices relative to a view offset", () => {
     const bins = createBins({ start: 100, end: 110 }, 3);
     expect([100, 103, 104, 106, 107, 109].map(bins.binOf)).toEqual([0, 0, 1, 1, 2, 2]);
-    expect(bins.rangeOf(1)).toEqual({ start: 104, end: 107 });
+    expect(bins.rangeOf(1)).toEqual([104, 107]);
     expect(bins.sizeOf(0)).toBe(4);
-    expect(bins.view).toEqual({ start: 100, end: 110 });
   });
 
   it("addRange clips to the view", () => {

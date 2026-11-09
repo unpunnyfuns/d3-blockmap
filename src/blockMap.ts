@@ -231,7 +231,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   // The axis and the brush overlay are both laid out in css pixels against
   // the current view, so neither can be refreshed without the other.
   const updateChrome = (): void => {
-    axis?.update(state.view, cssWidth);
+    axis?.update(state.getView(), cssWidth);
     lastChromeWidth = cssWidth;
     lastChromeHeight = cssHeight;
     overlay?.update();
@@ -242,7 +242,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
 
   // Reports the requested view, not the committed one, so a read straight
   // after setView sees what the caller just asked for.
-  const getView = (): BlockView => ({ ...(pendingView ?? state.view) });
+  const getView = (): BlockView => ({ ...(pendingView ?? state.getView()) });
 
   /**
    * Applies at most one view change per frame. Rebinning a view change is the
@@ -269,7 +269,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     if (!Number.isFinite(view.start) || !Number.isFinite(view.end)) return;
 
     const clamped = clampView(view, state.totalBlocks);
-    if (sameView(clamped, pendingView ?? state.view)) return;
+    if (sameView(clamped, pendingView ?? state.getView())) return;
 
     pendingView = clamped;
     if (viewFrame !== NO_FRAME) return;
@@ -331,7 +331,6 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   resizeObserver.observe(container);
 
   type Hit = {
-    column: number;
     block: number;
     range: BlockRange;
     completed: number;
@@ -350,17 +349,17 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
    * Returns undefined before the first layout too, when there are no bins.
    */
   const locate = (x: number): Hit | undefined => {
-    const { binCount, view } = state;
+    const { binCount } = state;
     if (binCount === 0) return undefined;
     if (x < 0 || x >= cssWidth) return undefined;
 
     const column = Math.min(binCount - 1, Math.max(0, Math.floor(x * dpr)));
+    const view = state.getView();
     const length = viewLength(view);
 
     if (length < binCount) {
       const block = view.start + discreteBlock(column, length, binCount);
       return {
-        column,
         block,
         range: [block, block + 1],
         completed: state.has(block) ? 1 : 0,
@@ -368,9 +367,8 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       };
     }
 
-    const { start, end } = state.rangeOf(column);
+    const [start, end] = state.rangeOf(column);
     return {
-      column,
       block: start,
       range: [start, end],
       completed: state.countOf(column),
@@ -393,9 +391,9 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     }
 
     const text =
-      viewLength(state.view) < state.binCount
+      viewLength(state.getView()) < state.binCount
         ? formatBlockTooltip(hit.block, hit.completed === 1)
-        : formatBinTooltip({ start: hit.range[0], end: hit.range[1] }, hit.completed);
+        : formatBinTooltip(hit.range, hit.completed);
     tooltip.show(x, text);
   };
 
@@ -424,8 +422,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     const hit = locate(canvasX(canvas, event));
     if (!hit) return;
 
-    const { column: _column, ...rest } = hit;
-    options.onBlockClick({ ...rest, originalEvent: event });
+    options.onBlockClick({ ...hit, originalEvent: event });
   };
 
   container.addEventListener("pointermove", onPointerMove);

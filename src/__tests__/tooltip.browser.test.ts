@@ -2,27 +2,25 @@ import { createTooltip, formatBinTooltip, formatBlockTooltip } from "../tooltip"
 
 describe("formatBinTooltip", () => {
   it("shows range, count and percentage", () => {
-    expect(formatBinTooltip({ start: 1234000, end: 1235250 }, 812)).toBe(
+    expect(formatBinTooltip([1234000, 1235250], 812)).toBe(
       "Blocks 1,234,000–1,235,249 · 812 / 1,250 (65.0%)",
     );
   });
 
   it("collapses a single-block range", () => {
-    expect(formatBinTooltip({ start: 5, end: 6 }, 1)).toBe("Block 5 · 1 / 1 (100%)");
+    expect(formatBinTooltip([5, 6], 1)).toBe("Block 5 · 1 / 1 (100%)");
   });
 
   it("shows 0% for empty bin", () => {
-    expect(formatBinTooltip({ start: 0, end: 1250 }, 0)).toBe("Blocks 0–1,249 · 0 / 1,250 (0%)");
+    expect(formatBinTooltip([0, 1250], 0)).toBe("Blocks 0–1,249 · 0 / 1,250 (0%)");
   });
 
   it("shows >99.9% for nearly full bin", () => {
-    expect(formatBinTooltip({ start: 0, end: 2500 }, 2499)).toBe(
-      "Blocks 0–2,499 · 2,499 / 2,500 (>99.9%)",
-    );
+    expect(formatBinTooltip([0, 2500], 2499)).toBe("Blocks 0–2,499 · 2,499 / 2,500 (>99.9%)");
   });
 
   it("shows <0.1% for sparse bin", () => {
-    expect(formatBinTooltip({ start: 0, end: 2500 }, 1)).toBe("Blocks 0–2,499 · 1 / 2,500 (<0.1%)");
+    expect(formatBinTooltip([0, 2500], 1)).toBe("Blocks 0–2,499 · 1 / 2,500 (<0.1%)");
   });
 });
 

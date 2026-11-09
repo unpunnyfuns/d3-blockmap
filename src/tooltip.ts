@@ -5,9 +5,9 @@
  * testing - the caller decides which bin or block is under the pointer.
  */
 
-import type { BinRange } from "./bins";
 import { DECIMAL_BASE, PERCENT, PERCENT_FRACTION_DIGITS, TOOLTIP_OFFSET_PX } from "./constants";
 import { ensureRelative } from "./dom";
+import type { BlockRange } from "./ranges";
 
 export type Tooltip = {
   show(x: number, text: string): void;
@@ -54,12 +54,12 @@ const formatPercent = (count: number, size: number): string => {
 
 // Ranges are half-open, so the label's last block is end - 1, and a bin that
 // covers a single block is named rather than given a degenerate range.
-export const formatBinTooltip = (range: BinRange, count: number): string => {
-  const size = range.end - range.start;
+export const formatBinTooltip = ([start, end]: BlockRange, count: number): string => {
+  const size = end - start;
   const label =
     size === 1
-      ? `Block ${countFormat.format(range.start)}`
-      : `Blocks ${countFormat.format(range.start)}${EN_DASH}${countFormat.format(range.end - 1)}`;
+      ? `Block ${countFormat.format(start)}`
+      : `Blocks ${countFormat.format(start)}${EN_DASH}${countFormat.format(end - 1)}`;
   return `${label}${SEPARATOR}${countFormat.format(count)} / ${countFormat.format(size)} (${formatPercent(count, size)})`;
 };
 

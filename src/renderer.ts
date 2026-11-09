@@ -25,7 +25,7 @@ export type Canvas2dLike = {
 
 export type RenderSource = {
   readonly binCount: number;
-  readonly view: BlockView;
+  getView(): BlockView;
   fraction(bin: number): number;
   has(index: number): boolean;
 };
@@ -114,7 +114,8 @@ export const createRenderer = (
    * either present or not.
    */
   const paintDiscrete = (target: ImageDataLike, colors: ColorScale): void => {
-    const { view, binCount } = source;
+    const { binCount } = source;
+    const view = source.getView();
     const length = viewLength(view);
 
     for (let block = 0; block < length; block += 1) {
@@ -157,7 +158,7 @@ export const createRenderer = (
       return;
     }
 
-    if (viewLength(source.view) < source.binCount) paintDiscrete(target, scale);
+    if (viewLength(source.getView()) < source.binCount) paintDiscrete(target, scale);
     else paintBins(target, scale);
     ctx.putImageData(target, 0, 0);
 

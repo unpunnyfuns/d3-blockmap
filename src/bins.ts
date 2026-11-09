@@ -4,16 +4,14 @@
  * Uint32Array: no DOM, no colours, no knowledge of how bins are painted.
  */
 
+import type { BlockRange } from "./ranges";
 import type { BlockView } from "./view";
 
-export type BinRange = { start: number; end: number };
-
 export type Bins = {
-  readonly view: BlockView;
   readonly binCount: number;
   readonly counts: Uint32Array;
   binOf(index: number): number;
-  rangeOf(bin: number): BinRange;
+  rangeOf(bin: number): BlockRange;
   sizeOf(bin: number): number;
   rebuild(countInRange: (start: number, end: number) => number): void;
   addRange(start: number, end: number): void;
@@ -48,10 +46,7 @@ const clipToView = (
   rawEnd: number,
   viewStart: number,
   viewEnd: number,
-): BinRange => ({
-  start: Math.max(rawStart, viewStart),
-  end: Math.min(rawEnd, viewEnd),
-});
+): BlockRange => [Math.max(rawStart, viewStart), Math.min(rawEnd, viewEnd)];
 
 export const createBins = (view: BlockView, binCount: number): Bins => {
   const { start: viewStart, end: viewEnd } = view;
@@ -68,18 +63,17 @@ export const createBins = (view: BlockView, binCount: number): Bins => {
    * b * length / binCount is its first block, hence ceil on both ends. Using
    * floor here would overlap neighbouring bins by a block.
    */
-  const rangeOf = (bin: number): BinRange => ({
-    start: viewStart + Math.ceil((bin * length) / binCount),
-    end: viewStart + Math.ceil(((bin + 1) * length) / binCount),
-  });
+  const rangeOf = (bin: number): BlockRange => [
+    viewStart + Math.ceil((bin * length) / binCount),
+    viewStart + Math.ceil(((bin + 1) * length) / binCount),
+  ];
 
   const sizeOf = (bin: number): number => {
-    const { start, end } = rangeOf(bin);
+    const [start, end] = rangeOf(bin);
     return end - start;
   };
 
   return {
-    view,
     binCount,
     counts,
     binOf,
@@ -92,7 +86,7 @@ export const createBins = (view: BlockView, binCount: number): Bins => {
       if (binCount === 0) return;
 
       for (let bin = 0; bin < binCount; bin += 1) {
-        const { start, end } = rangeOf(bin);
+        const [start, end] = rangeOf(bin);
         counts[bin] = countInRange(start, end);
       }
     },
@@ -103,7 +97,7 @@ export const createBins = (view: BlockView, binCount: number): Bins => {
      * range covers, the bins between get their full size.
      */
     addRange: (rawStart, rawEnd) => {
-      const { start, end } = clipToView(rawStart, rawEnd, viewStart, viewEnd);
+      const [start, end] = clipToView(rawStart, rawEnd, viewStart, viewEnd);
       if (binCount === 0 || end <= start) return;
 
       const first = binOf(start);
@@ -114,14 +108,14 @@ export const createBins = (view: BlockView, binCount: number): Bins => {
         return;
       }
 
-      counts[first] += rangeOf(first).end - start;
+      counts[first] += rangeOf(first)[1] - start;
       for (let bin = first + 1; bin < last; bin += 1) counts[bin] += sizeOf(bin);
-      counts[last] += end - rangeOf(last).start;
+      counts[last] += end - rangeOf(last)[0];
     },
 
     // Which bins a range overlaps, so callers can mark exactly those dirty.
     binsTouching: (rawStart, rawEnd) => {
-      const { start, end } = clipToView(rawStart, rawEnd, viewStart, viewEnd);
+      const [start, end] = clipToView(rawStart, rawEnd, viewStart, viewEnd);
       if (binCount === 0 || end <= start) return [];
 
       const first = binOf(start);
@@ -133,8 +127,8 @@ export const createBins = (view: BlockView, binCount: number): Bins => {
 
     recountBins: (bins, countInRange) => {
       for (const bin of bins) {
-        const range = rangeOf(bin);
-        counts[bin] = countInRange(range.start, range.end);
+        const [start, end] = rangeOf(bin);
+        counts[bin] = countInRange(start, end);
       }
     },
   };

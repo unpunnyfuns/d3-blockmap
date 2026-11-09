@@ -18,7 +18,8 @@ describe("createBlockState at 100M blocks", () => {
     const elapsedMs = performance.now() - start;
 
     expect(state.progress().completed).toBe(30_001_001);
-    expect(state.countOf(0)).toBe(state.sizeOf(0));
+    const [firstStart, firstEnd] = state.rangeOf(0);
+    expect(state.countOf(0)).toBe(firstEnd - firstStart);
     expect(state.countOf(3999)).toBeGreaterThan(0);
     expect(state.fraction(2001)).toBe(0);
     expect(elapsedMs, `resize took ${elapsedMs}ms`).toBeLessThan(PATHOLOGICAL_MS);

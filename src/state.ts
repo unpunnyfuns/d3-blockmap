@@ -7,10 +7,10 @@
 
 import { createBitset } from "./bitset";
 import { createBins } from "./bins";
-import type { BinRange, Bins } from "./bins";
+import type { Bins } from "./bins";
 import { MAX_BLOCKS, RANGE_PAIR } from "./constants";
 import { normalizeRanges, rangesLength } from "./ranges";
-import type { RangeInput } from "./ranges";
+import type { BlockRange, RangeInput } from "./ranges";
 import { clampView, fullView, sameView } from "./view";
 import type { BlockView } from "./view";
 
@@ -22,7 +22,6 @@ export type Progress = { completed: number; total: number };
 export type BlockState = {
   readonly totalBlocks: number;
   readonly binCount: number;
-  readonly view: BlockView;
   resize(binCount: number): void;
   setView(view: BlockView): boolean;
   getView(): BlockView;
@@ -34,8 +33,7 @@ export type BlockState = {
   has(index: number): boolean;
   fraction(bin: number): number;
   countOf(bin: number): number;
-  sizeOf(bin: number): number;
-  rangeOf(bin: number): BinRange;
+  rangeOf(bin: number): BlockRange;
   progress(): Progress;
 };
 
@@ -133,12 +131,6 @@ export const createBlockState = (totalBlocks: number): BlockState => {
     get binCount() {
       return bins.binCount;
     },
-    // Returns a copy so callers cannot mutate the internal view; getView
-    // does the same.
-    get view() {
-      return { ...view };
-    },
-
     // Column count changed: the bin boundaries move, so rebuild from the
     // bitset rather than trying to redistribute the old counts.
     resize: (binCount) => {
@@ -201,7 +193,6 @@ export const createBlockState = (totalBlocks: number): BlockState => {
     },
 
     countOf: (bin) => bins.counts[bin],
-    sizeOf: (bin) => bins.sizeOf(bin),
     rangeOf: (bin) => bins.rangeOf(bin),
     progress: () => ({ completed: bitset.count, total: totalBlocks }),
   };
