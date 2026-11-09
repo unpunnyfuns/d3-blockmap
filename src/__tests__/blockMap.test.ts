@@ -89,7 +89,7 @@ describe("createBlockMap", () => {
   });
 
   it("shows a tooltip for the hovered column and hides on leave", () => {
-    const container = dom.mount();
+    const container = dom.mount(5);
     const map = createBlockMap(container, { totalBlocks: 100 });
     dom.triggerResize(5);
     map.addBlocks([0, 1, 2, 3, 4]);
@@ -152,12 +152,9 @@ describe("createBlockMap", () => {
   });
 
   it("coverage style paints a half-covered bin as the partial colour", () => {
-    vi.spyOn(window, "getComputedStyle").mockReturnValue({
-      position: "static",
-      getPropertyValue: (name: string) =>
-        ({ "--blockmap-missing": "#000000", "--blockmap-complete": "#ffffff" })[name] ?? "",
-    } as unknown as CSSStyleDeclaration);
     const container = dom.mount();
+    container.style.setProperty("--blockmap-missing", "#000000");
+    container.style.setProperty("--blockmap-complete", "#ffffff");
     const map = createBlockMap(container, { totalBlocks: 100, partial: "coverage" });
     dom.triggerResize(5);
     map.setRanges([[0, 5]]);
@@ -220,7 +217,7 @@ describe("createBlockMap", () => {
   });
 
   it("ctrl+wheel zooms by default and does nothing when interactive is false", () => {
-    const zoomable = dom.mount();
+    const zoomable = dom.mount(50);
     const map = createBlockMap(zoomable, { totalBlocks: 1000 });
     dom.triggerResize(50);
     const canvas = zoomable.querySelector("canvas") as HTMLCanvasElement;
@@ -228,7 +225,7 @@ describe("createBlockMap", () => {
     expect(map.getView()).toEqual({ start: 100, end: 900 });
     map.destroy();
 
-    const fixed = dom.mount();
+    const fixed = dom.mount(50);
     const still = createBlockMap(fixed, { totalBlocks: 1000, interactive: false });
     dom.triggerResize(50);
     const canvas2 = fixed.querySelector("canvas") as HTMLCanvasElement;
@@ -268,7 +265,7 @@ describe("createBlockMap", () => {
   });
 
   it("discrete tooltip reports the exact block the renderer painted at boundary columns", () => {
-    const container = dom.mount();
+    const container = dom.mount(50);
     const map = createBlockMap(container, { totalBlocks: 7 });
     dom.triggerResize(50);
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
@@ -318,7 +315,7 @@ describe("createBlockMap", () => {
   });
 
   it("tooltip shows absolute block ranges under a view", () => {
-    const container = dom.mount();
+    const container = dom.mount(5);
     const map = createBlockMap(container, { totalBlocks: 1000, view: { start: 500, end: 600 } });
     dom.triggerResize(5);
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;

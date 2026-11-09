@@ -123,7 +123,7 @@ describe("createAxis", () => {
     const axis = createAxis(container, { tickCount: 5 });
     axis.update({ start: 0, end: 1000 }, 400);
     const spans = Array.from(container.querySelectorAll("[data-blockmap-tick]")) as HTMLElement[];
-    expect(spans[0].style.transform).toBe("translateX(0)");
+    expect(spans[0].style.transform).toBe("translateX(0px)");
     expect(spans[spans.length - 1].style.transform).toBe("translateX(-100%)");
     expect(spans[2].style.transform).toBe("translateX(-50%)");
     axis.destroy();

@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 const setup = (totalBlocks: number, width: number) => {
-  const container = dom.mount();
+  const container = dom.mount(width);
   const onViewChange = vi.fn();
   const map = createBlockMap(container, { totalBlocks, onViewChange });
   dom.triggerResize(width);
@@ -90,16 +90,13 @@ describe("createBlockMap integration", () => {
   it("theme change repaints and keeps the blink timer while highlighted", async () => {
     const setInterval = vi.spyOn(window, "setInterval");
     const clearInterval = vi.spyOn(window, "clearInterval");
-    const { map } = setup(10, 5);
+    const { map, container } = setup(10, 5);
     map.addBlocks([0]);
     map.setHighlight(true);
     dom.flushFrames();
     const paintsBefore = dom.puts.length;
 
-    vi.spyOn(window, "getComputedStyle").mockReturnValue({
-      position: "static",
-      getPropertyValue: (name: string) => (name === CSS_VAR_HIGHLIGHT ? "#0000ff" : ""),
-    } as unknown as CSSStyleDeclaration);
+    container.style.setProperty(CSS_VAR_HIGHLIGHT, "#0000ff");
     document.documentElement.setAttribute("data-theme", "dark");
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
     dom.flushFrames();

@@ -77,9 +77,7 @@ describe("readTheme", () => {
   it("reads CSS custom properties with defaults", () => {
     const el = document.createElement("div");
     document.body.append(el);
-    vi.spyOn(window, "getComputedStyle").mockReturnValue({
-      getPropertyValue: (name: string) => (name === "--blockmap-complete" ? " #123456 " : ""),
-    } as unknown as CSSStyleDeclaration);
+    el.style.setProperty("--blockmap-complete", " #123456 ");
     expect(readTheme(el)).toEqual({
       missing: DEFAULT_THEME.missing,
       partialLow: DEFAULT_THEME.partialLow,
@@ -88,7 +86,6 @@ describe("readTheme", () => {
       complete: "#123456",
       highlight: DEFAULT_THEME.highlight,
     });
-    vi.restoreAllMocks();
     el.remove();
   });
 });

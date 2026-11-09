@@ -1,12 +1,21 @@
 import { installDom } from "../dom";
 
 describe("installDom", () => {
-  it("throws on unknown matchMedia queries and unimplemented context methods", () => {
+  it("throws on unknown matchMedia queries", () => {
     const dom = installDom();
     expect(() => matchMedia("(orientation: landscape)")).toThrow(/unexpected matchMedia/);
+    dom.restore();
+  });
+
+  it("records a real putImageData call from a mounted canvas", () => {
+    const dom = installDom();
+    const container = dom.mount();
     const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d") as unknown as Record<string, unknown>;
-    expect(() => (ctx.fillRect as () => void)()).toThrow(/unimplemented/);
+    container.append(canvas);
+    const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
+    const image = ctx.createImageData(2, 1);
+    ctx.putImageData(image, 0, 0);
+    expect(dom.puts).toEqual([image]);
     dom.restore();
   });
 
@@ -69,13 +78,6 @@ describe("installDom", () => {
     dom.restore();
   });
 
-  it('getContext throws for ids other than "2d"', () => {
-    const dom = installDom();
-    const canvas = document.createElement("canvas");
-    expect(() => canvas.getContext("webgl" as unknown as "2d")).toThrow(/unimplemented/);
-    dom.restore();
-  });
-
   it("throws when installed twice without restore", () => {
     const dom = installDom();
     expect(() => installDom()).toThrow(/already installed/);
@@ -113,7 +115,8 @@ describe("installDom", () => {
     const originalMatchMedia = globalThis.matchMedia;
     const originalRaf = globalThis.requestAnimationFrame;
     const originalDpr = globalThis.devicePixelRatio;
-    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    const originalPutImageData = CanvasRenderingContext2D.prototype.putImageData;
+    const originalSetPointerCapture = Element.prototype.setPointerCapture;
 
     const dom = installDom();
     const container = dom.mount();
@@ -123,7 +126,8 @@ describe("installDom", () => {
     expect(globalThis.matchMedia).toBe(originalMatchMedia);
     expect(globalThis.requestAnimationFrame).toBe(originalRaf);
     expect(globalThis.devicePixelRatio).toBe(originalDpr);
-    expect(HTMLCanvasElement.prototype.getContext).toBe(originalGetContext);
+    expect(CanvasRenderingContext2D.prototype.putImageData).toBe(originalPutImageData);
+    expect(Element.prototype.setPointerCapture).toBe(originalSetPointerCapture);
     expect(document.body.contains(container)).toBe(false);
   });
 });

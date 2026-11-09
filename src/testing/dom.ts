@@ -1,6 +1,7 @@
 import { vi } from "vitest";
 import type { ImageDataLike } from "../renderer";
-import { createStubContext } from "./canvas";
+import { installPointerCapture } from "./pointerCapture";
+import type { InstalledPointerCapture } from "./pointerCapture";
 
 export type DomOptions = {
   dpr?: number;
@@ -9,7 +10,7 @@ export type DomOptions = {
 };
 export type MediaListener = { query: string; listener: () => void };
 export type InstalledDom = {
-  mount(): HTMLElement;
+  mount(width?: number): HTMLElement;
   triggerResize(width: number): void;
   flushFrames(): void;
   puts: ImageDataLike[];
@@ -27,7 +28,8 @@ const KNOWN_QUERIES = [
 ];
 const DEFAULT_DPR = 2;
 const MAX_FLUSH_ROUNDS = 10;
-const CONTEXT_2D = "2d";
+const DEFAULT_MOUNT_WIDTH = 200;
+const MOUNT_HEIGHT_PX = "12px";
 
 const defaultMedia = (query: string): boolean => {
   if (!KNOWN_QUERIES.some((pattern) => pattern.test(query))) {
@@ -126,28 +128,23 @@ export const installDom = (options: DomOptions = {}): InstalledDom => {
       },
     }) as unknown as MediaQueryList;
   });
-  const contextSpy = vi
-    .spyOn(HTMLCanvasElement.prototype, "getContext")
-    .mockImplementation((id: string) => {
-      if (id !== CONTEXT_2D) {
-        throw new Error(`unimplemented: HTMLCanvasElement.getContext(${id})`);
-      }
-      const { ctx } = createStubContext();
-      return new Proxy(ctx, {
-        get: (target, name) => {
-          if (name === "putImageData") {
-            return (image: ImageDataLike) => {
-              puts.push(image);
-            };
-          }
-          return target[name as keyof typeof target];
-        },
-      }) as unknown as CanvasRenderingContext2D;
+  const originalPutImageData = CanvasRenderingContext2D.prototype.putImageData;
+  const putImageDataSpy = vi
+    .spyOn(CanvasRenderingContext2D.prototype, "putImageData")
+    .mockImplementation(function putImageData(
+      this: CanvasRenderingContext2D,
+      ...args: Parameters<typeof originalPutImageData>
+    ) {
+      puts.push(args[0]);
+      return originalPutImageData.apply(this, args);
     });
+  const pointerCapture: InstalledPointerCapture = installPointerCapture();
 
   return {
-    mount: () => {
+    mount: (width = DEFAULT_MOUNT_WIDTH) => {
       const container = document.createElement("div");
+      container.style.width = `${width}px`;
+      container.style.height = MOUNT_HEIGHT_PX;
       document.body.append(container);
       mounted.push(container);
       return container;
@@ -171,7 +168,8 @@ export const installDom = (options: DomOptions = {}): InstalledDom => {
     mediaListeners,
     removedQueries,
     restore: () => {
-      contextSpy.mockRestore();
+      putImageDataSpy.mockRestore();
+      pointerCapture.restore();
       vi.unstubAllGlobals();
       mounted.forEach((el) => el.remove());
       installed = false;

@@ -13,7 +13,6 @@ export const fire = (
   target: EventTarget,
   type: string,
   init: Record<string, unknown> = {},
-  props: Record<string, unknown> = {},
 ): Event => {
   const Ctor =
     type === "wheel"
@@ -22,16 +21,20 @@ export const fire = (
         ? PointerEvent
         : MouseEvent;
   const event = new Ctor(type, { bubbles: true, cancelable: true, ...init });
-  Object.entries(props).forEach(([key, value]) => Object.defineProperty(event, key, { value }));
   target.dispatchEvent(event);
   return event;
 };
 
+export const at = (target: EventTarget, offsetX: number): { clientX: number; clientY: number } => {
+  const rect = (target as Element).getBoundingClientRect();
+  return { clientX: rect.left + offsetX, clientY: rect.top + rect.height / 2 };
+};
+
 export const ctrlWheel = (target: EventTarget, deltaY: number, offsetX: number): Event =>
-  fire(target, "wheel", { deltaY }, { ctrlKey: true, offsetX });
+  fire(target, "wheel", { deltaY, ctrlKey: true, ...at(target, offsetX) });
 
 export const metaWheel = (target: EventTarget, deltaY: number, offsetX: number): Event =>
-  fire(target, "wheel", { deltaY }, { metaKey: true, offsetX });
+  fire(target, "wheel", { deltaY, metaKey: true, ...at(target, offsetX) });
 
 export const pointer = (
   target: EventTarget,
@@ -39,4 +42,4 @@ export const pointer = (
   offsetX: number,
   pointerId = 1,
   button = 0,
-): Event => fire(target, type, { button }, { offsetX, pointerId });
+): Event => fire(target, type, { button, pointerId, ...at(target, offsetX) });

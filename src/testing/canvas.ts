@@ -27,7 +27,7 @@ export const createStubContext = (): { ctx: Canvas2dLike; puts: ImageDataLike[] 
   return { ctx, puts };
 };
 
-export const pixel = (image: ImageDataLike, column: number): number[] =>
+export const pixel = (image: ImageDataLike | ImageData, column: number): number[] =>
   Array.from(
     image.data.subarray(column * BYTES_PER_PIXEL, column * BYTES_PER_PIXEL + BYTES_PER_PIXEL),
   );
