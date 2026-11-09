@@ -5,7 +5,7 @@ Canvas progress bar for millions of blocks: one pixel column per bin, drawn from
 ## Install
 
 ```bash
-npm i d3-blockmap
+npm i @unpunnyfuns/d3-blockmap
 ```
 
 Peer dependency for the React component: `react >= 19`.
@@ -13,7 +13,7 @@ Peer dependency for the React component: `react >= 19`.
 ## Quick start
 
 ```ts
-import { createBlockMap } from 'd3-blockmap';
+import { createBlockMap } from '@unpunnyfuns/d3-blockmap';
 
 const map = createBlockMap(document.querySelector('#progress')!, {
   totalBlocks: 10_000_000,
@@ -28,8 +28,8 @@ The container needs a height; the canvas fills it. Leave a little space below if
 
 ```tsx
 import { useRef } from 'react';
-import { BlockMap } from 'd3-blockmap/react';
-import type { BlockMapHandle } from 'd3-blockmap/react';
+import { BlockMap } from '@unpunnyfuns/d3-blockmap/react';
+import type { BlockMapHandle } from '@unpunnyfuns/d3-blockmap/react';
 
 const ref = useRef<BlockMapHandle>(null);
 

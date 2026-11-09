@@ -65,14 +65,14 @@
 <!-- d3-array.mjs pre-bundles its internmap dependency, so no separate import map entry is needed for it. -->
 <script type="importmap">
 { "imports": {
-  "d3-blockmap": "/dist/index.js",
+  "@unpunnyfuns/d3-blockmap": "/dist/index.js",
   "d3-array": "/node_modules/d3-array/dist/d3-array.mjs",
   "d3-color": "/node_modules/d3-color/dist/d3-color.mjs",
   "d3-interpolate": "/node_modules/d3-interpolate/dist/d3-interpolate.mjs"
 } }
 </script>
 <script type="module">
-import { createBlockMap } from "d3-blockmap";
+import { createBlockMap } from "@unpunnyfuns/d3-blockmap";
 
 const BIG = 10_000_000;
 const SMALL = 40;
