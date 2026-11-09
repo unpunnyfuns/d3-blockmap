@@ -153,9 +153,7 @@ export const createAxis = (container: HTMLElement, options: AxisOptions): Axis =
 
   // `top: 100%` hangs the axis below the canvas without reserving layout
   // space; it is aria-hidden because the tooltip and getProgress already
-  // expose the same numbers - the canvas itself has no accessible name yet,
-  // which is a separate follow-up - and pointer-events none keeps it out of
-  // hit testing.
+  // expose the same numbers; pointer-events none keeps it out of hit testing.
   const root = document.createElement("div");
   root.setAttribute(AXIS_ATTRIBUTE, "");
   root.setAttribute("aria-hidden", "true");

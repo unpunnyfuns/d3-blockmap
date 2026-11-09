@@ -170,9 +170,9 @@ export const createRenderer = (
   /**
    * Many updates can arrive between frames; this coalesces them into one
    * paint. The guard is the `scheduled` flag rather than the frame handle,
-   * because a synchronous scheduler (the tests inject one) runs paint before
-   * `frame` is assigned - the assignment would then land on top of paint's
-   * reset and no later repaint would ever be scheduled.
+   * because a scheduler that invokes the callback synchronously runs paint
+   * before `frame` is assigned - the assignment would then land on top of
+   * paint's reset and no later repaint would ever be scheduled.
    */
   const schedule = (): void => {
     if (scheduled) return;
