@@ -28,6 +28,8 @@ export type BlockMap = {
   setBlocks(indices: ArrayLike<number>): void;
   setRanges(ranges: RangeInput): void;
   addBlocks(indices: ArrayLike<number>): void;
+  addRanges(ranges: RangeInput): void;
+  removeRanges(ranges: RangeInput): void;
   setView(view: BlockView): void;
   resetView(): void;
   getView(): BlockView;
@@ -206,6 +208,14 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     addBlocks: (indices) => {
       if (destroyed) return;
       renderer.markDirty(state.add(indices));
+    },
+    addRanges: (ranges) => {
+      if (destroyed) return;
+      renderer.markDirty(state.addRanges(ranges));
+    },
+    removeRanges: (ranges) => {
+      if (destroyed) return;
+      renderer.markDirty(state.removeRanges(ranges));
     },
     setView: (view) => {
       if (destroyed) return;

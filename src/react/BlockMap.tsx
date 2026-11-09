@@ -25,6 +25,8 @@ export type BlockMapHandle = Pick<
   BlockMapInstance,
   | "addBlocks"
   | "setRanges"
+  | "addRanges"
+  | "removeRanges"
   | "setView"
   | "resetView"
   | "getView"
@@ -101,6 +103,8 @@ export const BlockMap = forwardRef<BlockMapHandle, BlockMapProps>(
       () => ({
         addBlocks: (indices) => instanceRef.current?.addBlocks(indices),
         setRanges: (next) => instanceRef.current?.setRanges(next),
+        addRanges: (next) => instanceRef.current?.addRanges(next),
+        removeRanges: (next) => instanceRef.current?.removeRanges(next),
         setView: (next) => instanceRef.current?.setView(next),
         resetView: () => instanceRef.current?.resetView(),
         getView: () => instanceRef.current?.getView() ?? { start: 0, end: totalBlocks },

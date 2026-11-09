@@ -9,6 +9,8 @@ const createInstance = (): BlockMapInstance => ({
   setBlocks: vi.fn(),
   setRanges: vi.fn(),
   addBlocks: vi.fn(),
+  addRanges: vi.fn(),
+  removeRanges: vi.fn(),
   setView: vi.fn(),
   resetView: vi.fn(),
   getView: vi.fn(() => ({ start: 0, end: 0 })),
@@ -196,6 +198,18 @@ describe("<BlockMap>", () => {
     const spy = vi.spyOn(core, "createBlockMap").mockReturnValue(instance);
     render(<BlockMap totalBlocks={10} axis={true} />);
     expect(spy.mock.calls[0][1]).toMatchObject({ axis: true });
+    spy.mockRestore();
+  });
+
+  it("forwards addRanges and removeRanges through the handle", () => {
+    const instance = createInstance();
+    const spy = vi.spyOn(core, "createBlockMap").mockReturnValue(instance);
+    const ref = createRef<BlockMapHandle>();
+    render(<BlockMap ref={ref} totalBlocks={10} />);
+    act(() => ref.current?.addRanges([[0, 2]]));
+    act(() => ref.current?.removeRanges([[1, 2]]));
+    expect(instance.addRanges).toHaveBeenCalledWith([[0, 2]]);
+    expect(instance.removeRanges).toHaveBeenCalledWith([[1, 2]]);
     spy.mockRestore();
   });
 });

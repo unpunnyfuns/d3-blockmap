@@ -55,7 +55,7 @@ A new `blocks` array identity triggers `setBlocks`; keep the reference stable be
 
 `view` (`BlockView`) applies via `setView` when its identity changes. `interactive` (`boolean`, default `true`) recreates the underlying instance when its value changes, same as `partial`. `onViewChange` is called after the view changes by API or interaction; its identity does not trigger instance recreation, so inline closures are fine. `highlight` (`boolean`) toggles blinking on incomplete bins via `setHighlight`. `axis` is a creation option: like `partial` and `interactive`, it recreates the underlying instance when its value changes, so an object value (`{ format?, tickCount? }`) must be memoized (`useMemo`) to avoid recreating the instance on every render.
 
-`BlockMapHandle` also exposes an imperative `setRanges(ranges)`, bypassing React state, for high-frequency snapshots where re-rendering on every tick would be wasteful. Do not combine it with the `ranges` prop; the prop's own effect will re-apply and fight the imperative calls. The handle additionally exposes `setView(view)`, `resetView()`, `getView()`, and `setHighlight(on)` for the same imperative use case.
+`BlockMapHandle` also exposes an imperative `setRanges(ranges)`, bypassing React state, for high-frequency snapshots where re-rendering on every tick would be wasteful. Do not combine it with the `ranges` prop; the prop's own effect will re-apply and fight the imperative calls. The handle additionally exposes `setView(view)`, `resetView()`, `getView()`, `setHighlight(on)`, `addRanges(ranges)`, and `removeRanges(ranges)` for the same imperative use case.
 
 ## API
 
@@ -79,6 +79,8 @@ Returns:
 | `setBlocks(indices)` | Replace all state. |
 | `setRanges(ranges)` | Replace all state from a snapshot of `[start, end)` tuples. Any sizes, unsorted and overlapping allowed. O(ranges log ranges + bins + totalBlocks / 8). |
 | `addBlocks(indices)` | Add newly completed indices. O(indices). Duplicates and out-of-range skipped. |
+| `addRanges(ranges)` | Mark ranges complete on top of current state. Overlap with existing blocks or between tuples is counted once. Repaints only touched columns. |
+| `removeRanges(ranges)` | Mark ranges missing. Progress drops by the number of blocks that were complete. |
 | `getProgress()` | `{ completed, total }`. |
 | `setView(view)` | Clamp and apply a view window; repaints and calls `onViewChange` if it changed. |
 | `resetView()` | Back to the full range. |
@@ -132,6 +134,7 @@ The tooltip element carries the attribute `data-blockmap-tooltip` and ships unst
 - There is no keyboard affordance for zoom or pan yet.
 - The axis renders below the container at `top: 100%`; leave space under the bar. Ticks land on integer block values, spaced by a nice step (1, 2, 5 × 10ⁿ) within the current view.
 - `overflow: hidden` on the container clips the axis, since it renders outside the container's height at `top: 100%`.
+- Incremental range updates recount touched bins from the bitset, so overlap never double-counts; cost is proportional to the blocks covered, not to totalBlocks.
 
 ## Development
 

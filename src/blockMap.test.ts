@@ -477,4 +477,23 @@ describe("createBlockMap", () => {
     expect(map.getScale().domain).toEqual([100, 200]);
     map.destroy();
   });
+
+  it("addRanges repaints only touched columns and removeRanges reverts them", () => {
+    const container = mount();
+    const map = createBlockMap(container, { totalBlocks: 100 });
+    triggerResize(5);
+    const before = puts.length;
+    map.addRanges([[20, 30]]);
+    expect(puts.length).toBe(before + 1);
+    let image = puts.at(-1) as ImageData;
+    expect(Array.from(image.data.subarray(2 * 4, 2 * 4 + 4))).toEqual([46, 204, 113, 255]);
+    expect(Array.from(image.data.subarray(3 * 4, 3 * 4 + 4))).toEqual([43, 43, 43, 255]);
+    expect(map.getProgress().completed).toBe(10);
+    map.removeRanges([[25, 35]]);
+    image = puts.at(-1) as ImageData;
+    expect(map.getProgress().completed).toBe(5);
+    expect(Array.from(image.data.subarray(2 * 4, 2 * 4 + 4))).not.toEqual([46, 204, 113, 255]);
+    map.destroy();
+    expect(() => map.addRanges([[0, 1]])).not.toThrow();
+  });
 });
