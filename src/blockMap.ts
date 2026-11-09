@@ -389,6 +389,15 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
 
   const onPointerLeave = (): void => tooltip.hide();
 
+  // Clears a flag left over from a drag that never reached a click:
+  // pointercancel - a touch gesture taken over by scrolling, say - ends the
+  // drag through the same onDragEnd as pointerup, but fires no click after
+  // it, so a stale suppressClick would swallow the next unrelated one. Every
+  // new gesture starts clean.
+  const onPointerDown = (): void => {
+    suppressClick = false;
+  };
+
   // A click right after an active pan is a drag artefact, not an intent to
   // pick a block, so suppressClick swallows exactly one. Registered
   // regardless of `interactive`, like the tooltip listeners above, since a
@@ -409,6 +418,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
 
   container.addEventListener("pointermove", onPointerMove);
   container.addEventListener("pointerleave", onPointerLeave);
+  container.addEventListener("pointerdown", onPointerDown);
   container.addEventListener("click", onClick);
 
   // Interaction reads the live view and total through getters rather than
@@ -519,6 +529,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       motionMedia.removeEventListener("change", onMotionChange);
       container.removeEventListener("pointermove", onPointerMove);
       container.removeEventListener("pointerleave", onPointerLeave);
+      container.removeEventListener("pointerdown", onPointerDown);
       container.removeEventListener("click", onClick);
       detachInteraction?.();
 

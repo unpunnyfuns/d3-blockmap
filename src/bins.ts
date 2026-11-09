@@ -6,14 +6,14 @@
 
 import type { BlockView } from "./view";
 
-export type BlockRange = { start: number; end: number };
+export type BinRange = { start: number; end: number };
 
 export type Bins = {
   readonly view: BlockView;
   readonly binCount: number;
   readonly counts: Uint32Array;
   binOf(index: number): number;
-  rangeOf(bin: number): BlockRange;
+  rangeOf(bin: number): BinRange;
   sizeOf(bin: number): number;
   rebuild(countInRange: (start: number, end: number) => number): void;
   addRange(start: number, end: number): void;
@@ -30,7 +30,7 @@ const clipToView = (
   rawEnd: number,
   viewStart: number,
   viewEnd: number,
-): BlockRange => ({
+): BinRange => ({
   start: Math.max(rawStart, viewStart),
   end: Math.min(rawEnd, viewEnd),
 });
@@ -50,7 +50,7 @@ export const createBins = (view: BlockView, binCount: number): Bins => {
    * b * length / binCount is its first block, hence ceil on both ends. Using
    * floor here would overlap neighbouring bins by a block.
    */
-  const rangeOf = (bin: number): BlockRange => ({
+  const rangeOf = (bin: number): BinRange => ({
     start: viewStart + Math.ceil((bin * length) / binCount),
     end: viewStart + Math.ceil(((bin + 1) * length) / binCount),
   });

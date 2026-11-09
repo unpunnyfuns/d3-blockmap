@@ -7,7 +7,7 @@
 
 import { createBitset } from "./bitset";
 import { createBins } from "./bins";
-import type { Bins, BlockRange } from "./bins";
+import type { BinRange, Bins } from "./bins";
 import { MAX_BLOCKS, RANGE_PAIR } from "./constants";
 import { normalizeRanges, rangesLength } from "./ranges";
 import type { RangeInput } from "./ranges";
@@ -35,7 +35,7 @@ export type BlockState = {
   fraction(bin: number): number;
   countOf(bin: number): number;
   sizeOf(bin: number): number;
-  rangeOf(bin: number): BlockRange;
+  rangeOf(bin: number): BinRange;
   progress(): Progress;
 };
 

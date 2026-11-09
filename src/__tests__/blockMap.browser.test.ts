@@ -675,6 +675,26 @@ describe("createBlockMap", () => {
       map.destroy();
     });
 
+    it("recovers from a cancelled drag so the next fresh click still fires", () => {
+      const container = dom.mount();
+      const onBlockClick = vi.fn();
+      const map = createBlockMap(container, { totalBlocks: 100, onBlockClick });
+      dom.triggerResize(5);
+
+      // pointercancel ends the drag through the same onDragEnd as pointerup
+      // but is never followed by a click, so suppressClick must not survive
+      // past the next pointerdown.
+      pointer(container, "pointerdown", 1.2);
+      pointer(container, "pointermove", 10);
+      pointer(container, "pointercancel", 10);
+
+      pointer(container, "pointerdown", 1.2);
+      fire(container, "click", at(container, 1.2));
+
+      expect(onBlockClick).toHaveBeenCalledTimes(1);
+      map.destroy();
+    });
+
     it("fires when interactive is false", () => {
       const container = dom.mount();
       const onBlockClick = vi.fn();
