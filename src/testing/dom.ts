@@ -25,6 +25,7 @@ const KNOWN_QUERIES = [
   /^\(prefers-reduced-motion: reduce\)$/,
 ];
 const DEFAULT_DPR = 2;
+const MAX_FLUSH_ROUNDS = 10;
 
 const defaultMedia = (query: string): boolean => {
   if (!KNOWN_QUERIES.some((pattern) => pattern.test(query))) {
@@ -61,6 +62,9 @@ export const installDom = (options: DomOptions = {}): InstalledDom => {
     callback(0);
     return 1;
   });
+  // Cancellation by index is approximate: it only correctly removes the most
+  // recently scheduled handle, since earlier handles shift once frames are
+  // flushed or other frames are cancelled.
   vi.stubGlobal("cancelAnimationFrame", (handle: number) => {
     frames.splice(handle - 1, 1);
   });
@@ -98,8 +102,13 @@ export const installDom = (options: DomOptions = {}): InstalledDom => {
     triggerResize: (width) =>
       observers.forEach((cb) => cb([{ contentRect: { width } } as unknown as ResizeObserverEntry])),
     flushFrames: () => {
-      const pending = frames.splice(0, frames.length);
-      pending.forEach((callback) => callback(0));
+      for (let round = 0; frames.length > 0; round += 1) {
+        if (round >= MAX_FLUSH_ROUNDS) {
+          throw new Error("flushFrames: frames keep scheduling frames");
+        }
+        const pending = frames.splice(0, frames.length);
+        pending.forEach((callback) => callback(0));
+      }
     },
     puts,
     mediaListeners,

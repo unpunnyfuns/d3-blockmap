@@ -34,6 +34,18 @@ describe("installDom", () => {
     dom.restore();
   });
 
+  it("drains a frame that schedules another frame in one flushFrames call", () => {
+    const dom = installDom({ deferFrames: true });
+    const order: number[] = [];
+    requestAnimationFrame(() => {
+      order.push(1);
+      requestAnimationFrame(() => order.push(2));
+    });
+    dom.flushFrames();
+    expect(order).toEqual([1, 2]);
+    dom.restore();
+  });
+
   it("restore removes the installed globals", () => {
     const dom = installDom();
     dom.restore();

@@ -313,7 +313,6 @@ describe("createBlockMap", () => {
     expect(dom.puts.length).toBe(before);
 
     dom.flushFrames();
-    dom.flushFrames();
 
     expect(map.getView()).toEqual({ start: 30, end: 40 });
     expect(onViewChange).toHaveBeenCalledTimes(1);
