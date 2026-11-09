@@ -20,5 +20,13 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: Resolve installed Playwright version
+        id: playwright-version
+        run: echo "version=$(npm ls playwright --json | node -pe 'JSON.parse(require("fs").readFileSync(0,"utf8")).dependencies.playwright.version')" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers (actions/cache v4.3.0)
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
       - run: npx playwright install --with-deps chromium
       - run: npm run verify

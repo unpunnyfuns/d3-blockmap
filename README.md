@@ -70,7 +70,7 @@ Ranges use exclusive ends: `[0, 10]` means blocks 0 through 9. Unsorted, overlap
 
 ## React
 
-Props mirror the options plus `blocks`, `ranges`, `highlight`, `className`, `style`. `ref` is a plain prop exposing the methods above as `BlockMapHandle`.
+Props mirror the options plus `blocks`, `ranges`, `highlight`, `className`, `style`. `ref` is a plain prop exposing the methods above, except `setBlocks` and `destroy`, as `BlockMapHandle`.
 
 - `blocks` and `ranges` apply when their identity changes, so keep the references stable.
 - `partial`, `interactive`, and `axis` recreate the instance when they change; memoise an object `axis`.
