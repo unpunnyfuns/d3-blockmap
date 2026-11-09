@@ -51,7 +51,7 @@
   <div id="small" class="map"></div>
 </section>
 <section>
-  <div class="label"><span>10,000,000 blocks, range snapshots, coverage style</span><span id="ranges-progress"></span></div>
+  <div class="label"><span>10,000,000 blocks, incremental ranges, coverage style</span><span id="ranges-progress"></span></div>
   <div id="ranges" class="map"></div>
 </section>
 <p>
@@ -96,8 +96,13 @@ const RUN_GROWTH = 120;
 const NEW_RUN_EVERY = 20;
 const SNAPSHOT_EVERY = 5;
 const runs = [];
-const addRun = () =>
-  runs.push([Math.floor(Math.random() * BIG), Math.floor(Math.random() * RUN_START_LENGTH)]);
+const rangeDeltas = [];
+const addRun = () => {
+  const start = Math.floor(Math.random() * BIG);
+  const length = Math.floor(Math.random() * RUN_START_LENGTH);
+  runs.push([start, length]);
+  rangeDeltas.push([start, start + length]);
+};
 const seedRuns = () => {
   runs.length = 0;
   for (let i = 0; i < RUN_SEED; i += 1) addRun();
@@ -107,13 +112,20 @@ let rangeTick = 0;
 const stepRanges = () => {
   rangeTick += 1;
   for (const run of runs) {
+    const prevStart = run[0];
+    const prevEnd = run[0] + run[1];
     const left = Math.min(run[0], Math.floor(Math.random() * RUN_GROWTH));
     run[0] -= left;
     run[1] += left + Math.floor(Math.random() * RUN_GROWTH);
+    const newStart = run[0];
+    const newEnd = run[0] + run[1];
+    if (newStart < prevStart) rangeDeltas.push([newStart, prevStart]);
+    if (newEnd > prevEnd) rangeDeltas.push([prevEnd, newEnd]);
   }
   if (rangeTick % NEW_RUN_EVERY === 0 && runs.length < RUN_MAX) addRun();
   if (rangeTick % SNAPSHOT_EVERY === 0) {
-    rangeMap.setRanges(runs.map(([start, length]) => [start, start + length]));
+    rangeMap.addRanges(rangeDeltas);
+    rangeDeltas.length = 0;
   }
 };
 
@@ -178,8 +190,11 @@ document.querySelector("#reset-view").onclick = () => maps.forEach((map) => map.
 document.querySelector("#reset").onclick = () => {
   big.setBlocks([]);
   small.setBlocks([]);
-  seedRuns();
   rangeMap.setRanges([]);
+  rangeDeltas.length = 0;
+  seedRuns();
+  rangeMap.addRanges(rangeDeltas);
+  rangeDeltas.length = 0;
   maps.forEach((map) => map.resetView());
   highlighted = false;
   maps.forEach((map) => map.setHighlight(false));
