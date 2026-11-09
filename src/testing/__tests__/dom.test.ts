@@ -1,4 +1,4 @@
-import { installDom } from "./dom";
+import { installDom } from "../dom";
 
 describe("installDom", () => {
   it("throws on unknown matchMedia queries and unimplemented context methods", () => {

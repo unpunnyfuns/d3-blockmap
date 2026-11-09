@@ -1,6 +1,6 @@
-import { DEFAULT_THEME } from "./constants";
-import { createColorScale, highlightColor, readTheme, watchTheme } from "./colors";
-import { TEST_THEME as theme } from "./testing";
+import { DEFAULT_THEME } from "../constants";
+import { createColorScale, highlightColor, readTheme, watchTheme } from "../colors";
+import { TEST_THEME as theme } from "../testing";
 
 describe("createColorScale", () => {
   it("returns exact endpoint colours", () => {

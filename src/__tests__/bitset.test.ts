@@ -1,4 +1,4 @@
-import { createBitset } from "./bitset";
+import { createBitset } from "../bitset";
 
 describe("createBitset", () => {
   it("starts empty", () => {

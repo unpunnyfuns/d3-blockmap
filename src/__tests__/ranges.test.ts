@@ -1,4 +1,4 @@
-import { normalizeRanges, rangesLength } from "./ranges";
+import { normalizeRanges, rangesLength } from "../ranges";
 
 const flat = (input: Parameters<typeof normalizeRanges>[0], total = 100) =>
   Array.from(normalizeRanges(input, total));

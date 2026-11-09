@@ -1,11 +1,11 @@
 import { act, render } from "@testing-library/react";
 import { createRef } from "react";
-import * as core from "../blockMap";
-import type { BlockMap as BlockMapInstance } from "../blockMap";
-import { installDom } from "../testing";
-import type { InstalledDom } from "../testing";
-import { BlockMap } from "./BlockMap";
-import type { BlockMapHandle } from "./BlockMap";
+import * as core from "../../blockMap";
+import type { BlockMap as BlockMapInstance } from "../../blockMap";
+import { installDom } from "../../testing";
+import type { InstalledDom } from "../../testing";
+import { BlockMap } from "../BlockMap";
+import type { BlockMapHandle } from "../BlockMap";
 
 const createInstance = (): BlockMapInstance => ({
   setBlocks: vi.fn(),

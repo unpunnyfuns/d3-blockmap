@@ -1,6 +1,6 @@
-import { createBlockMap } from "./blockMap";
-import { CSS_VAR_HIGHLIGHT } from "./constants";
-import type { ImageDataLike } from "./renderer";
+import { createBlockMap } from "../blockMap";
+import { CSS_VAR_HIGHLIGHT } from "../constants";
+import type { ImageDataLike } from "../renderer";
 import {
   COMPLETE_RGBA,
   MISSING_RGBA,
@@ -9,8 +9,8 @@ import {
   metaWheel,
   pixel,
   pointer,
-} from "./testing";
-import type { InstalledDom } from "./testing";
+} from "../testing";
+import type { InstalledDom } from "../testing";
 
 let dom: InstalledDom;
 beforeEach(() => {

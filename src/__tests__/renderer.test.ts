@@ -1,14 +1,14 @@
-import { createColorScale, highlightColor } from "./colors";
-import { createRenderer } from "./renderer";
-import type { ImageDataLike, RenderSource, Scheduler } from "./renderer";
-import { createBlockState } from "./state";
+import { createColorScale, highlightColor } from "../colors";
+import { createRenderer } from "../renderer";
+import type { ImageDataLike, RenderSource, Scheduler } from "../renderer";
+import { createBlockState } from "../state";
 import {
   TEST_THEME as theme,
   createManualScheduler,
   createManualTimer,
   createStubContext,
   pixel,
-} from "./testing";
+} from "../testing";
 
 describe("createRenderer", () => {
   it("paints one column per bin, once per frame", () => {

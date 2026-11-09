@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { createBlockState } from "./state";
+import { createBlockState } from "../state";
 
 describe("createBlockState at 100M blocks", () => {
   it("resizes and reports progress within a bounded time", () => {

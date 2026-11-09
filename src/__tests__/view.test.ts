@@ -1,5 +1,5 @@
-import { ZOOM_STEP } from "./constants";
-import { clampView, fullView, panView, sameView, viewLength, zoomView } from "./view";
+import { ZOOM_STEP } from "../constants";
+import { clampView, fullView, panView, sameView, viewLength, zoomView } from "../view";
 
 describe("view helpers", () => {
   it("fullView, viewLength, sameView", () => {

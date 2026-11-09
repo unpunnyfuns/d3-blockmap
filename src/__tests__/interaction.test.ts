@@ -1,6 +1,6 @@
-import { attachInteraction } from "./interaction";
-import type { InteractionDeps } from "./interaction";
-import { fire } from "./testing";
+import { attachInteraction } from "../interaction";
+import type { InteractionDeps } from "../interaction";
+import { fire } from "../testing";
 
 const PRIMARY_BUTTON = 0;
 

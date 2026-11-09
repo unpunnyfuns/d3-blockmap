@@ -1,4 +1,4 @@
-import { createTooltip, formatBinTooltip, formatBlockTooltip } from "./tooltip";
+import { createTooltip, formatBinTooltip, formatBlockTooltip } from "../tooltip";
 
 describe("formatBinTooltip", () => {
   it("shows range, count and percentage", () => {

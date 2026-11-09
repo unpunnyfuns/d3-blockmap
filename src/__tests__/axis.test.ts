@@ -1,4 +1,4 @@
-import { anchorFor, computeTicks, createAxis, createScale, defaultFormat } from "./axis";
+import { anchorFor, computeTicks, createAxis, createScale, defaultFormat } from "../axis";
 
 describe("computeTicks", () => {
   it("returns nice values inside the view with linear x", () => {

@@ -1,4 +1,4 @@
-import { createBins } from "./bins";
+import { createBins } from "../bins";
 
 const full = (totalBlocks: number) => ({ start: 0, end: totalBlocks });
 

@@ -1,4 +1,4 @@
-import { createBlockState } from "./state";
+import { createBlockState } from "../state";
 
 describe("createBlockState", () => {
   it("rejects invalid totalBlocks", () => {
