@@ -128,13 +128,21 @@ export const attachInteraction = (
   const onDblClick = (): void => deps.resetView();
 
   /**
-   * Zoom keys anchor on the view's centre rather than a pointer position,
-   * since a keyboard gesture has none. Pan keys move by a fraction of the
-   * current view length rather than a fixed block count, so the step scales
-   * with how far zoomed in the view already is. Only handled keys are
-   * prevented, so everything else - Tab, browser shortcuts - still works.
+   * Ctrl/meta/alt are left alone so browser shortcuts - page zoom, Alt+arrow
+   * history navigation - are never intercepted; Shift is a gesture modifier
+   * here, not a browser one, so it stays allowed. A drag in progress also
+   * returns early, matching onWheel, since the pointer already owns the
+   * gesture. Zoom keys anchor on the view's centre rather than a pointer
+   * position, since a keyboard gesture has none. Pan keys move by a fraction
+   * of the current view length rather than a fixed block count, so the step
+   * scales with how far zoomed in the view already is. Only handled keys are
+   * prevented, so everything else - Tab, unmodified browser shortcuts -
+   * still works.
    */
   const onKeyDown = (event: KeyboardEvent): void => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (drag?.active) return;
+
     const view = deps.getView();
     const length = viewLength(view);
     const centre = view.start + length / HALF;

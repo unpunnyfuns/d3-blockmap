@@ -102,8 +102,13 @@ describe("attachInteraction", () => {
     expect(deps.resetView).toHaveBeenCalledTimes(1);
   });
 
-  const keydown = (key: string, shiftKey = false): KeyboardEvent => {
-    const event = new KeyboardEvent("keydown", { key, shiftKey, bubbles: true, cancelable: true });
+  const keydown = (key: string, init: KeyboardEventInit = {}): KeyboardEvent => {
+    const event = new KeyboardEvent("keydown", {
+      key,
+      bubbles: true,
+      cancelable: true,
+      ...init,
+    });
     canvas.dispatchEvent(event);
     return event;
   };
@@ -139,7 +144,7 @@ describe("attachInteraction", () => {
   it("Shift+ArrowRight pans by 50% of the view length", () => {
     const { deps, calls } = createDeps({ start: 200, end: 400 });
     attachInteraction(canvas, deps);
-    keydown("ArrowRight", true);
+    keydown("ArrowRight", { shiftKey: true });
     expect(calls).toEqual([{ start: 300, end: 500 }]);
   });
 
@@ -166,6 +171,38 @@ describe("attachInteraction", () => {
     expect(event.defaultPrevented).toBe(false);
     expect(calls).toEqual([]);
     expect(deps.resetView).not.toHaveBeenCalled();
+  });
+
+  it("ignores a gesture key held with ctrl, meta or alt", () => {
+    const { deps, calls } = createDeps();
+    attachInteraction(canvas, deps);
+
+    const ctrlMinus = keydown("-", { ctrlKey: true });
+    expect(ctrlMinus.defaultPrevented).toBe(false);
+
+    const metaEquals = keydown("=", { metaKey: true });
+    expect(metaEquals.defaultPrevented).toBe(false);
+
+    const altArrowRight = keydown("ArrowRight", { altKey: true });
+    expect(altArrowRight.defaultPrevented).toBe(false);
+
+    expect(calls).toEqual([]);
+    expect(deps.resetView).not.toHaveBeenCalled();
+  });
+
+  it("ignores a key while a drag is active", () => {
+    const { deps, calls } = createDeps({ start: 100, end: 200 });
+    attachInteraction(canvas, deps);
+    pointer(canvas, "pointerdown", 50, 1, PRIMARY_BUTTON);
+    pointer(canvas, "pointermove", 60);
+    expect(deps.onDragStart).toHaveBeenCalledTimes(1);
+
+    const before = calls.length;
+    const event = keydown("+");
+    expect(event.defaultPrevented).toBe(false);
+    expect(calls.length).toBe(before);
+
+    pointer(canvas, "pointerup", 60);
   });
 
   it("dispose removes the keydown listener", () => {
