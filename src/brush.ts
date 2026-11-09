@@ -20,10 +20,7 @@ export type BrushOverlayDeps = {
   getHeight(): number;
   getTotalBlocks(): number;
   onBrush(selection: BlockRange | null): void;
-  // `moved` separates a real drag from a bare press on the overlay, which the
-  // caller needs in order to decide whether the click the browser fires on
-  // release is a gesture artefact or an intentional click.
-  onBrushEnd(selection: BlockRange | null, moved: boolean): void;
+  onBrushEnd(selection: BlockRange | null): void;
 };
 
 export type BrushOverlay = {
@@ -115,7 +112,7 @@ const xSpan = (selection: BrushSelection | null): readonly [number, number] | nu
 };
 
 // Two selections are the same when both are empty or both cover the same
-// blocks; used to tell a no-op press apart from a real change.
+// blocks; used to tell a no-op gesture apart from a real change.
 const sameRange = (a: BlockRange | null, b: BlockRange | null): boolean =>
   a === b || (a !== null && b !== null && a[0] === b[0] && a[1] === b[1]);
 
@@ -172,10 +169,6 @@ export const createBrushOverlay = (
   // A gesture is in flight, which is the only state in which d3 holds the
   // page-wide window listeners that destroy has to clean up by hand.
   let active = false;
-  // The pointer has actually travelled during this gesture. d3-brush emits
-  // `end` for a bare press just as it does for a drag, so without this a
-  // click would be indistinguishable from a selection.
-  let moved = false;
 
   // The .selection rect does not exist until the behaviour has been applied,
   // and d3-brush gives it default colours as it creates it, so repainting
@@ -213,34 +206,32 @@ export const createBrushOverlay = (
   brush.on("start", (event: D3BrushEvent<unknown>) => {
     if (!event.sourceEvent || silent) return;
     active = true;
-    moved = false;
   });
 
   brush.on("brush", (event: D3BrushEvent<unknown>) => {
     if (!event.sourceEvent || silent) return;
-    moved = true;
     deps.onBrush(blocksFrom(event.selection));
   });
 
   /**
    * Release is where the selection becomes block space: snap, store, then
-   * re-project so the rectangle sits on the block boundaries it reports. A
-   * press that never moved and left the selection as it found it is not a
-   * gesture at all - a stray click on the map, either half of a double click -
-   * so it reports nothing, and neither does a press inside an existing
-   * selection that left it as it was; a press that cleared a selection still
-   * does, because the selection genuinely changed.
+   * re-project so the rectangle sits on the block boundaries it reports.
+   * d3-brush emits `end` for a bare press just as for a drag, so a gesture
+   * that leaves the selection as it found it - a stray click on the map,
+   * either half of a double click, a drag back to where it started - reports
+   * nothing; a press that cleared a selection still does, because the
+   * selection genuinely changed.
    */
   brush.on("end", (event: D3BrushEvent<unknown>) => {
     if (!event.sourceEvent || silent) return;
     active = false;
 
     const next = normalize(blocksFrom(event.selection), deps.getTotalBlocks());
-    if (!moved && sameRange(selection, next)) return;
+    if (sameRange(selection, next)) return;
 
     selection = next;
     update();
-    deps.onBrushEnd(selection, moved);
+    deps.onBrushEnd(selection);
   });
 
   update();

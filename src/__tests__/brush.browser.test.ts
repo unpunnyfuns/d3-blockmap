@@ -37,7 +37,7 @@ const mount = (totalBlocks = TOTAL): Harness => {
     getHeight: () => HEIGHT,
     getTotalBlocks: () => totalBlocks,
     onBrush: (selection: BlockRange | null) => onBrush(selection),
-    onBrushEnd: (selection: BlockRange | null, moved: boolean) => onBrushEnd(selection, moved),
+    onBrushEnd: (selection: BlockRange | null) => onBrushEnd(selection),
   });
 
   return {
@@ -231,7 +231,7 @@ describe("createBrushOverlay", () => {
     drag(harness.container, 160, 400);
     expect(harness.onBrush).toHaveBeenCalledWith([2, 5]);
     expect(harness.onBrushEnd).toHaveBeenCalledTimes(1);
-    expect(harness.onBrushEnd).toHaveBeenCalledWith([2, 5], true);
+    expect(harness.onBrushEnd).toHaveBeenCalledWith([2, 5]);
     expect(harness.onBrush.mock.invocationCallOrder[0]).toBeLessThan(
       harness.onBrushEnd.mock.invocationCallOrder[0],
     );
@@ -242,17 +242,17 @@ describe("createBrushOverlay", () => {
   it("snaps the drawn rectangle to block boundaries on release", () => {
     const harness = mount();
     drag(harness.container, 167, 391);
-    expect(harness.onBrushEnd).toHaveBeenCalledWith([2, 5], true);
+    expect(harness.onBrushEnd).toHaveBeenCalledWith([2, 5]);
     const rect = selectionRect(harness.container);
     expect(rect.getAttribute("x")).toBe("160");
     expect(rect.getAttribute("width")).toBe("240");
     harness.cleanup();
   });
 
-  it("reports no selection from a drag when the map has no blocks", () => {
+  it("reports nothing from a drag when the map has no blocks to select", () => {
     const harness = mount(0);
     drag(harness.container, 160, 400);
-    expect(harness.onBrushEnd).toHaveBeenCalledWith(null, true);
+    expect(harness.onBrushEnd).not.toHaveBeenCalled();
     expect(harness.overlay.getSelection()).toBeNull();
     harness.cleanup();
   });
@@ -262,7 +262,7 @@ describe("createBrushOverlay", () => {
     harness.overlay.setSelection([2, 5]);
     drag(harness.container, 400, 400);
     expect(harness.onBrushEnd).toHaveBeenCalledTimes(1);
-    expect(harness.onBrushEnd).toHaveBeenCalledWith(null, false);
+    expect(harness.onBrushEnd).toHaveBeenCalledWith(null);
     expect(harness.overlay.getSelection()).toBeNull();
     harness.cleanup();
   });
@@ -280,6 +280,20 @@ describe("createBrushOverlay", () => {
     harness.overlay.setSelection([2, 5]);
     const selectionRect = svgOf(harness.container).querySelector(".selection") as SVGRectElement;
     selectionRect.dispatchEvent(new MouseEvent("mousedown", mouseInit(harness.container, 300)));
+    release(harness.container, 300);
+    expect(harness.onBrushEnd).not.toHaveBeenCalled();
+    expect(harness.overlay.getSelection()).toEqual([2, 5]);
+    harness.cleanup();
+  });
+
+  it("reports nothing for a drag that ends on the selection it started with", () => {
+    const harness = mount();
+    drag(harness.container, 160, 400);
+    harness.onBrushEnd.mockClear();
+    const selectionRect = svgOf(harness.container).querySelector(".selection") as SVGRectElement;
+    selectionRect.dispatchEvent(new MouseEvent("mousedown", mouseInit(harness.container, 300)));
+    moveTo(harness.container, 340);
+    moveTo(harness.container, 300);
     release(harness.container, 300);
     expect(harness.onBrushEnd).not.toHaveBeenCalled();
     expect(harness.overlay.getSelection()).toEqual([2, 5]);

@@ -18,6 +18,7 @@ import {
   ARIA_LABEL_DEFAULT_PERCENT_DIGITS,
   ARIA_ROLEDESCRIPTION,
   CANVAS_ROWS,
+  DRAG_THRESHOLD_PX,
   PERCENT,
   REDUCED_MOTION_QUERY,
 } from "./constants";
@@ -147,10 +148,9 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   let theme: Theme = readTheme(container);
   let highlightOn = false;
   let dragging = false;
-  // Set when a pan or a brush gesture ends, so the click the browser fires
-  // right after pointerup is swallowed instead of reaching onBlockClick as a
-  // false hit.
-  let suppressClick = false;
+  // Where the last press went down. NaN until the first one, so a click with
+  // no press before it - a synthetic one - is never taken for a drag's end.
+  let downX = Number.NaN;
 
   // Appended straight after the canvas so it covers the bar, and before the
   // tooltip and the axis so those keep painting over it. The committed view
@@ -164,17 +164,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
           getHeight: () => cssHeight,
           getTotalBlocks: () => state.totalBlocks,
           onBrush: (selection) => options.onBrush?.(selection),
-
-          // A brush gesture that moved is driven by mouse events, so the
-          // browser fires a click on release just as it does after a pan; the
-          // container's pointerdown already cleared the flag at the start of
-          // this gesture, so setting it here is what the click then consumes.
-          // A press that only cleared the selection moved nothing, and the
-          // click it ends with is still a click on a block.
-          onBrushEnd: (selection, moved) => {
-            if (moved) suppressClick = true;
-            options.onBrushEnd?.(selection);
-          },
+          onBrushEnd: (selection) => options.onBrushEnd?.(selection),
         })
       : undefined;
 
@@ -384,24 +374,17 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
 
   const onPointerLeave = (): void => tooltip.hide();
 
-  // Clears a flag left over from a drag that never reached a click:
-  // pointercancel - a touch gesture taken over by scrolling, say - ends the
-  // drag through the same onDragEnd as pointerup, but fires no click after
-  // it, so a stale suppressClick would swallow the next unrelated one. Every
-  // new gesture starts clean.
-  const onPointerDown = (): void => {
-    suppressClick = false;
+  const onPointerDown = (event: PointerEvent): void => {
+    downX = event.clientX;
   };
 
-  // A click right after an active pan is a drag artefact, not an intent to
-  // pick a block, so suppressClick swallows exactly one. Registered
-  // regardless of `interactive`, like the tooltip listeners above, since a
-  // non-interactive map can still report what was clicked.
+  // A click that lands as far from its press as a drag has to travel is the
+  // end of a pan or a brush, not an intent to pick a block. Distance alone
+  // decides, so no gesture can leave state behind for the next click.
+  // Registered regardless of `interactive`, like the tooltip listeners above,
+  // since a non-interactive map can still report what was clicked.
   const onClick = (event: MouseEvent): void => {
-    if (suppressClick) {
-      suppressClick = false;
-      return;
-    }
+    if (Math.abs(event.clientX - downX) >= DRAG_THRESHOLD_PX) return;
     if (!options.onBlockClick) return;
 
     const hit = locate(canvasX(canvas, event));
@@ -434,7 +417,6 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
           },
           onDragEnd: () => {
             dragging = false;
-            suppressClick = true;
           },
         });
 

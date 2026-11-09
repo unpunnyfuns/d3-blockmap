@@ -724,15 +724,29 @@ describe("createBlockMap", () => {
       map.destroy();
     });
 
+    it("fires for a press that moved less than the drag threshold", () => {
+      const container = dom.mount();
+      const onBlockClick = vi.fn();
+      const map = createBlockMap(container, { totalBlocks: 100, onBlockClick });
+      dom.triggerResize(50);
+
+      pointer(container, "pointerdown", 20);
+      pointer(container, "pointermove", 22);
+      pointer(container, "pointerup", 22);
+      fire(container, "click", at(container, 22));
+
+      expect(onBlockClick).toHaveBeenCalledTimes(1);
+      map.destroy();
+    });
+
     it("recovers from a cancelled drag so the next fresh click still fires", () => {
       const container = dom.mount();
       const onBlockClick = vi.fn();
       const map = createBlockMap(container, { totalBlocks: 100, onBlockClick });
       dom.triggerResize(5);
 
-      // pointercancel ends the drag through the same onDragEnd as pointerup
-      // but is never followed by a click, so suppressClick must not survive
-      // past the next pointerdown.
+      // pointercancel ends the drag but is never followed by a click, so
+      // nothing from that gesture may reach the next press and click.
       pointer(container, "pointerdown", 1.2);
       pointer(container, "pointermove", 10);
       pointer(container, "pointercancel", 10);
@@ -796,8 +810,8 @@ describe("createBlockMap", () => {
 
     // d3-brush reads mouse events, not pointer events, and takes move/up from
     // `event.view`, so a gesture needs both families: the pointerdown the
-    // browser would send first (which clears the click suppression), then the
-    // mouse sequence d3 actually listens to.
+    // browser would send first (which records where the press began), then
+    // the mouse sequence d3 actually listens to.
     const mouseAt = (container: HTMLElement, x: number): Record<string, unknown> => {
       const rect = container.getBoundingClientRect();
       return { clientX: rect.left + x, clientY: rect.top + rect.height / 2, view: window };
@@ -820,7 +834,7 @@ describe("createBlockMap", () => {
 
     // d3-drag suppresses the click after a moved gesture with its own capturing
     // window listener, cleared on a macrotask; waiting for that is what leaves
-    // the map's own suppression as the only thing in the click's way.
+    // the map's own distance check as the only thing in the click's way.
     const afterD3ClickGuard = (): Promise<void> =>
       new Promise<void>((resolve) => setTimeout(resolve, 0));
 
@@ -925,6 +939,19 @@ describe("createBlockMap", () => {
       map.destroy();
     });
 
+    it("counts a brush drag under the drag threshold as a click", async () => {
+      const onBlockClick = vi.fn();
+      const { container, map } = mountBrushed({ onBlockClick });
+
+      brushDrag(container, 400, 402);
+      await afterD3ClickGuard();
+      fire(container, "click", at(container, 402));
+
+      expect(onBlockClick).toHaveBeenCalledTimes(1);
+      expect(onBlockClick.mock.calls[0][0].block).toBe(5);
+      map.destroy();
+    });
+
     it("reports a block for a click that selected nothing", () => {
       const onBlockClick = vi.fn();
       const onBrushEnd = vi.fn();
@@ -950,7 +977,7 @@ describe("createBlockMap", () => {
       map.destroy();
     });
 
-    it("clears an existing selection once and leaves no suppression behind", async () => {
+    it("clears an existing selection once and leaves nothing behind for the next click", async () => {
       const onBlockClick = vi.fn();
       const onBrushEnd = vi.fn();
       const { container, map } = mountBrushed({ onBlockClick, onBrushEnd });
@@ -963,8 +990,8 @@ describe("createBlockMap", () => {
       expect(map.getBrush()).toBeNull();
 
       // d3-drag guards the click after a gesture it treated as a move of the
-      // existing selection, so what matters here is that none of the map's
-      // own suppression outlives it: the next plain click still reports.
+      // existing selection, so what matters here is that nothing of the map's
+      // own outlives it: the next plain click still reports.
       await afterD3ClickGuard();
       fire(container, "pointerdown", { ...at(container, 400), pointerId: 1, button: 0 });
       fire(container, "click", at(container, 400));

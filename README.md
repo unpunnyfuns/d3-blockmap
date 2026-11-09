@@ -62,7 +62,7 @@ export const Download = ({ totalBlocks }: { totalBlocks: number }) => {
 | `axis` | `boolean \| { format?, tickCount? }` | `false` | Tick labels under the bar. |
 | `brush` | `boolean` | `false` | A mouse or pen drag selects a block range; panning then needs Shift. See Behaviour. |
 | `onBrush` | `(selection) => void` | | Called on every brush move with the live `[start, end)` or `null`. |
-| `onBrushEnd` | `(selection) => void` | | Called when the gesture ends, with the snapped `[start, end)`, or `null` when it cleared the selection. A click that selects nothing and clears nothing fires nothing. |
+| `onBrushEnd` | `(selection) => void` | | Called when the gesture ends, with the snapped `[start, end)`, or `null` when it cleared the selection. A gesture that leaves the selection as it was fires nothing. |
 | `onBlockClick` | `(event) => void` | | Called on click with `{ block, range, completed, total, originalEvent }`. Works even when `interactive` is `false`. |
 | `label` | `(progress) => string` | | Overrides the canvas `aria-label`. See Behaviour. |
 
@@ -90,7 +90,7 @@ Ranges use exclusive ends: `[0, 10]` means blocks 0 through 9. Unsorted, overlap
 - The canvas is focusable (`tabindex="0"`) when `interactive` isn't `false`, and announces progress through `role="img"` plus an `aria-label`: `label` overrides the default `Download progress: 4,343,270 of 10,000,000 blocks (43%)` text.
 - With the canvas focused: `+`/`-` (or `=`/`_`) zoom in or out around the centre of the current view, arrow keys pan by 10% of the view length, Shift+arrow by 50%, and `Home` or `0` resets to the full range.
 - With `brush: true`, a mouse or pen drag selects a block range and Shift+drag pans; click an empty spot to clear. The brush is a mouse and pen gesture only, so a touch drag keeps panning and needs no modifier.
-- `onBlockClick` reports the block under the pointer, or the column's range when a column covers several blocks. It does not fire for the click that ends a pan or a brush drag, nor for a click outside the canvas. A plain click with no selection present reports the block it hit; the click that clears an existing selection does not.
+- `onBlockClick` reports the block under the pointer, or the column's range when a column covers several blocks. It does not fire for a click that lands 3 px or more from where the press began, which is how a pan or a brush drag ends, nor for a click outside the canvas. A plain click with no selection present reports the block it hit; the click that clears an existing selection does not.
 
 ## React
 
