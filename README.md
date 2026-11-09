@@ -14,7 +14,7 @@ npm i d3-blockmap
 |---|---|---|
 | `createBlockMap(container, options)` | `d3-blockmap` | Vanilla factory. Returns `BlockMap`. |
 | `BlockMap`, `BlockMapOptions`, `Progress`, `Theme`, `BlockRangeTuple`, `RangeInput`, `PartialStyle`, `BlockView`, `AxisOptions`, `BlockScale` | `d3-blockmap` | Types. |
-| `<BlockMap>` | `d3-blockmap/react` | React wrapper, `forwardRef` to `BlockMapHandle`. |
+| `<BlockMap>` | `d3-blockmap/react` | React wrapper; accepts `ref` as a prop (React 19) exposing `BlockMapHandle`. |
 | `BlockMapProps`, `BlockMapHandle` | `d3-blockmap/react` | Types. |
 
 ## Usage
