@@ -270,11 +270,9 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   };
 
   /**
-   * pendingView doubles as the "a frame is already queued" flag, so repeated
-   * calls overwrite the target instead of queueing more frames; viewFrame is
-   * kept only so destroy can cancel a frame that will never run. Comparing
-   * against the pending view means a gesture that ends where it started is
-   * dropped without a repaint.
+   * Repeated calls within a frame overwrite the target rather than queueing
+   * more frames. Comparing against the pending view means a gesture that ends
+   * where it started is dropped without a repaint.
    */
   const setView = (view: BlockView): void => {
     if (!Number.isFinite(view.start) || !Number.isFinite(view.end)) return;
@@ -282,9 +280,9 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     const clamped = clampView(view, state.totalBlocks);
     if (sameView(clamped, pendingView ?? state.view)) return;
 
-    const hasPendingFrame = pendingView !== undefined;
     pendingView = clamped;
-    if (!hasPendingFrame) viewFrame = requestAnimationFrame(commitView);
+    if (viewFrame !== NO_FRAME) return;
+    viewFrame = requestAnimationFrame(commitView);
   };
 
   const resetView = (): void => setView(fullView(state.totalBlocks));

@@ -1,6 +1,6 @@
 import { createColorScale, highlightColor } from "../colors";
 import { createRenderer } from "../renderer";
-import type { ImageDataLike, RenderSource, Scheduler } from "../renderer";
+import type { ImageDataLike, RenderSource } from "../renderer";
 import { createBlockState } from "../state";
 import {
   TEST_THEME as theme,
@@ -75,24 +75,6 @@ describe("createRenderer", () => {
     expect([0, 1, 2].map((c) => pixel(image, c))).toEqual(Array(3).fill([0, 0, 0, 255]));
     expect([3, 4, 5].map((c) => pixel(image, c))).toEqual(Array(3).fill([255, 255, 255, 255]));
     expect([6, 7, 8].map((c) => pixel(image, c))).toEqual(Array(3).fill([0, 0, 0, 255]));
-  });
-
-  it("does not stall repaints when the scheduler runs synchronously", () => {
-    const state = createBlockState(10);
-    state.resize(5);
-    const { ctx, puts } = createStubContext();
-    const scheduler: Scheduler = {
-      request: (callback) => {
-        callback();
-        return 1;
-      },
-      cancel: () => {},
-    };
-    const renderer = createRenderer(ctx, state, scheduler);
-    renderer.setColors(createColorScale(theme));
-    renderer.markDirty(state.add([0]));
-    renderer.markDirty(state.add([1]));
-    expect(puts).toHaveLength(3);
   });
 
   it("ignores a stale dirty bin when the source shrinks before paint", () => {

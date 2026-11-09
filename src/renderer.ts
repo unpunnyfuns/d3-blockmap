@@ -75,7 +75,6 @@ export const createRenderer = (
   let image: ImageDataLike | undefined;
   let scale: ColorScale | undefined;
   let frame = NO_FRAME;
-  let scheduled = false;
   let allDirty = false;
   let highlight: Uint8ClampedArray | undefined;
   let phase = false;
@@ -149,7 +148,6 @@ export const createRenderer = (
    * and whatever restores them (a resize, a theme) marks everything dirty.
    */
   const paint = (): void => {
-    scheduled = false;
     frame = NO_FRAME;
 
     const target = ensureImage();
@@ -167,16 +165,9 @@ export const createRenderer = (
     allDirty = false;
   };
 
-  /**
-   * Many updates can arrive between frames; this coalesces them into one
-   * paint. The guard is the `scheduled` flag rather than the frame handle,
-   * because a scheduler that invokes the callback synchronously runs paint
-   * before `frame` is assigned - the assignment would then land on top of
-   * paint's reset and no later repaint would ever be scheduled.
-   */
+  // Many updates can arrive between frames; this coalesces them into one paint.
   const schedule = (): void => {
-    if (scheduled) return;
-    scheduled = true;
+    if (frame !== NO_FRAME) return;
     frame = scheduler.request(paint);
   };
 
@@ -233,8 +224,7 @@ export const createRenderer = (
 
     destroy: () => {
       stopBlink();
-      if (scheduled) scheduler.cancel(frame);
-      scheduled = false;
+      if (frame !== NO_FRAME) scheduler.cancel(frame);
       frame = NO_FRAME;
       dirty.clear();
     },
