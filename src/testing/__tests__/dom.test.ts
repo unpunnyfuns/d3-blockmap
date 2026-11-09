@@ -15,7 +15,29 @@ describe("installDom", () => {
     const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
     const image = ctx.createImageData(2, 1);
     ctx.putImageData(image, 0, 0);
-    expect(dom.puts).toEqual([image]);
+    expect(dom.puts).toHaveLength(1);
+    expect(dom.puts[0]?.width).toBe(image.width);
+    expect(dom.puts[0]?.height).toBe(image.height);
+    expect(dom.puts[0]?.data).toEqual(image.data);
+    dom.restore();
+  });
+
+  it("copies each painted image so puts holds distinct snapshots", () => {
+    const dom = installDom();
+    const container = dom.mount();
+    const canvas = document.createElement("canvas");
+    container.append(canvas);
+    const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
+    const image = ctx.createImageData(2, 1);
+    image.data.set([1, 2, 3, 4, 5, 6, 7, 8]);
+    ctx.putImageData(image, 0, 0);
+    image.data.set([9, 10, 11, 12, 13, 14, 15, 16]);
+    ctx.putImageData(image, 0, 0);
+    expect(dom.puts).toHaveLength(2);
+    expect(dom.puts[0]).not.toBe(dom.puts[1]);
+    expect(dom.puts[0]?.data).not.toEqual(dom.puts[1]?.data);
+    expect(Array.from(dom.puts[0]?.data ?? [])).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(Array.from(dom.puts[1]?.data ?? [])).toEqual([9, 10, 11, 12, 13, 14, 15, 16]);
     dom.restore();
   });
 
@@ -101,6 +123,15 @@ describe("installDom", () => {
     dom.triggerResize(20);
     expect(stopped).toEqual([10]);
     expect(stays).toEqual([10, 20]);
+    dom.restore();
+  });
+
+  it("couples triggerResize to the mounted container's actual geometry", () => {
+    const dom = installDom();
+    const container = dom.mount();
+    new ResizeObserver(() => {}).observe(container);
+    dom.triggerResize(50);
+    expect(container.getBoundingClientRect().width).toBe(50);
     dom.restore();
   });
 

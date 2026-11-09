@@ -135,7 +135,13 @@ export const installDom = (options: DomOptions = {}): InstalledDom => {
       this: CanvasRenderingContext2D,
       ...args: Parameters<typeof originalPutImageData>
     ) {
-      puts.push(args[0]);
+      const image = args[0];
+      const copy: ImageDataLike = {
+        width: image.width,
+        height: image.height,
+        data: new Uint8ClampedArray(image.data),
+      };
+      puts.push(copy);
       return originalPutImageData.apply(this, args);
     });
   const pointerCapture: InstalledPointerCapture = installPointerCapture();
@@ -151,6 +157,9 @@ export const installDom = (options: DomOptions = {}): InstalledDom => {
     },
     triggerResize: (width) => {
       if (observers.length === 0) throw new Error("triggerResize: no observers");
+      mounted.forEach((container) => {
+        container.style.width = `${width}px`;
+      });
       const entry = createResizeEntry(width);
       observers.forEach((cb) => cb([entry]));
     },

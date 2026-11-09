@@ -15,11 +15,7 @@ export const fire = (
   init: Record<string, unknown> = {},
 ): Event => {
   const Ctor =
-    type === "wheel"
-      ? WheelEvent
-      : POINTER_EVENT_TYPES.has(type) && typeof PointerEvent !== "undefined"
-        ? PointerEvent
-        : MouseEvent;
+    type === "wheel" ? WheelEvent : POINTER_EVENT_TYPES.has(type) ? PointerEvent : MouseEvent;
   const event = new Ctor(type, { bubbles: true, cancelable: true, ...init });
   target.dispatchEvent(event);
   return event;

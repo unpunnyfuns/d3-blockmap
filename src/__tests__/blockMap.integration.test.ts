@@ -79,9 +79,7 @@ describe("createBlockMap integration", () => {
     const before = map.getView();
     expect(before).toEqual({ start: 180, end: 380 });
     expect(() => map.destroy()).not.toThrow();
-    if (typeof canvas.hasPointerCapture === "function") {
-      expect(canvas.hasPointerCapture(1)).toBe(false);
-    }
+    expect(canvas.hasPointerCapture(1)).toBe(false);
     pointer(canvas, "pointermove", 90);
     dom.flushFrames();
     expect(map.getView()).toEqual(before);

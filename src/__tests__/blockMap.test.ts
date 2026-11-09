@@ -4,7 +4,9 @@ import {
   COMPLETE_RGBA,
   HIGHLIGHT_RGBA,
   MISSING_RGBA,
+  at,
   ctrlWheel,
+  fire,
   installDom,
   pixel,
   pointer,
@@ -98,7 +100,7 @@ describe("createBlockMap", () => {
     pointer(canvas, "pointermove", 0);
     expect(tooltip.style.display).toBe("block");
     expect(tooltip.textContent).toBe("Blocks 0–9 · 5 / 10 (50.0%)");
-    canvas.dispatchEvent(new MouseEvent("pointerleave"));
+    fire(canvas, "pointerleave", at(canvas, 0));
     expect(tooltip.style.display).toBe("none");
     map.destroy();
   });

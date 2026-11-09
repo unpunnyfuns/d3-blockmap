@@ -4,7 +4,21 @@ export type InstalledPointerCapture = {
   restore(): void;
 };
 
+// Models per-element pointer capture tracking: setPointerCapture records the
+// pointer id against the element, hasPointerCapture reports whether it is
+// still held, releasePointerCapture drops it.
+// It does not model gotpointercapture/lostpointercapture events, implicit
+// release on pointerup/pointercancel, retargeting of subsequent events to
+// the capturing element, or the InvalidStateError thrown for an unconnected
+// or inactive pointer id.
+let installed = false;
+
 export const installPointerCapture = (): InstalledPointerCapture => {
+  if (installed) {
+    throw new Error("installPointerCapture: already installed; call restore() first");
+  }
+  installed = true;
+
   const captured = new WeakMap<Element, Set<number>>();
 
   const setSpy = vi
@@ -30,6 +44,7 @@ export const installPointerCapture = (): InstalledPointerCapture => {
       setSpy.mockRestore();
       releaseSpy.mockRestore();
       hasSpy.mockRestore();
+      installed = false;
     },
   };
 };
