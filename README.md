@@ -27,15 +27,23 @@ map.getProgress();                      // { completed, total }
 The container needs a height; the canvas fills it. Leave a little space below if you turn the axis on.
 
 ```tsx
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { BlockMap } from '@unpunnyfuns/d3-blockmap/react';
 import type { BlockMapHandle } from '@unpunnyfuns/d3-blockmap/react';
 
-const ref = useRef<BlockMapHandle>(null);
+export const Download = ({ totalBlocks }: { totalBlocks: number }) => {
+  const ref = useRef<BlockMapHandle>(null);
+  const [highlight, setHighlight] = useState(false);
 
-<BlockMap ref={ref} totalBlocks={total} ranges={initialRanges} axis style={{ height: 12 }} />;
+  // Call ref.current?.addRanges(...) from your data source as ranges complete.
 
-ref.current?.addRanges(delta);
+  return (
+    <>
+      <BlockMap ref={ref} totalBlocks={totalBlocks} axis highlight={highlight} style={{ height: 12 }} />
+      <button onClick={() => setHighlight((on) => !on)}>Highlight missing</button>
+    </>
+  );
+};
 ```
 
 ## Options
