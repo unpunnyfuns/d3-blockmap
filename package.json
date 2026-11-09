@@ -67,5 +67,16 @@
     "progress",
     "block-map",
     "bittorrent"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unpunnyfuns/d3-blockmap.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "homepage": "https://github.com/unpunnyfuns/d3-blockmap#readme",
+  "bugs": {
+    "url": "https://github.com/unpunnyfuns/d3-blockmap/issues"
+  }
 }
