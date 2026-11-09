@@ -98,7 +98,7 @@ Props mirror the options, including `label`, `brush`, `onBrush`, `onBrushEnd`, `
 
 - `blocks` and `ranges` apply when their identity changes, so keep the references stable.
 - `partial`, `interactive`, `axis`, and `brush` recreate the instance when they change; memoise an object `axis`.
-- `onViewChange`, `onBrush`, `onBrushEnd`, and `onBlockClick` can be inline: the latest function is called without recreating the instance.
+- `onViewChange`, `onBrush`, `onBrushEnd`, `onBlockClick`, and `label` can be inline, added, or removed: the latest function is called without recreating the instance. A changed `label` applies on the next progress update.
 - `setBlocks` and `setRanges` on the ref hold until the `blocks` or `ranges` prop next changes.
 - For high-frequency updates use the ref (`addBlocks`, `addRanges`) rather than props.
 

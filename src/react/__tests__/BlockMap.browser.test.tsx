@@ -215,11 +215,29 @@ describe("<BlockMap>", () => {
     expect(passed({ completed: 3, total: 10 })).toBe("Download progress: 3 of 10 blocks (30%)");
   });
 
-  it("omits label from the created options when the prop is not given", () => {
+  it("uses the default text when no label is given", () => {
     const instance = createInstance();
     vi.mocked(createBlockMap).mockReturnValue(instance);
     render(<BlockMap totalBlocks={10} />);
-    expect(vi.mocked(createBlockMap).mock.calls[0][1]).not.toHaveProperty("label");
+    const passed = vi.mocked(createBlockMap).mock.calls[0][1].label as (p: {
+      completed: number;
+      total: number;
+    }) => string;
+    expect(passed({ completed: 3, total: 10 })).toBe("Download progress: 3 of 10 blocks (30%)");
+  });
+
+  it("applies a label supplied after mount without recreating", () => {
+    const instance = createInstance();
+    vi.mocked(createBlockMap).mockReturnValue(instance);
+    const { rerender } = render(<BlockMap totalBlocks={10} />);
+    const passed = vi.mocked(createBlockMap).mock.calls[0][1].label as (p: {
+      completed: number;
+      total: number;
+    }) => string;
+
+    rerender(<BlockMap totalBlocks={10} label={(progress) => `${progress.completed} done`} />);
+    expect(createBlockMap).toHaveBeenCalledTimes(1);
+    expect(passed({ completed: 3, total: 10 })).toBe("3 done");
   });
 
   it("passes brush as a create option and recreates when it changes", () => {

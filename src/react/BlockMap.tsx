@@ -96,17 +96,13 @@ export const BlockMap = ({
       onBrush: (selection) => latest.current.onBrush?.(selection),
       onBrushEnd: (selection) => latest.current.onBrushEnd?.(selection),
       onBlockClick: (event) => latest.current.onBlockClick?.(event),
+      label: (progress) => (latest.current.label ?? defaultLabel)(progress),
     };
     if (partial) options.partial = partial;
     if (interactive !== undefined) options.interactive = interactive;
     if (view) options.view = view;
     if (axis !== undefined) options.axis = axis;
     if (brush !== undefined) options.brush = brush;
-    // Installed only when given at construction, so a label supplied later
-    // never applies until the map is rebuilt.
-    if (label !== undefined) {
-      options.label = (progress) => (latest.current.label ?? defaultLabel)(progress);
-    }
 
     const created = createBlockMap(container, options);
     setInstance(created);
