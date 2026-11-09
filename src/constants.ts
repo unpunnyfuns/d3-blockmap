@@ -36,3 +36,8 @@ export const DARK_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 export const RANGE_PAIR = 2;
 export const FULL_BYTE = 0xff;
 export const MAX_BLOCKS = 0xffffffff;
+
+export const CSS_VAR_AXIS_COLOR = "--blockmap-axis-color";
+export const TICK_SPACING_PX = 80;
+export const MIN_TICKS = 2;
+export const EDGE_ANCHOR_RATIO = 0.5;
