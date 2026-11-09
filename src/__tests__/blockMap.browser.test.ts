@@ -539,7 +539,7 @@ describe("createBlockMap", () => {
     const map = createBlockMap(container, { totalBlocks: 10 });
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     expect(canvas.getAttribute("aria-roledescription")).toBe("zoomable block map");
-    expect(canvas.getAttribute("aria-keyshortcuts")).toBe("Plus Minus ArrowLeft ArrowRight Home");
+    expect(canvas.getAttribute("aria-keyshortcuts")).toBe("Plus - ArrowLeft ArrowRight Home");
     map.destroy();
 
     const fixed = dom.mount();

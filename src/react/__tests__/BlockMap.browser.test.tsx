@@ -1,3 +1,4 @@
+import type * as BlockMapModule from "../../blockMap";
 import { act, render } from "@testing-library/react";
 import { createRef } from "react";
 import { createBlockMap } from "../../blockMap";
@@ -5,7 +6,10 @@ import type { BlockMap as BlockMapInstance } from "../../blockMap";
 import { BlockMap } from "../BlockMap";
 import type { BlockMapHandle } from "../BlockMap";
 
-vi.mock("../../blockMap", () => ({ createBlockMap: vi.fn() }));
+vi.mock("../../blockMap", async (importOriginal) => {
+  const actual = await importOriginal<typeof BlockMapModule>();
+  return { createBlockMap: vi.fn(), defaultLabel: actual.defaultLabel };
+});
 
 const createInstance = (): BlockMapInstance => ({
   setBlocks: vi.fn(),
@@ -190,6 +194,21 @@ describe("<BlockMap>", () => {
     expect(passed({ completed: 3, total: 10 })).toBe("10");
     expect(first).toHaveBeenCalledTimes(1);
     expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the default label when the prop is removed after mount", () => {
+    const instance = createInstance();
+    vi.mocked(createBlockMap).mockReturnValue(instance);
+    const custom = (progress: { completed: number; total: number }) => `${progress.completed}`;
+    const { rerender } = render(<BlockMap totalBlocks={10} label={custom} />);
+    const passed = vi.mocked(createBlockMap).mock.calls[0][1].label as (p: {
+      completed: number;
+      total: number;
+    }) => string;
+
+    rerender(<BlockMap totalBlocks={10} />);
+    expect(createBlockMap).toHaveBeenCalledTimes(1);
+    expect(passed({ completed: 3, total: 10 })).toBe("Download progress: 3 of 10 blocks (30%)");
   });
 
   it("omits label from the created options when the prop is not given", () => {

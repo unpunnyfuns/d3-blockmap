@@ -67,7 +67,7 @@ const numberFormat = new Intl.NumberFormat(LOCALE);
 // counts so large totals read in thousands rather than a wall of digits.
 // The percentage is floored, not rounded, so it only reads 100% once every
 // block actually is, and reports a last block still missing as 99%.
-const defaultLabel = (progress: Progress): string => {
+export const defaultLabel = (progress: Progress): string => {
   const percent = Math.floor((progress.completed / progress.total) * PERCENT).toFixed(
     ARIA_LABEL_DEFAULT_PERCENT_DIGITS,
   );

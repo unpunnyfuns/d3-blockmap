@@ -9,7 +9,7 @@ import { useEffect, useImperativeHandle, useRef } from "react";
 import type { CSSProperties, Ref } from "react";
 import type { AxisOptions } from "../axis";
 import type { PartialStyle } from "../colors";
-import { createBlockMap } from "../blockMap";
+import { createBlockMap, defaultLabel } from "../blockMap";
 import type { BlockMap as BlockMapInstance, BlockMapOptions } from "../blockMap";
 import type { RangeInput } from "../ranges";
 import type { Progress } from "../state";
@@ -77,12 +77,12 @@ export const BlockMap = ({
   onViewChangeRef.current = onViewChange;
 
   // Same idea as onViewChangeRef, but label is also kept out of the create
-  // effect's dependencies below: the core already defaults the label when
-  // the option is absent, so the wrapper is only installed when `label` was
-  // given at construction. Supplying `label` on a later render, after
+  // effect's dependencies below: the wrapper is only installed when `label`
+  // was given at construction. Supplying `label` on a later render, after
   // mounting without one, does not recreate the instance and so never takes
-  // effect; a changed function identity once the wrapper exists does, on the
-  // next progress update.
+  // effect. Once the wrapper exists, a changed function identity applies on
+  // the next progress update, and removing the prop falls back to the core's
+  // default text.
   const labelRef = useRef(label);
   labelRef.current = label;
 
@@ -104,7 +104,9 @@ export const BlockMap = ({
     if (interactive !== undefined) options.interactive = interactive;
     if (view) options.view = view;
     if (axis !== undefined) options.axis = axis;
-    if (label !== undefined) options.label = (progress) => labelRef.current!(progress);
+    if (label !== undefined) {
+      options.label = (progress) => (labelRef.current ?? defaultLabel)(progress);
+    }
 
     const instance = createBlockMap(container, options);
     instanceRef.current = instance;
