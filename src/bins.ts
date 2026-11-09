@@ -11,6 +11,11 @@ export type Bins = {
   sizeOf(bin: number): number;
   rebuild(countInRange: (start: number, end: number) => number): void;
   addRange(start: number, end: number): void;
+  recount(
+    start: number,
+    end: number,
+    countInRange: (start: number, end: number) => number,
+  ): number[];
 };
 
 export const createBins = (view: BlockView, binCount: number): Bins => {
@@ -55,6 +60,20 @@ export const createBins = (view: BlockView, binCount: number): Bins => {
       counts[first] += rangeOf(first).end - start;
       for (let bin = first + 1; bin < last; bin += 1) counts[bin] += sizeOf(bin);
       counts[last] += end - rangeOf(last).start;
+    },
+    recount: (rawStart, rawEnd, countInRange) => {
+      const start = Math.max(rawStart, viewStart);
+      const end = Math.min(rawEnd, viewEnd);
+      if (binCount === 0 || end <= start) return [];
+      const first = binOf(start);
+      const last = binOf(end - 1);
+      const touched: number[] = [];
+      for (let bin = first; bin <= last; bin += 1) {
+        const range = rangeOf(bin);
+        counts[bin] = countInRange(range.start, range.end);
+        touched.push(bin);
+      }
+      return touched;
     },
   };
 };

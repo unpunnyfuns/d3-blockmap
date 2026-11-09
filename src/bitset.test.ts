@@ -126,4 +126,30 @@ describe("createBitset", () => {
       }
     }
   });
+
+  it("clearRange clears a span across byte boundaries without touching neighbours", () => {
+    const bits = createBitset(24);
+    bits.fill(0, 24);
+    bits.clearRange(5, 19);
+    for (let i = 0; i < 24; i += 1) expect(bits.has(i)).toBe(i < 5 || i >= 19);
+  });
+
+  it("clearRange within one byte and whole bytes", () => {
+    const bits = createBitset(16);
+    bits.fill(0, 16);
+    bits.clearRange(2, 5);
+    expect([1, 2, 4, 5].map(bits.has)).toEqual([true, false, false, true]);
+    bits.clearRange(0, 16);
+    expect(bits.countRange(0, 16)).toBe(0);
+    bits.clearRange(3, 3);
+    expect(bits.countRange(0, 16)).toBe(0);
+  });
+
+  it("clearRange leaves count to the caller", () => {
+    const bits = createBitset(8);
+    bits.fill(0, 8);
+    bits.setCount(8);
+    bits.clearRange(0, 4);
+    expect(bits.count).toBe(8);
+  });
 });
