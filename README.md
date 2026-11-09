@@ -116,6 +116,6 @@ npm run verify      # lint, format check, typecheck, tests, build
 npm run demo        # serves the repo; open /demo/
 ```
 
-Tests run in headless Chromium through Vitest browser mode; pure modules run in Node. One-time setup: `npx playwright install chromium` and `npm run prepare` (installs the commit-message hook). Shared test fakes live in `src/testing/`.
+Files named `*.browser.test.ts` run in headless Chromium; every other test is a Node unit test. One-time setup: `npx playwright install chromium` and `npm run prepare` (installs the commit-message hook). Shared test fakes live in `src/testing/`.
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org); commitlint checks each message. Releases are automated: release-please opens a release PR from the commit history, and merging it tags the version, publishes the GitHub release, and stages the npm publish for approval with 2FA. There is no npm token anywhere.
