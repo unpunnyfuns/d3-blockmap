@@ -10,6 +10,7 @@ import { interpolateRgb, piecewise } from "d3-interpolate";
 import {
   BYTES_PER_PIXEL,
   COLOR_TABLE_SIZE,
+  CSS_VAR_BRUSH,
   CSS_VAR_COMPLETE,
   CSS_VAR_HIGHLIGHT,
   CSS_VAR_MISSING,
@@ -29,6 +30,7 @@ export type Theme = {
   partial: string;
   complete: string;
   highlight: string;
+  brush: string;
 };
 
 export type ColorScale = (fraction: number) => Uint8ClampedArray;
@@ -42,6 +44,7 @@ const THEME_VARS: Record<keyof Theme, string> = {
   partial: CSS_VAR_PARTIAL,
   complete: CSS_VAR_COMPLETE,
   highlight: CSS_VAR_HIGHLIGHT,
+  brush: CSS_VAR_BRUSH,
 };
 
 // Entry 0 is reserved for "nothing complete" and the last entry for "all
@@ -86,6 +89,7 @@ export const readTheme = (el: HTMLElement): Theme => {
     partial: read("partial"),
     complete: read("complete"),
     highlight: read("highlight"),
+    brush: read("brush"),
   };
 };
 

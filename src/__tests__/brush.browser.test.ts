@@ -1,0 +1,259 @@
+import { createBrushOverlay } from "../brush";
+import type { BlockRange } from "../ranges";
+import type { BlockView } from "../view";
+
+const WIDTH = 800;
+const HEIGHT = 40;
+const TOTAL = 10;
+
+type Harness = {
+  container: HTMLElement;
+  overlay: ReturnType<typeof createBrushOverlay>;
+  onBrush: ReturnType<typeof vi.fn>;
+  onBrushEnd: ReturnType<typeof vi.fn>;
+  setView(next: BlockView): void;
+  cleanup(): void;
+};
+
+const mount = (): Harness => {
+  const container = document.createElement("div");
+  Object.assign(container.style, {
+    position: "absolute",
+    left: "0px",
+    top: "0px",
+    width: `${WIDTH}px`,
+    height: `${HEIGHT}px`,
+  });
+  document.body.append(container);
+
+  let view: BlockView = { start: 0, end: TOTAL };
+  const onBrush = vi.fn();
+  const onBrushEnd = vi.fn();
+
+  const overlay = createBrushOverlay(container, {
+    getView: () => view,
+    getWidth: () => WIDTH,
+    getHeight: () => HEIGHT,
+    getTotalBlocks: () => TOTAL,
+    onBrush: (selection: BlockRange | null) => onBrush(selection),
+    onBrushEnd: (selection: BlockRange | null) => onBrushEnd(selection),
+  });
+
+  return {
+    container,
+    overlay,
+    onBrush,
+    onBrushEnd,
+    setView: (next) => {
+      view = next;
+    },
+    cleanup: () => {
+      overlay.destroy();
+      container.remove();
+    },
+  };
+};
+
+const svgOf = (container: HTMLElement): SVGSVGElement =>
+  container.querySelector("svg[data-blockmap-brush]") as SVGSVGElement;
+
+const selectionRect = (container: HTMLElement): SVGRectElement =>
+  svgOf(container).querySelector(".selection") as SVGRectElement;
+
+// d3-brush listens for mousedown on its group (the overlay rect is the
+// bubbling target it reads a datum from) and for move/up on event.view.
+const drag = (container: HTMLElement, fromX: number, toX: number): void => {
+  const svg = svgOf(container);
+  const rect = svg.getBoundingClientRect();
+  const overlay = svg.querySelector(".overlay") as SVGRectElement;
+  const clientY = rect.top + HEIGHT / 2;
+  const at = (x: number) => ({ clientX: rect.left + x, clientY, bubbles: true, view: window });
+
+  overlay.dispatchEvent(new MouseEvent("mousedown", at(fromX)));
+  window.dispatchEvent(new MouseEvent("mousemove", at(toX)));
+  window.dispatchEvent(new MouseEvent("mouseup", at(toX)));
+};
+
+describe("createBrushOverlay", () => {
+  it("appends an svg overlay carrying the brush data attribute", () => {
+    const harness = mount();
+    const svg = svgOf(harness.container);
+    expect(svg).not.toBeNull();
+    expect(svg.style.position).toBe("absolute");
+    expect(svg.style.touchAction).toBe("none");
+    expect(svg.querySelector(".overlay")).not.toBeNull();
+    harness.cleanup();
+  });
+
+  it("sets position: relative on a static container, same as the axis", () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const overlay = createBrushOverlay(container, {
+      getView: () => ({ start: 0, end: TOTAL }),
+      getWidth: () => WIDTH,
+      getHeight: () => HEIGHT,
+      getTotalBlocks: () => TOTAL,
+      onBrush: () => {},
+      onBrushEnd: () => {},
+    });
+    expect(container.style.position).toBe("relative");
+    overlay.destroy();
+    container.remove();
+  });
+
+  it("projects a selection onto the view in pixels", () => {
+    const harness = mount();
+    harness.overlay.setSelection([2, 5]);
+    const rect = selectionRect(harness.container);
+    expect(rect.getAttribute("x")).toBe("160");
+    expect(rect.getAttribute("width")).toBe("240");
+    harness.cleanup();
+  });
+
+  it("paints the selection with the themed colour", () => {
+    const harness = mount();
+    harness.overlay.setColor("#ff00ff");
+    harness.overlay.setSelection([2, 5]);
+    const rect = selectionRect(harness.container);
+    expect(rect.getAttribute("fill")).toBe("#ff00ff");
+    expect(rect.getAttribute("stroke")).toBe("#ff00ff");
+    expect(rect.getAttribute("fill-opacity")).toBe("0.3");
+    harness.cleanup();
+  });
+
+  it("returns a copy of the selection", () => {
+    const harness = mount();
+    harness.overlay.setSelection([2, 5]);
+    expect(harness.overlay.getSelection()).toEqual([2, 5]);
+    expect(harness.overlay.getSelection()).not.toBe(harness.overlay.getSelection());
+    harness.cleanup();
+  });
+
+  it("treats a zero-length selection as none", () => {
+    const harness = mount();
+    harness.overlay.setSelection([5, 5]);
+    expect(harness.overlay.getSelection()).toBeNull();
+    expect(selectionRect(harness.container).style.display).toBe("none");
+    harness.cleanup();
+  });
+
+  it("clamps a selection to the block count", () => {
+    const harness = mount();
+    harness.overlay.setSelection([-4, 40]);
+    expect(harness.overlay.getSelection()).toEqual([0, 10]);
+    harness.cleanup();
+  });
+
+  it("clears the selection", () => {
+    const harness = mount();
+    harness.overlay.setSelection([2, 5]);
+    harness.overlay.setSelection(null);
+    expect(harness.overlay.getSelection()).toBeNull();
+    expect(selectionRect(harness.container).style.display).toBe("none");
+    harness.cleanup();
+  });
+
+  it("re-projects the stored blocks after a view change", () => {
+    const harness = mount();
+    harness.overlay.setSelection([2, 5]);
+    harness.setView({ start: 0, end: 5 });
+    harness.overlay.update();
+    const rect = selectionRect(harness.container);
+    expect(rect.getAttribute("x")).toBe("320");
+    expect(rect.getAttribute("width")).toBe("480");
+    expect(harness.overlay.getSelection()).toEqual([2, 5]);
+    harness.cleanup();
+  });
+
+  it("hides a selection scrolled out of the view", () => {
+    const harness = mount();
+    harness.overlay.setSelection([2, 5]);
+    harness.setView({ start: 6, end: 10 });
+    harness.overlay.update();
+    expect(selectionRect(harness.container).style.display).toBe("none");
+    expect(harness.overlay.getSelection()).toEqual([2, 5]);
+    harness.cleanup();
+  });
+
+  it("reports snapped blocks while dragging and on release", () => {
+    const harness = mount();
+    drag(harness.container, 160, 400);
+    expect(harness.onBrush).toHaveBeenCalledWith([2, 5]);
+    expect(harness.onBrushEnd).toHaveBeenCalledTimes(1);
+    expect(harness.onBrushEnd).toHaveBeenCalledWith([2, 5]);
+    expect(harness.onBrush.mock.invocationCallOrder[0]).toBeLessThan(
+      harness.onBrushEnd.mock.invocationCallOrder[0],
+    );
+    expect(harness.overlay.getSelection()).toEqual([2, 5]);
+    harness.cleanup();
+  });
+
+  it("snaps the drawn rectangle to block boundaries on release", () => {
+    const harness = mount();
+    drag(harness.container, 167, 391);
+    expect(harness.onBrushEnd).toHaveBeenCalledWith([2, 5]);
+    const rect = selectionRect(harness.container);
+    expect(rect.getAttribute("x")).toBe("160");
+    expect(rect.getAttribute("width")).toBe("240");
+    harness.cleanup();
+  });
+
+  it("clears the selection on a click without movement", () => {
+    const harness = mount();
+    harness.overlay.setSelection([2, 5]);
+    drag(harness.container, 400, 400);
+    expect(harness.onBrushEnd).toHaveBeenCalledWith(null);
+    expect(harness.overlay.getSelection()).toBeNull();
+    harness.cleanup();
+  });
+
+  it("ignores a drag with a modifier held", () => {
+    const harness = mount();
+    const svg = svgOf(harness.container);
+    const rect = svg.getBoundingClientRect();
+    const overlay = svg.querySelector(".overlay") as SVGRectElement;
+    overlay.dispatchEvent(
+      new MouseEvent("mousedown", {
+        clientX: rect.left + 160,
+        clientY: rect.top + HEIGHT / 2,
+        bubbles: true,
+        view: window,
+        shiftKey: true,
+      }),
+    );
+    window.dispatchEvent(
+      new MouseEvent("mousemove", { clientX: rect.left + 400, bubbles: true, view: window }),
+    );
+    window.dispatchEvent(
+      new MouseEvent("mouseup", { clientX: rect.left + 400, bubbles: true, view: window }),
+    );
+    expect(harness.onBrush).not.toHaveBeenCalled();
+    expect(harness.onBrushEnd).not.toHaveBeenCalled();
+    harness.cleanup();
+  });
+
+  it("fires no callbacks for a programmatic selection", () => {
+    const harness = mount();
+    harness.overlay.setSelection([2, 5]);
+    harness.overlay.update();
+    harness.overlay.setSelection(null);
+    expect(harness.onBrush).not.toHaveBeenCalled();
+    expect(harness.onBrushEnd).not.toHaveBeenCalled();
+    harness.cleanup();
+  });
+
+  it("removes the overlay and stops listening on destroy", () => {
+    const harness = mount();
+    const svg = svgOf(harness.container);
+    harness.overlay.destroy();
+    expect(harness.container.querySelector("svg[data-blockmap-brush]")).toBeNull();
+
+    // Re-attached only so a gesture has live geometry to measure against,
+    // which is what proves the brush listeners themselves are gone.
+    harness.container.append(svg);
+    drag(harness.container, 160, 400);
+    expect(harness.onBrush).not.toHaveBeenCalled();
+    expect(harness.onBrushEnd).not.toHaveBeenCalled();
+    harness.container.remove();
+  });
+});

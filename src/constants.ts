@@ -34,6 +34,7 @@ export const CSS_VAR_PARTIAL_HIGH = "--blockmap-partial-high";
 export const CSS_VAR_PARTIAL = "--blockmap-partial";
 export const CSS_VAR_COMPLETE = "--blockmap-complete";
 export const CSS_VAR_HIGHLIGHT = "--blockmap-highlight";
+export const CSS_VAR_BRUSH = "--blockmap-brush";
 
 export const DEFAULT_THEME = {
   missing: "#2b2b2b",
@@ -42,7 +43,12 @@ export const DEFAULT_THEME = {
   partial: "#e0a500",
   complete: "#2ecc71",
   highlight: "#ff4d4f",
+  brush: "#ffffff",
 } as const;
+
+// The brush selection paints over the bar, so its fill stays translucent
+// while its stroke uses the colour at full strength.
+export const BRUSH_FILL_OPACITY = 0.3;
 
 // Theme re-reads are triggered by these attribute mutations on <html> (a
 // class swap, an inline style, a data-theme toggle) and by the colour scheme.

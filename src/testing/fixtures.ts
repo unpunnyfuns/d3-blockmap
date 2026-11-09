@@ -9,6 +9,7 @@ export const TEST_THEME: Theme = {
   partial: "#ff0000",
   complete: "#ffffff",
   highlight: "#00ff00",
+  brush: "#ff00ff",
 };
 
 export const rgba = (css: string): number[] => {

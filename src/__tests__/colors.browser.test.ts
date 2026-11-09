@@ -85,6 +85,7 @@ describe("readTheme", () => {
       partial: DEFAULT_THEME.partial,
       complete: "#123456",
       highlight: DEFAULT_THEME.highlight,
+      brush: DEFAULT_THEME.brush,
     });
     el.remove();
   });
