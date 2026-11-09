@@ -275,6 +275,17 @@ describe("createBrushOverlay", () => {
     harness.cleanup();
   });
 
+  it("reports nothing for a press inside the selection that left it unchanged", () => {
+    const harness = mount();
+    harness.overlay.setSelection([2, 5]);
+    const selectionRect = svgOf(harness.container).querySelector(".selection") as SVGRectElement;
+    selectionRect.dispatchEvent(new MouseEvent("mousedown", mouseInit(harness.container, 300)));
+    release(harness.container, 300);
+    expect(harness.onBrushEnd).not.toHaveBeenCalled();
+    expect(harness.overlay.getSelection()).toEqual([2, 5]);
+    harness.cleanup();
+  });
+
   it("reports nothing for either half of a double click", () => {
     const harness = mount();
     drag(harness.container, 400, 400);

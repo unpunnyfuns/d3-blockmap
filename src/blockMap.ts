@@ -417,12 +417,18 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   };
 
   // Suppressed while dragging, where the pointer means pan rather than hover.
+  // A pointer inside the container but off the canvas - padding, or a brush
+  // handle poking past the edge - hides the readout rather than leaving a
+  // stale one behind.
   const onPointerMove = (event: PointerEvent): void => {
     if (dragging) return;
 
     const x = canvasX(canvas, event);
     const hit = locate(x);
-    if (!hit) return;
+    if (!hit) {
+      tooltip.hide();
+      return;
+    }
 
     const text =
       viewLength(state.view) < state.binCount

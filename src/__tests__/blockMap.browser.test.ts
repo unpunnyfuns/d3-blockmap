@@ -106,6 +106,18 @@ describe("createBlockMap", () => {
     map.destroy();
   });
 
+  it("hides the tooltip when the pointer is inside the container but off the canvas", () => {
+    const container = dom.mount(5);
+    const map = createBlockMap(container, { totalBlocks: 100 });
+    dom.triggerResize(5);
+    const tooltip = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
+    pointer(container, "pointermove", 0);
+    expect(tooltip.style.display).toBe("block");
+    pointer(container, "pointermove", 5);
+    expect(tooltip.style.display).toBe("none");
+    map.destroy();
+  });
+
   it("destroy removes elements and makes methods no-ops", () => {
     const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 10 });

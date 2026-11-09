@@ -118,6 +118,11 @@ const xSpan = (selection: BrushSelection | null): readonly [number, number] | nu
   return [x0, x1];
 };
 
+// Two selections are the same when both are empty or both cover the same
+// blocks; used to tell a no-op press apart from a real change.
+const sameRange = (a: BlockRange | null, b: BlockRange | null): boolean =>
+  a === b || (a !== null && b !== null && a[0] === b[0] && a[1] === b[1]);
+
 export const createBrushOverlay = (
   container: HTMLElement,
   deps: BrushOverlayDeps,
@@ -226,7 +231,8 @@ export const createBrushOverlay = (
    * re-project so the rectangle sits on the block boundaries it reports. A
    * press that never moved and left the selection as it found it is not a
    * gesture at all - a stray click on the map, either half of a double click -
-   * so it reports nothing; a press that cleared an existing selection still
+   * so it reports nothing, and neither does a press inside an existing
+   * selection that left it as it was; a press that cleared a selection still
    * does, because the selection genuinely changed.
    */
   brush.on("end", (event: D3BrushEvent<unknown>) => {
@@ -234,7 +240,7 @@ export const createBrushOverlay = (
     active = false;
 
     const next = normalize(blocksFrom(event.selection), deps.getTotalBlocks());
-    if (!moved && !selection && !next) return;
+    if (!moved && sameRange(selection, next)) return;
 
     selection = next;
     update();
