@@ -13,7 +13,7 @@ import {
   TICK_SPACING_PX,
 } from "./constants";
 import { ensureRelative } from "./dom";
-import { viewLength } from "./view";
+import { createScale } from "./view";
 import type { BlockView } from "./view";
 
 export type AxisOptions = {
@@ -22,13 +22,6 @@ export type AxisOptions = {
 };
 
 export type Tick = { block: number; x: number; step: number };
-
-export type BlockScale = {
-  domain: readonly [number, number];
-  range: readonly [number, number];
-  x(block: number): number;
-  block(x: number): number;
-};
 
 export type Axis = {
   update(view: BlockView, cssWidth: number): void;
@@ -89,22 +82,6 @@ export const defaultFormat = (block: number, step = 1): string => {
 
   if (digits > MAX_COMPACT_FRACTION_DIGITS) return groupedFormat.format(block);
   return compactFormatterFor(digits).format(block);
-};
-
-/**
- * Linear block-to-pixel mapping for the current view, with `block` as its
- * inverse. The zero-width guards keep a container that has not been laid out
- * yet from producing NaN coordinates.
- */
-export const createScale = (view: BlockView, cssWidth: number): BlockScale => {
-  const length = viewLength(view);
-
-  return {
-    domain: [view.start, view.end],
-    range: [0, cssWidth],
-    x: (block) => (cssWidth === 0 ? 0 : ((block - view.start) / length) * cssWidth),
-    block: (x) => (cssWidth === 0 ? view.start : view.start + (x / cssWidth) * length),
-  };
 };
 
 /**

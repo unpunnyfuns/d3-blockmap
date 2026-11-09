@@ -1,4 +1,4 @@
-import { createBins } from "../bins";
+import { createBins, discreteBlock, discreteColumn } from "../bins";
 
 const full = (totalBlocks: number) => ({ start: 0, end: totalBlocks });
 
@@ -180,4 +180,35 @@ describe("createBins", () => {
     bins.recountBins([0, 1], count);
     expect(Array.from(bins.counts)).toEqual([1, 1, beforeLast]);
   });
+});
+
+describe("discrete column spans", () => {
+  const cases: [number, number][] = [
+    [3, 9],
+    [7, 10],
+    [10, 800],
+    [13, 50],
+    [1, 4],
+  ];
+
+  it.each(cases)("%i blocks over %i columns tile the row with no gaps", (length, binCount) => {
+    expect(discreteColumn(0, length, binCount)).toBe(0);
+    expect(discreteColumn(length, length, binCount)).toBe(binCount);
+    for (let block = 0; block < length; block += 1) {
+      expect(discreteColumn(block + 1, length, binCount)).toBeGreaterThan(
+        discreteColumn(block, length, binCount),
+      );
+    }
+  });
+
+  it.each(cases)(
+    "%i blocks over %i columns: discreteBlock names the painted block",
+    (length, binCount) => {
+      for (let column = 0; column < binCount; column += 1) {
+        const block = discreteBlock(column, length, binCount);
+        expect(discreteColumn(block, length, binCount)).toBeLessThanOrEqual(column);
+        expect(discreteColumn(block + 1, length, binCount)).toBeGreaterThan(column);
+      }
+    },
+  );
 });

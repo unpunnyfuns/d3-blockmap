@@ -1,5 +1,5 @@
 import { ZOOM_STEP } from "../constants";
-import { clampView, fullView, panView, sameView, viewLength, zoomView } from "../view";
+import { clampView, createScale, fullView, panView, sameView, viewLength, zoomView } from "../view";
 
 describe("view helpers", () => {
   it("fullView, viewLength, sameView", () => {
@@ -54,5 +54,23 @@ describe("view helpers", () => {
     expect(panView({ start: 100, end: 200 }, 50, 1000)).toEqual({ start: 150, end: 250 });
     expect(panView({ start: 100, end: 200 }, -150, 1000)).toEqual({ start: 0, end: 100 });
     expect(panView({ start: 800, end: 900 }, 150, 1000)).toEqual({ start: 900, end: 1000 });
+  });
+});
+
+describe("createScale", () => {
+  it("maps blocks to px and back", () => {
+    const scale = createScale({ start: 100, end: 200 }, 400);
+    expect(scale.domain).toEqual([100, 200]);
+    expect(scale.range).toEqual([0, 400]);
+    expect(scale.x(150)).toBe(200);
+    expect(scale.block(200)).toBe(150);
+    expect(scale.block(scale.x(137))).toBeCloseTo(137);
+  });
+
+  it("is safe before layout", () => {
+    const scale = createScale({ start: 5, end: 10 }, 0);
+    expect(scale.range).toEqual([0, 0]);
+    expect(scale.x(7)).toBe(0);
+    expect(scale.block(0)).toBe(5);
   });
 });

@@ -6,8 +6,9 @@
  * repaint, what a gesture means for the model) lives here.
  */
 
-import { createAxis, createScale } from "./axis";
-import type { Axis, AxisOptions, BlockScale } from "./axis";
+import { createAxis } from "./axis";
+import type { Axis, AxisOptions } from "./axis";
+import { discreteBlock } from "./bins";
 import { createBrushOverlay } from "./brush";
 import type { BrushOverlay } from "./brush";
 import { createColorScale, highlightColor, readTheme, watchTheme } from "./colors";
@@ -28,8 +29,8 @@ import type { BlockRange, RangeInput } from "./ranges";
 import { createBlockState } from "./state";
 import type { Progress } from "./state";
 import { createTooltip, formatBinTooltip, formatBlockTooltip } from "./tooltip";
-import { clampView, fullView, sameView, viewLength } from "./view";
-import type { BlockView } from "./view";
+import { clampView, createScale, fullView, sameView, viewLength } from "./view";
+import type { BlockScale, BlockView } from "./view";
 
 export type BlockMapOptions = {
   totalBlocks: number;
@@ -98,16 +99,6 @@ export const defaultLabel = (progress: Progress): string => {
 // devicePixelRatio fires no change event, so the current ratio is watched as
 // a media query that stops matching when it moves.
 const dprQuery = (dpr: number): string => `(resolution: ${dpr}dppx)`;
-
-/**
- * Inverse of the renderer's discrete-mode column span. There, block b covers
- * columns [floor(b * binCount / length), floor((b + 1) * binCount / length)),
- * so the block under a column is the number of block boundaries that fit
- * within the first `column + 1` columns, minus one. Floor and ceil must agree
- * like this or the tooltip names a neighbour of the block you can see.
- */
-const discreteBlock = (column: number, length: number, binCount: number, start: number): number =>
-  start + Math.ceil(((column + 1) * length) / binCount) - 1;
 
 export const createBlockMap = (container: HTMLElement, options: BlockMapOptions): BlockMap => {
   const state = createBlockState(options.totalBlocks);
@@ -367,7 +358,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     const length = viewLength(view);
 
     if (length < binCount) {
-      const block = discreteBlock(column, length, binCount, view.start);
+      const block = view.start + discreteBlock(column, length, binCount);
       return {
         column,
         block,

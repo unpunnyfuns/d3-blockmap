@@ -11,7 +11,7 @@ import { select } from "d3-selection";
 import { BRUSH_FILL_OPACITY, DEFAULT_THEME } from "./constants";
 import { ensureRelative } from "./dom";
 import type { BlockRange } from "./ranges";
-import { viewLength } from "./view";
+import { createScale } from "./view";
 import type { BlockView } from "./view";
 
 export type BrushOverlayDeps = {
@@ -69,9 +69,8 @@ export const toPixels = (
   if (cssWidth === 0) return null;
   if (selection[1] <= view.start || selection[0] >= view.end) return null;
 
-  const length = viewLength(view);
-  const x = (block: number): number => clamp(((block - view.start) / length) * cssWidth, cssWidth);
-  return [x(selection[0]), x(selection[1])];
+  const scale = createScale(view, cssWidth);
+  return [clamp(scale.x(selection[0]), cssWidth), clamp(scale.x(selection[1]), cssWidth)];
 };
 
 /**
@@ -86,12 +85,9 @@ export const toBlocks = (
   cssWidth: number,
   totalBlocks: number,
 ): BlockRange => {
-  const length = viewLength(view);
-  const block = (x: number): number =>
-    cssWidth === 0 ? view.start : view.start + (x / cssWidth) * length;
-
-  const start = clamp(Math.round(block(pixels[0])), totalBlocks);
-  let end = clamp(Math.round(block(pixels[1])), totalBlocks);
+  const scale = createScale(view, cssWidth);
+  const start = clamp(Math.round(scale.block(pixels[0])), totalBlocks);
+  let end = clamp(Math.round(scale.block(pixels[1])), totalBlocks);
 
   if (end <= start) {
     end = Math.min(start + 1, totalBlocks);

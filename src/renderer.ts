@@ -6,6 +6,7 @@
  * are injected so tests can drive frames and blinks synchronously.
  */
 
+import { discreteColumn } from "./bins";
 import type { ColorScale } from "./colors";
 import { BLINK_INTERVAL_MS, BYTES_PER_PIXEL, CANVAS_ROWS } from "./constants";
 import { viewLength } from "./view";
@@ -110,8 +111,7 @@ export const createRenderer = (
   /**
    * Zoomed in past one block per column: each block owns a span of columns,
    * so iterate blocks and paint their span. The colour is binary - a block is
-   * either present or not - and the span bounds use the same floor split for
-   * both ends, so consecutive blocks tile the row with no gaps.
+   * either present or not.
    */
   const paintDiscrete = (target: ImageDataLike, colors: ColorScale): void => {
     const { view, binCount } = source;
@@ -119,8 +119,8 @@ export const createRenderer = (
 
     for (let block = 0; block < length; block += 1) {
       const color = colorFor(colors, source.has(view.start + block) ? COMPLETE : 0);
-      const start = Math.floor((block * binCount) / length);
-      const end = Math.floor(((block + 1) * binCount) / length);
+      const start = discreteColumn(block, length, binCount);
+      const end = discreteColumn(block + 1, length, binCount);
       for (let column = start; column < end; column += 1) writeColumn(target, column, color);
     }
   };

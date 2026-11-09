@@ -22,6 +22,24 @@ export type Bins = {
 };
 
 /**
+ * Discrete mode, fewer blocks in the view than columns: the block `block`
+ * places from the view's start covers columns [discreteColumn(block),
+ * discreteColumn(block + 1)). The same floor split for both ends is what lets
+ * consecutive blocks tile the row with no gaps.
+ */
+export const discreteColumn = (block: number, length: number, binCount: number): number =>
+  Math.floor((block * binCount) / length);
+
+/**
+ * Inverse of discreteColumn, counted from the view's start: the block under a
+ * column is the number of block boundaries that fit within the first
+ * `column + 1` columns, minus one. Floor and ceil must agree like this or the
+ * tooltip names a neighbour of the block the renderer painted there.
+ */
+export const discreteBlock = (column: number, length: number, binCount: number): number =>
+  Math.ceil(((column + 1) * length) / binCount) - 1;
+
+/**
  * Callers may hand in ranges that extend past the zoomed-in view; intersect
  * first so bin arithmetic never sees an out-of-range index.
  */

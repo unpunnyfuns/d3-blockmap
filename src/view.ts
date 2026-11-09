@@ -8,12 +8,36 @@ import { MIN_VIEW_LENGTH } from "./constants";
 
 export type BlockView = { start: number; end: number };
 
+export type BlockScale = {
+  domain: readonly [number, number];
+  range: readonly [number, number];
+  x(block: number): number;
+  block(x: number): number;
+};
+
 export const fullView = (totalBlocks: number): BlockView => ({ start: 0, end: totalBlocks });
 
 export const viewLength = (view: BlockView): number => view.end - view.start;
 
 export const sameView = (a: BlockView, b: BlockView): boolean =>
   a.start === b.start && a.end === b.end;
+
+/**
+ * Linear block-to-pixel mapping for the view, with `block` as its inverse.
+ * It is the one projection between blocks and css pixels: the axis, the
+ * brush and getScale all go through it. The zero-width guards keep a
+ * container that has not been laid out yet from producing NaN coordinates.
+ */
+export const createScale = (view: BlockView, cssWidth: number): BlockScale => {
+  const length = viewLength(view);
+
+  return {
+    domain: [view.start, view.end],
+    range: [0, cssWidth],
+    x: (block) => (cssWidth === 0 ? 0 : ((block - view.start) / length) * cssWidth),
+    block: (x) => (cssWidth === 0 ? view.start : view.start + (x / cssWidth) * length),
+  };
+};
 
 /**
  * Normalises any candidate view: swaps inverted bounds, rounds to whole

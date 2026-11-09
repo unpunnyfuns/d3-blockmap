@@ -1,4 +1,4 @@
-import { anchorFor, computeTicks, createAxis, createScale, defaultFormat } from "../axis";
+import { anchorFor, computeTicks, createAxis, defaultFormat } from "../axis";
 
 describe("computeTicks", () => {
   it("returns nice values inside the view with linear x", () => {
@@ -76,24 +76,6 @@ describe("defaultFormat", () => {
 
   it("falls back to grouped integers when the step is far below the compact unit", () => {
     expect(defaultFormat(1_000_000, 1)).toBe("1,000,000");
-  });
-});
-
-describe("createScale", () => {
-  it("maps blocks to px and back", () => {
-    const scale = createScale({ start: 100, end: 200 }, 400);
-    expect(scale.domain).toEqual([100, 200]);
-    expect(scale.range).toEqual([0, 400]);
-    expect(scale.x(150)).toBe(200);
-    expect(scale.block(200)).toBe(150);
-    expect(scale.block(scale.x(137))).toBeCloseTo(137);
-  });
-
-  it("is safe before layout", () => {
-    const scale = createScale({ start: 5, end: 10 }, 0);
-    expect(scale.range).toEqual([0, 0]);
-    expect(scale.x(7)).toBe(0);
-    expect(scale.block(0)).toBe(5);
   });
 });
 
