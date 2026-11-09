@@ -4,3 +4,4 @@ export type { Progress } from "./state";
 export type { PartialStyle, Theme } from "./colors";
 export type { BlockRangeTuple, RangeInput } from "./ranges";
 export type { BlockView } from "./view";
+export type { AxisOptions, BlockScale } from "./axis";

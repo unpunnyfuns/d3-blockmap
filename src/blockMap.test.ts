@@ -410,4 +410,41 @@ describe("createBlockMap", () => {
     expect(tooltip.textContent).toBe("Blocks 500–509 · 0 / 10 (0%)");
     map.destroy();
   });
+
+  it("renders no axis by default", () => {
+    const container = mount();
+    const map = createBlockMap(container, { totalBlocks: 1000 });
+    triggerResize(400);
+    expect(container.querySelector("[data-blockmap-axis]")).toBeNull();
+    map.destroy();
+  });
+
+  it("renders axis ticks after layout and updates after a view change", () => {
+    const container = mount();
+    const map = createBlockMap(container, { totalBlocks: 1000, axis: { tickCount: 5 } });
+    triggerResize(400);
+    const blocks = () =>
+      Array.from(container.querySelectorAll("[data-blockmap-tick]")).map(
+        (s) => (s as HTMLElement).dataset.block,
+      );
+    expect(blocks()).toEqual(["0", "200", "400", "600", "800", "1000"]);
+    map.setView({ start: 500, end: 600 });
+    expect(blocks()).toEqual(["500", "520", "540", "560", "580", "600"]);
+    map.destroy();
+    expect(container.querySelector("[data-blockmap-axis]")).toBeNull();
+  });
+
+  it("getScale reflects layout and view", () => {
+    const container = mount();
+    const map = createBlockMap(container, { totalBlocks: 1000 });
+    expect(map.getScale().range).toEqual([0, 0]);
+    triggerResize(400);
+    expect(map.getScale().domain).toEqual([0, 1000]);
+    expect(map.getScale().range).toEqual([0, 400]);
+    expect(map.getScale().x(500)).toBe(200);
+    map.setView({ start: 500, end: 600 });
+    expect(map.getScale().domain).toEqual([500, 600]);
+    expect(map.getScale().block(200)).toBe(550);
+    map.destroy();
+  });
 });

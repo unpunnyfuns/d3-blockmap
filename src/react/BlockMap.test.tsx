@@ -12,6 +12,12 @@ const createInstance = (): BlockMapInstance => ({
   setView: vi.fn(),
   resetView: vi.fn(),
   getView: vi.fn(() => ({ start: 0, end: 0 })),
+  getScale: vi.fn(() => ({
+    domain: [0, 0] as const,
+    range: [0, 0] as const,
+    x: () => 0,
+    block: () => 0,
+  })),
   setHighlight: vi.fn(),
   getProgress: vi.fn(() => ({ completed: 0, total: 0 })),
   destroy: vi.fn(),

@@ -1,3 +1,5 @@
+import { createAxis, createScale } from "./axis";
+import type { Axis, AxisOptions, BlockScale } from "./axis";
 import { createColorScale, highlightColor, readTheme, watchTheme } from "./colors";
 import type { PartialStyle, Theme } from "./colors";
 import { CANVAS_ROWS, REDUCED_MOTION_QUERY } from "./constants";
@@ -18,6 +20,7 @@ export type BlockMapOptions = {
   partial?: PartialStyle;
   view?: BlockView;
   interactive?: boolean;
+  axis?: boolean | AxisOptions;
   onViewChange?: (view: BlockView) => void;
 };
 
@@ -28,6 +31,7 @@ export type BlockMap = {
   setView(view: BlockView): void;
   resetView(): void;
   getView(): BlockView;
+  getScale(): BlockScale;
   setHighlight(on: boolean): void;
   getProgress(): Progress;
   destroy(): void;
@@ -64,6 +68,13 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
 
   const renderer: Renderer = createRenderer(ctx, state);
   const tooltip = createTooltip(container);
+  const axisOptions: AxisOptions | undefined =
+    options.axis === true
+      ? {}
+      : options.axis === false || options.axis === undefined
+        ? undefined
+        : options.axis;
+  const axis: Axis | undefined = axisOptions ? createAxis(container, axisOptions) : undefined;
   let destroyed = false;
   let cssWidth = 0;
   let dpr = devicePixelRatio;
@@ -95,6 +106,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     pendingView = undefined;
     if (!next || !state.setView(next)) return;
     renderer.markAllDirty();
+    axis?.update(state.view, cssWidth);
     options.onViewChange?.(state.getView());
   };
 
@@ -114,6 +126,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     canvas.width = binCount;
     state.resize(binCount);
     renderer.markAllDirty();
+    axis?.update(state.view, cssWidth);
   };
 
   const onDprChange = (): void => {
@@ -203,6 +216,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       resetView();
     },
     getView,
+    getScale: () => createScale(getView(), cssWidth),
     setHighlight: (on) => {
       if (destroyed) return;
       highlightOn = on;
@@ -223,6 +237,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       detachInteraction?.();
       renderer.destroy();
       tooltip.destroy();
+      axis?.destroy();
       canvas.remove();
     },
   };
