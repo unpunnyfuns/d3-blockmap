@@ -9,6 +9,9 @@ import type { BlockView } from "./view";
 
 export type Progress = { completed: number; total: number };
 
+/**
+ * Dirty arrays are ascending and deduplicated.
+ */
 export type BlockState = {
   readonly totalBlocks: number;
   readonly binCount: number;
@@ -61,7 +64,7 @@ export const createBlockState = (totalBlocks: number): BlockState => {
       bins.counts[bin] += 1;
       dirty.add(bin);
     }
-    return dirty.size === 0 ? EMPTY_DIRTY : Uint32Array.from(dirty);
+    return dirty.size === 0 ? EMPTY_DIRTY : Uint32Array.from(dirty).sort();
   };
 
   const applyRanges = (input: RangeInput, complete: boolean): Uint32Array => {
@@ -79,8 +82,9 @@ export const createBlockState = (totalBlocks: number): BlockState => {
         bitset.clearRange(start, end);
         delta -= present;
       }
-      for (const bin of bins.recount(start, end, bitset.countRange)) dirty.add(bin);
+      for (const bin of bins.binsTouching(start, end)) dirty.add(bin);
     }
+    bins.recountBins(dirty, bitset.countRange);
     bitset.setCount(bitset.count + delta);
     return dirty.size === 0 ? EMPTY_DIRTY : Uint32Array.from(dirty).sort();
   };

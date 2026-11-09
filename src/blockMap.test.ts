@@ -496,4 +496,62 @@ describe("createBlockMap", () => {
     map.destroy();
     expect(() => map.addRanges([[0, 1]])).not.toThrow();
   });
+
+  it("addRanges before a pending view flush does not throw and resolves after flush", () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      frames.push(cb);
+      return frames.length;
+    });
+    const flush = () => {
+      while (frames.length > 0) {
+        const pending = frames.slice();
+        frames.length = 0;
+        pending.forEach((cb) => cb(0));
+      }
+    };
+    const container = mount();
+    const map = createBlockMap(container, { totalBlocks: 1000 });
+    triggerResize(50);
+    flush();
+    const widthBefore = puts.at(-1)?.width;
+
+    map.setView({ start: 500, end: 600 });
+    expect(() => map.addRanges([[0, 10]])).not.toThrow();
+    expect(puts.at(-1)?.width).toBe(widthBefore);
+
+    flush();
+
+    expect(map.getProgress().completed).toBe(10);
+    expect(map.getView()).toEqual({ start: 500, end: 600 });
+    map.destroy();
+  });
+
+  it("discrete mode removeRanges paints the missing colour for only the affected block", () => {
+    const container = mount();
+    const map = createBlockMap(container, { totalBlocks: 20 });
+    triggerResize(50);
+    map.addRanges([[0, 20]]);
+    map.removeRanges([[5, 6]]);
+    const image = puts.at(-1) as ImageData;
+    const missing = rgb(DEFAULT_THEME.missing);
+    const complete = rgb(DEFAULT_THEME.complete);
+    for (let column = 25; column <= 29; column += 1) {
+      expect(Array.from(image.data.subarray(column * 4, column * 4 + 4))).toEqual([
+        missing.r,
+        missing.g,
+        missing.b,
+        255,
+      ]);
+    }
+    for (let column = 20; column <= 24; column += 1) {
+      expect(Array.from(image.data.subarray(column * 4, column * 4 + 4))).toEqual([
+        complete.r,
+        complete.g,
+        complete.b,
+        255,
+      ]);
+    }
+    map.destroy();
+  });
 });

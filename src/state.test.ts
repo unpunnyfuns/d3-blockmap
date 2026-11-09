@@ -233,6 +233,31 @@ describe("createBlockState", () => {
     expect(state.progress().completed).toBe(15);
   });
 
+  it("removeRanges with more bins than view blocks touches exactly the bins overlapping the removed range", () => {
+    const state = createBlockState(100);
+    state.resize(10);
+    state.setView({ start: 40, end: 45 });
+    state.replaceRanges([[0, 100]]);
+    const dirty = state.removeRanges([[42, 44]]);
+    expect(state.progress().completed).toBe(98);
+    expect(state.has(42)).toBe(false);
+    const expectedDirty = Array.from({ length: state.binCount }, (_, bin) => bin).filter((bin) => {
+      const { start, end } = state.rangeOf(bin);
+      return start < 44 && end > 42;
+    });
+    expect(Array.from(dirty)).toEqual(expectedDirty);
+  });
+
+  it("removeRanges fully out of view returns an empty dirty array but reduces progress", () => {
+    const state = createBlockState(100);
+    state.resize(5);
+    state.setView({ start: 40, end: 60 });
+    state.replaceRanges([[0, 100]]);
+    const dirty = state.removeRanges([[0, 10]]);
+    expect(Array.from(dirty)).toEqual([]);
+    expect(state.progress().completed).toBe(90);
+  });
+
   it("addRanges with no bins still sets bits and progress", () => {
     const state = createBlockState(100);
     expect(Array.from(state.addRanges([[10, 20]]))).toEqual([]);

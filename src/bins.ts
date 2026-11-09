@@ -11,12 +11,19 @@ export type Bins = {
   sizeOf(bin: number): number;
   rebuild(countInRange: (start: number, end: number) => number): void;
   addRange(start: number, end: number): void;
-  recount(
-    start: number,
-    end: number,
-    countInRange: (start: number, end: number) => number,
-  ): number[];
+  binsTouching(start: number, end: number): number[];
+  recountBins(bins: Iterable<number>, countInRange: (start: number, end: number) => number): void;
 };
+
+const clipToView = (
+  rawStart: number,
+  rawEnd: number,
+  viewStart: number,
+  viewEnd: number,
+): BlockRange => ({
+  start: Math.max(rawStart, viewStart),
+  end: Math.min(rawEnd, viewEnd),
+});
 
 export const createBins = (view: BlockView, binCount: number): Bins => {
   const { start: viewStart, end: viewEnd } = view;
@@ -48,8 +55,7 @@ export const createBins = (view: BlockView, binCount: number): Bins => {
       }
     },
     addRange: (rawStart, rawEnd) => {
-      const start = Math.max(rawStart, viewStart);
-      const end = Math.min(rawEnd, viewEnd);
+      const { start, end } = clipToView(rawStart, rawEnd, viewStart, viewEnd);
       if (binCount === 0 || end <= start) return;
       const first = binOf(start);
       const last = binOf(end - 1);
@@ -61,19 +67,20 @@ export const createBins = (view: BlockView, binCount: number): Bins => {
       for (let bin = first + 1; bin < last; bin += 1) counts[bin] += sizeOf(bin);
       counts[last] += end - rangeOf(last).start;
     },
-    recount: (rawStart, rawEnd, countInRange) => {
-      const start = Math.max(rawStart, viewStart);
-      const end = Math.min(rawEnd, viewEnd);
+    binsTouching: (rawStart, rawEnd) => {
+      const { start, end } = clipToView(rawStart, rawEnd, viewStart, viewEnd);
       if (binCount === 0 || end <= start) return [];
       const first = binOf(start);
       const last = binOf(end - 1);
       const touched: number[] = [];
-      for (let bin = first; bin <= last; bin += 1) {
+      for (let bin = first; bin <= last; bin += 1) touched.push(bin);
+      return touched;
+    },
+    recountBins: (bins, countInRange) => {
+      for (const bin of bins) {
         const range = rangeOf(bin);
         counts[bin] = countInRange(range.start, range.end);
-        touched.push(bin);
       }
-      return touched;
     },
   };
 };

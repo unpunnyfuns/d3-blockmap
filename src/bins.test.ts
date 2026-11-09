@@ -146,7 +146,7 @@ describe("createBins", () => {
     expect(Array.from(bins.counts)).toEqual([1, 1, 1]);
   });
 
-  it("recount recomputes touched bins from the source and returns them", () => {
+  it("binsTouching returns the touched bins and recountBins recomputes just those", () => {
     const bins = createBins(full(10), 3);
     const set = new Set([0, 1, 5]);
     const count = (s: number, e: number) => {
@@ -154,19 +154,30 @@ describe("createBins", () => {
       for (let i = s; i < e; i += 1) if (set.has(i)) n += 1;
       return n;
     };
-    expect(bins.recount(1, 6, count)).toEqual([0, 1]);
+    expect(bins.binsTouching(1, 6)).toEqual([0, 1]);
+    bins.recountBins(bins.binsTouching(1, 6), count);
     expect(Array.from(bins.counts)).toEqual([2, 1, 0]);
     set.add(9);
-    expect(bins.recount(9, 10, count)).toEqual([2]);
+    expect(bins.binsTouching(9, 10)).toEqual([2]);
+    bins.recountBins(bins.binsTouching(9, 10), count);
     expect(Array.from(bins.counts)).toEqual([2, 1, 1]);
   });
 
-  it("recount clips to the view and returns nothing for no overlap or zero bins", () => {
+  it("binsTouching clips to the view and returns nothing for no overlap or zero bins", () => {
     const bins = createBins({ start: 100, end: 110 }, 2);
-    const count = () => 1;
-    expect(bins.recount(0, 50, count)).toEqual([]);
-    expect(bins.recount(95, 103, count)).toEqual([0]);
-    expect(bins.recount(108, 200, count)).toEqual([1]);
-    expect(createBins(full(10), 0).recount(0, 10, count)).toEqual([]);
+    expect(bins.binsTouching(0, 50)).toEqual([]);
+    expect(bins.binsTouching(95, 103)).toEqual([0]);
+    expect(bins.binsTouching(108, 200)).toEqual([1]);
+    expect(createBins(full(10), 0).binsTouching(0, 10)).toEqual([]);
+  });
+
+  it("binsTouching(1, 6) on 10 blocks / 3 bins is [0, 1] and recountBins([0, 1], count) sets exactly those", () => {
+    const bins = createBins(full(10), 3);
+    bins.addRange(0, 10);
+    const beforeLast = bins.counts[2];
+    const count = (s: number, e: number) => (e > s ? 1 : 0);
+    expect(bins.binsTouching(1, 6)).toEqual([0, 1]);
+    bins.recountBins([0, 1], count);
+    expect(Array.from(bins.counts)).toEqual([1, 1, beforeLast]);
   });
 });
