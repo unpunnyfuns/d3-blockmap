@@ -11,7 +11,7 @@ export type DomOptions = {
 export type MediaListener = { query: string; listener: () => void };
 export type InstalledDom = {
   mount(width?: number): HTMLElement;
-  triggerResize(width: number): void;
+  triggerResize(width: number, container?: HTMLElement): void;
   flushFrames(): void;
   puts: ImageDataLike[];
   mediaListeners: MediaListener[];
@@ -164,10 +164,11 @@ export const installDom = (options: DomOptions = {}): InstalledDom => {
       mounted.push(container);
       return container;
     },
-    triggerResize: (width) => {
+    triggerResize: (width, container) => {
       if (observers.length === 0) throw new Error("triggerResize: no observers");
-      mounted.forEach((container) => {
-        container.style.width = `${width}px`;
+      const targets = container ? [container] : mounted;
+      targets.forEach((el) => {
+        el.style.width = `${width}px`;
       });
       const entry = createResizeEntry(width);
       observers.forEach((cb) => cb([entry]));

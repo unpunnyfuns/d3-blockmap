@@ -141,6 +141,29 @@ describe("installDom", () => {
     dom.restore();
   });
 
+  it("triggerResize with a container only resizes that container, but still notifies every observer", () => {
+    const dom = installDom();
+    const containerA = dom.mount();
+    const containerB = dom.mount();
+    const seenA: number[] = [];
+    const seenB: number[] = [];
+    new ResizeObserver((entries) => seenA.push(entries[0]?.contentRect.width ?? -1)).observe(
+      containerA,
+    );
+    new ResizeObserver((entries) => seenB.push(entries[0]?.contentRect.width ?? -1)).observe(
+      containerB,
+    );
+
+    const widthBBefore = containerB.getBoundingClientRect().width;
+    dom.triggerResize(30, containerA);
+
+    expect(containerA.getBoundingClientRect().width).toBe(30);
+    expect(containerB.getBoundingClientRect().width).toBe(widthBBefore);
+    expect(seenA).toEqual([30]);
+    expect(seenB).toEqual([30]);
+    dom.restore();
+  });
+
   it("matchMedia's matches reflects the media function at read time, not call time", () => {
     let flag = false;
     const dom = installDom({ media: () => flag });

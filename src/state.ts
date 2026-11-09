@@ -133,8 +133,10 @@ export const createBlockState = (totalBlocks: number): BlockState => {
     get binCount() {
       return bins.binCount;
     },
+    // A copy, because callers destructure this into local bindings that then
+    // outlive the next setView/resize, which would otherwise mutate them.
     get view() {
-      return view;
+      return { ...view };
     },
 
     // Column count changed: the bin boundaries move, so rebuild from the

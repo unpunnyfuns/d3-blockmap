@@ -180,6 +180,16 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     });
   };
 
+  // The css width the axis was last built for; distinct from binCount, which
+  // rounds to whole device pixels and so can stay put across a sub-pixel
+  // css width change that the axis still needs to reflect.
+  let lastAxisWidth: number | undefined;
+
+  const updateAxis = (): void => {
+    axis?.update(state.view, cssWidth);
+    lastAxisWidth = cssWidth;
+  };
+
   let pendingView: BlockView | undefined;
   let viewFrame = NO_FRAME;
 
@@ -199,7 +209,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     if (!next || !state.setView(next)) return;
 
     renderer.markAllDirty();
-    axis?.update(state.view, cssWidth);
+    updateAxis();
     options.onViewChange?.(state.getView());
   };
 
@@ -231,12 +241,18 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
    */
   const layout = (): void => {
     const binCount = Math.round(cssWidth * dpr);
-    if (binCount === state.binCount) return;
+    if (binCount === state.binCount) {
+      // The device-pixel bin count can stay put across a sub-pixel css
+      // width change (rounding absorbs it), but the axis is laid out in css
+      // pixels and still needs its tick positions refreshed.
+      if (cssWidth !== lastAxisWidth) updateAxis();
+      return;
+    }
 
     canvas.width = binCount;
     state.resize(binCount);
     renderer.markAllDirty();
-    axis?.update(state.view, cssWidth);
+    updateAxis();
   };
 
   const onDprChange = (): void => {

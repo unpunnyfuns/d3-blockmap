@@ -373,6 +373,24 @@ describe("createBlockMap", () => {
     expect(container.querySelector("[data-blockmap-axis]")).toBeNull();
   });
 
+  it("refreshes axis tick positions on a sub-pixel css width change with an unchanged bin count", () => {
+    const container = dom.mount();
+    const map = createBlockMap(container, { totalBlocks: 1000, axis: { tickCount: 5 } });
+    const lastTickLeft = () =>
+      (Array.from(container.querySelectorAll("[data-blockmap-tick]")).at(-1) as HTMLElement).style
+        .left;
+    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+
+    dom.triggerResize(50);
+    expect(canvas.width).toBe(100);
+    expect(lastTickLeft()).toBe("50px");
+
+    dom.triggerResize(50.2);
+    expect(canvas.width).toBe(100);
+    expect(lastTickLeft()).toBe("50.2px");
+    map.destroy();
+  });
+
   it("getScale reflects layout and view", () => {
     const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 1000 });
