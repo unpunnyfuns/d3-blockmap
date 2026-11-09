@@ -266,6 +266,29 @@ describe("createBlockMap", () => {
     map.destroy();
   });
 
+  it("re-applies the highlight steadily when prefers-reduced-motion changes while highlighted", () => {
+    dom.restore();
+    let reduced = false;
+    dom = installDom({ media: (q) => (q.includes("reduced-motion") ? reduced : false) });
+    const setInterval = vi.spyOn(window, "setInterval");
+    const clearInterval = vi.spyOn(window, "clearInterval");
+    const container = dom.mount();
+    const map = createBlockMap(container, { totalBlocks: 10 });
+    dom.triggerResize(5);
+    map.setHighlight(true);
+    expect(setInterval).toHaveBeenCalledTimes(1);
+
+    reduced = true;
+    const motionListener = dom.mediaListeners
+      .filter((entry) => entry.query.includes("reduced-motion"))
+      .at(-1);
+    motionListener?.listener();
+
+    expect(clearInterval).toHaveBeenCalledTimes(1);
+    expect(pixel(dom.puts.at(-1) as ImageDataLike, 0)).toEqual(HIGHLIGHT_RGBA);
+    map.destroy();
+  });
+
   it("discrete tooltip reports the exact block the renderer painted at boundary columns", () => {
     const container = dom.mount(50);
     const map = createBlockMap(container, { totalBlocks: 7 });

@@ -106,8 +106,17 @@ export const installDom = (options: DomOptions = {}): InstalledDom => {
     frames.delete(handle);
   });
   vi.stubGlobal("matchMedia", (query: string) => {
+    // Validated eagerly, matching real matchMedia throwing synchronously on a
+    // bad query, rather than deferring the default media's throw to whenever
+    // something first reads `.matches`.
+    media(query);
     const target = {
-      matches: media(query),
+      // A getter, not a snapshot, so a caller that holds onto the returned
+      // MediaQueryList and re-reads `.matches` later sees the media function's
+      // current answer rather than the one in effect when matchMedia ran.
+      get matches() {
+        return media(query);
+      },
       media: query,
       addEventListener: (_type: string, listener: () => void) => {
         mediaListeners.push({ query, listener });

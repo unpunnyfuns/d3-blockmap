@@ -134,11 +134,22 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   let highlightOn = false;
   let dragging = false;
 
-  const blinkAllowed = (): boolean => !matchMedia(REDUCED_MOTION_QUERY).matches;
+  // Created once and read live, rather than re-queried per call, so the
+  // change listener below can be attached to this exact MediaQueryList.
+  const motionMedia = matchMedia(REDUCED_MOTION_QUERY);
+  const blinkAllowed = (): boolean => !motionMedia.matches;
 
   const applyHighlight = (): void => {
     renderer.setHighlight(highlightOn, highlightColor(theme), blinkAllowed());
   };
+
+  // The preference can flip while the highlight is already running and its
+  // blink timer mid-flight; only a fresh call to applyHighlight picks up the
+  // new blinkAllowed() value, and only the active highlight needs it.
+  const onMotionChange = (): void => {
+    if (highlightOn) applyHighlight();
+  };
+  motionMedia.addEventListener("change", onMotionChange);
 
   // Re-reads the custom properties and rebuilds the 256-entry table; the
   // highlight colour is separate from that table, so it needs its own push.
@@ -384,6 +395,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       resizeObserver.disconnect();
       unwatchTheme();
       dprMedia?.removeEventListener("change", onDprChange);
+      motionMedia.removeEventListener("change", onMotionChange);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerleave", onPointerLeave);
       detachInteraction?.();

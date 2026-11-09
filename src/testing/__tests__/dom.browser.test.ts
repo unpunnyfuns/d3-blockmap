@@ -141,6 +141,16 @@ describe("installDom", () => {
     dom.restore();
   });
 
+  it("matchMedia's matches reflects the media function at read time, not call time", () => {
+    let flag = false;
+    const dom = installDom({ media: () => flag });
+    const mql = matchMedia("(prefers-reduced-motion: reduce)");
+    expect(mql.matches).toBe(false);
+    flag = true;
+    expect(mql.matches).toBe(true);
+    dom.restore();
+  });
+
   it("restore returns the environment to its prior state", () => {
     const originalResizeObserver = globalThis.ResizeObserver;
     const originalMatchMedia = globalThis.matchMedia;
