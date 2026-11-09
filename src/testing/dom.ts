@@ -66,7 +66,10 @@ export const installDom = (options: DomOptions = {}): InstalledDom => {
   installed = true;
 
   const media = options.media ?? defaultMedia;
-  const observers: ResizeCallback[] = [];
+  // Each instance keeps its own observed targets, so triggerResize can tell
+  // which observers actually watch a given container rather than firing
+  // every observer that happens to exist.
+  const instances: StubResizeObserver[] = [];
   const frames = new Map<number, FrameRequestCallback>();
   let nextFrameId = 1;
   const puts: ImageDataLike[] = [];
@@ -75,18 +78,22 @@ export const installDom = (options: DomOptions = {}): InstalledDom => {
   const mounted: HTMLElement[] = [];
 
   class StubResizeObserver {
-    private readonly callback: ResizeCallback;
+    readonly callback: ResizeCallback;
+    readonly targets: Element[] = [];
     constructor(callback: ResizeCallback) {
       this.callback = callback;
-      observers.push(callback);
+      instances.push(this);
     }
-    observe(): void {}
+    observe(target: Element): void {
+      this.targets.push(target);
+    }
     disconnect(): void {
-      const index = observers.indexOf(this.callback);
-      if (index !== -1) observers.splice(index, 1);
+      const index = instances.indexOf(this);
+      if (index !== -1) instances.splice(index, 1);
     }
-    unobserve(): void {
-      this.disconnect();
+    unobserve(target: Element): void {
+      const index = this.targets.indexOf(target);
+      if (index !== -1) this.targets.splice(index, 1);
     }
   }
 
@@ -165,13 +172,16 @@ export const installDom = (options: DomOptions = {}): InstalledDom => {
       return container;
     },
     triggerResize: (width, container) => {
-      if (observers.length === 0) throw new Error("triggerResize: no observers");
+      if (instances.length === 0) throw new Error("triggerResize: no observers");
       const targets = container ? [container] : mounted;
       targets.forEach((el) => {
         el.style.width = `${width}px`;
       });
       const entry = createResizeEntry(width);
-      observers.forEach((cb) => cb([entry]));
+      const notified = container
+        ? instances.filter((instance) => instance.targets.includes(container))
+        : instances;
+      notified.forEach((instance) => instance.callback([entry]));
     },
     flushFrames: () => {
       for (let round = 0; frames.size > 0; round += 1) {

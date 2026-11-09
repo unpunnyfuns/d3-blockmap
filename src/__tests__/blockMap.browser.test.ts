@@ -289,6 +289,60 @@ describe("createBlockMap", () => {
     map.destroy();
   });
 
+  it("resumes blinking when prefers-reduced-motion flips from reduced back to allowed", () => {
+    dom.restore();
+    let reduced = false;
+    dom = installDom({ media: (q) => (q.includes("reduced-motion") ? reduced : false) });
+    const setInterval = vi.spyOn(window, "setInterval");
+    const clearInterval = vi.spyOn(window, "clearInterval");
+    const container = dom.mount();
+    const map = createBlockMap(container, { totalBlocks: 10 });
+    dom.triggerResize(5);
+    map.setHighlight(true);
+    expect(setInterval).toHaveBeenCalledTimes(1);
+
+    const motionListener = dom.mediaListeners
+      .filter((entry) => entry.query.includes("reduced-motion"))
+      .at(-1);
+
+    reduced = true;
+    motionListener?.listener();
+    expect(clearInterval).toHaveBeenCalledTimes(1);
+
+    reduced = false;
+    motionListener?.listener();
+    expect(setInterval).toHaveBeenCalledTimes(2);
+    map.destroy();
+  });
+
+  it("ignores a prefers-reduced-motion change while the highlight is off", () => {
+    dom.restore();
+    let reduced = false;
+    dom = installDom({ media: (q) => (q.includes("reduced-motion") ? reduced : false) });
+    const setInterval = vi.spyOn(window, "setInterval");
+    const clearInterval = vi.spyOn(window, "clearInterval");
+    const container = dom.mount();
+    const map = createBlockMap(container, { totalBlocks: 10 });
+    dom.triggerResize(5);
+
+    reduced = true;
+    const motionListener = dom.mediaListeners
+      .filter((entry) => entry.query.includes("reduced-motion"))
+      .at(-1);
+    motionListener?.listener();
+
+    expect(setInterval).not.toHaveBeenCalled();
+    expect(clearInterval).not.toHaveBeenCalled();
+    map.destroy();
+  });
+
+  it("removes the reduced-motion listener on destroy", () => {
+    const container = dom.mount();
+    const map = createBlockMap(container, { totalBlocks: 10 });
+    map.destroy();
+    expect(dom.removedQueries).toContain("(prefers-reduced-motion: reduce)");
+  });
+
   it("discrete tooltip reports the exact block the renderer painted at boundary columns", () => {
     const container = dom.mount(50);
     const map = createBlockMap(container, { totalBlocks: 7 });

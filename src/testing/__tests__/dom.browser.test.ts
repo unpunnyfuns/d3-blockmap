@@ -141,7 +141,7 @@ describe("installDom", () => {
     dom.restore();
   });
 
-  it("triggerResize with a container only resizes that container, but still notifies every observer", () => {
+  it("triggerResize with a container only resizes and notifies the observer watching it", () => {
     const dom = installDom();
     const containerA = dom.mount();
     const containerB = dom.mount();
@@ -160,7 +160,7 @@ describe("installDom", () => {
     expect(containerA.getBoundingClientRect().width).toBe(30);
     expect(containerB.getBoundingClientRect().width).toBe(widthBBefore);
     expect(seenA).toEqual([30]);
-    expect(seenB).toEqual([30]);
+    expect(seenB).toEqual([]);
     dom.restore();
   });
 

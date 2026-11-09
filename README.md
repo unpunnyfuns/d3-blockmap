@@ -57,7 +57,7 @@ export const Download = ({ totalBlocks }: { totalBlocks: number }) => {
 | `initialRanges` | `RangeInput` | | `[start, end)` tuples (or a flat `Uint32Array` of pairs) already complete. |
 | `partial` | `"coverage" \| "gradient"` | `"coverage"` | How partly filled columns are coloured. See Theming. |
 | `view` | `{ start, end }` | full range | Initial zoom window, `end` exclusive. |
-| `interactive` | `boolean` | `true` | Ctrl/⌘+wheel zooms, drag pans, double-click resets. |
+| `interactive` | `boolean` | `true` | Ctrl/⌘+wheel zooms, drag pans, double-click resets; keyboard controls when focused, see Behaviour. |
 | `onViewChange` | `(view) => void` | | Called when the view changes. |
 | `axis` | `boolean \| { format?, tickCount? }` | `false` | Tick labels under the bar. |
 | `label` | `(progress) => string` | | Overrides the canvas `aria-label`. See Behaviour. |
@@ -86,7 +86,7 @@ Ranges use exclusive ends: `[0, 10]` means blocks 0 through 9. Unsorted, overlap
 
 ## React
 
-Props mirror the options plus `blocks`, `ranges`, `highlight`, `className`, `style`. `ref` is a plain prop exposing the methods above, except `setBlocks` and `destroy`, as `BlockMapHandle`.
+Props mirror the options, including `label`, plus `blocks`, `ranges`, `highlight`, `className`, `style`. `ref` is a plain prop exposing the methods above, except `setBlocks` and `destroy`, as `BlockMapHandle`.
 
 - `blocks` and `ranges` apply when their identity changes, so keep the references stable.
 - `partial`, `interactive`, and `axis` recreate the instance when they change; memoise an object `axis`.
@@ -122,6 +122,6 @@ npm run verify      # lint, format check, typecheck, tests, build
 npm run demo        # serves the repo; open /demo/
 ```
 
-Files named `*.browser.test.ts` run in headless Chromium; every other test is a Node unit test. One-time setup: `npx playwright install chromium` and `npm run prepare` (installs the commit-message hook). Shared test fakes live in `src/testing/`.
+Files named `*.browser.test.ts(x)` run in headless Chromium; every other test is a Node unit test. One-time setup: `npx playwright install chromium` and `npm run prepare` (installs the commit-message hook). Shared test fakes live in `src/testing/`.
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org); commitlint checks each message. Releases are automated: release-please opens a release PR from the commit history, and merging it tags the version, publishes the GitHub release, and stages the npm publish for approval with 2FA. There is no npm token anywhere.
