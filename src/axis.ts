@@ -32,6 +32,7 @@ const RIGHT_EDGE = "translateX(-100%)";
 const COMPACT_THRESHOLD = 1000;
 const MAGNITUDE_STEP = 3;
 const MAX_COMPACT_FRACTION_DIGITS = 3;
+const DECIMAL_BASE = 10;
 
 const groupedFormat = new Intl.NumberFormat("en-US");
 const compactFormatters = new Map<number, Intl.NumberFormat>();
@@ -51,7 +52,7 @@ export const defaultFormat = (block: number, step = 1): string => {
   if (block < COMPACT_THRESHOLD) return groupedFormat.format(block);
   const magnitude =
     Math.floor(Math.log10(Math.max(Math.abs(block), 1)) / MAGNITUDE_STEP) * MAGNITUDE_STEP;
-  const unit = 10 ** magnitude;
+  const unit = DECIMAL_BASE ** magnitude;
   const digits = Math.max(0, Math.ceil(Math.log10(unit / step)));
   if (digits > MAX_COMPACT_FRACTION_DIGITS) return groupedFormat.format(block);
   return compactFormatterFor(digits).format(block);

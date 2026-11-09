@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "eslint"],
+  "categories": { "correctness": "error" },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "typescript/consistent-type-imports": ["error", { "prefer": "type-imports" }],
+    "eslint/no-inline-comments": "error",
+    "eslint/no-magic-numbers": [
+      "error",
+      { "ignore": [0, 1, -1], "ignoreArrayIndexes": true, "detectObjects": false, "enforceConst": false }
+    ],
+    "eslint/prefer-const": "error",
+    "eslint/eqeqeq": "error"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx", "src/testing/**"],
+      "rules": { "eslint/no-magic-numbers": "off" }
+    }
+  ]
+}

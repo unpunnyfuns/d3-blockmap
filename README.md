@@ -145,3 +145,5 @@ npm run format
 npm run typecheck
 npm run build
 ```
+
+`npm run lint` enforces no `any`, `import type` for types, no inline end-of-line comments, and no unnamed numeric literals in library source (test files exempt). Naming conventions are reviewed by hand; oxlint has no working naming rule.
