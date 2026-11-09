@@ -223,18 +223,10 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     canvas.setAttribute(ARIA_LABEL_ATTRIBUTE, (options.label ?? defaultLabel)(state.progress()));
   };
 
-  // The css size the chrome was last built for; distinct from binCount, which
-  // rounds to whole device pixels and ignores height entirely, so it can stay
-  // put across a size change that the chrome still needs to reflect.
-  let lastChromeWidth: number | undefined;
-  let lastChromeHeight: number | undefined;
-
   // The axis and the brush overlay are both laid out in css pixels against
   // the current view, so neither can be refreshed without the other.
   const updateChrome = (): void => {
     axis?.update(state.getView(), cssWidth);
-    lastChromeWidth = cssWidth;
-    lastChromeHeight = cssHeight;
     overlay?.update();
   };
 
@@ -281,27 +273,21 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
    * One bin per device pixel, so the map never shows more detail than the
    * screen can resolve. A zero css width means the container has not been
    * measured yet (or has collapsed), so there is nothing to lay out and the
-   * chrome is left alone rather than refreshed against a width of zero. The
-   * binCount early return matters for more than speed: assigning
-   * canvas.width clears the backing store, so a no-op resize would blank the
-   * canvas until the next frame.
+   * chrome is left alone rather than refreshed against a width of zero. Only
+   * a bin count change resizes the canvas: assigning canvas.width clears the
+   * backing store, so a no-op resize would blank the canvas until the next
+   * frame. The chrome is placed in css pixels, which can move while the bin
+   * count stays put, so it is always refreshed.
    */
   const layout = (): void => {
     if (cssWidth === 0) return;
 
     const binCount = Math.round(cssWidth * dpr);
-    if (binCount === state.binCount) {
-      // The device-pixel bin count can stay put across a css size change -
-      // rounding absorbs a sub-pixel width, and height never feeds into it at
-      // all - but the axis ticks and the brush extent are placed in css
-      // pixels and still need refreshing.
-      if (cssWidth !== lastChromeWidth || cssHeight !== lastChromeHeight) updateChrome();
-      return;
+    if (binCount !== state.binCount) {
+      canvas.width = binCount;
+      state.resize(binCount);
+      renderer.markAllDirty();
     }
-
-    canvas.width = binCount;
-    state.resize(binCount);
-    renderer.markAllDirty();
     updateChrome();
   };
 
