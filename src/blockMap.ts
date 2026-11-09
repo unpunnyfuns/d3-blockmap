@@ -1,3 +1,11 @@
+/**
+ * The façade: creates the canvas, wires state, renderer, tooltip, axis and
+ * interaction together, and owns everything with a lifetime - observers,
+ * media queries, the pending-view frame. The pieces it composes stay
+ * unaware of each other; all cross-cutting policy (when to repaint, what a
+ * gesture means for the model) lives here.
+ */
+
 import { createAxis, createScale } from "./axis";
 import type { Axis, AxisOptions, BlockScale } from "./axis";
 import { createColorScale, highlightColor, readTheme, watchTheme } from "./colors";
@@ -43,8 +51,17 @@ const FULL = "100%";
 const CONTEXT_ID = "2d";
 const NO_FRAME = 0;
 
+// devicePixelRatio fires no change event, so the current ratio is watched as
+// a media query that stops matching when it moves.
 const dprQuery = (dpr: number): string => `(resolution: ${dpr}dppx)`;
 
+/**
+ * Inverse of the renderer's discrete-mode column span. There, block b covers
+ * columns [floor(b * binCount / length), floor((b + 1) * binCount / length)),
+ * so the block under a column is the number of block boundaries that fit
+ * within the first `column + 1` columns, minus one. Floor and ceil must agree
+ * like this or the tooltip names a neighbour of the block you can see.
+ */
 const discreteBlock = (column: number, length: number, binCount: number, start: number): number =>
   start + Math.ceil(((column + 1) * length) / binCount) - 1;
 
@@ -52,6 +69,9 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   const state = createBlockState(options.totalBlocks);
   if (options.view) state.setView(options.view);
 
+  // One pixel row stretched to fill the container: width is set in layout
+  // once the container has been measured. touchAction none so a drag pans
+  // the view instead of scrolling the page.
   const canvas = document.createElement("canvas");
   Object.assign(canvas.style, {
     display: "block",
@@ -62,6 +82,8 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   canvas.height = CANVAS_ROWS;
   container.append(canvas);
 
+  // Remove the canvas before throwing, so a failed construction leaves no
+  // orphan element in the caller's container.
   const ctx = canvas.getContext(CONTEXT_ID);
   if (!ctx) {
     canvas.remove();
@@ -70,6 +92,9 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
 
   const renderer: Renderer = createRenderer(ctx, state);
   const tooltip = createTooltip(container);
+
+  // `axis: true` means defaults, an object means those options, and both
+  // false and absent mean no axis at all.
   const axisOptions: AxisOptions | undefined =
     options.axis === true
       ? {}
@@ -77,6 +102,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
         ? undefined
         : options.axis;
   const axis: Axis | undefined = axisOptions ? createAxis(container, axisOptions) : undefined;
+
   let destroyed = false;
   let cssWidth = 0;
   let dpr = devicePixelRatio;
@@ -91,6 +117,8 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     renderer.setHighlight(highlightOn, highlightColor(theme), blinkAllowed());
   };
 
+  // Re-reads the custom properties and rebuilds the 256-entry table; the
+  // highlight colour is separate from that table, so it needs its own push.
   const applyTheme = (): void => {
     theme = readTheme(container);
     renderer.setColors(createColorScale(theme, options.partial));
@@ -100,31 +128,56 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   let pendingView: BlockView | undefined;
   let viewFrame = NO_FRAME;
 
+  // Reports the requested view, not the committed one, so a read straight
+  // after setView sees what the caller just asked for.
   const getView = (): BlockView => ({ ...(pendingView ?? state.view) });
 
+  /**
+   * Applies at most one view change per frame. Rebinning a view change is the
+   * expensive part - it recounts every bin - so a wheel spin or a drag that
+   * produces several candidates per frame only pays for the last one.
+   */
   const commitView = (): void => {
     viewFrame = NO_FRAME;
     const next = pendingView;
     pendingView = undefined;
     if (!next || !state.setView(next)) return;
+
     renderer.markAllDirty();
     axis?.update(state.view, cssWidth);
     options.onViewChange?.(state.getView());
   };
 
+  /**
+   * pendingView doubles as the "a frame is already queued" flag, so repeated
+   * calls overwrite the target instead of queueing more frames; viewFrame is
+   * kept only so destroy can cancel a frame that will never run. Comparing
+   * against the pending view means a gesture that ends where it started is
+   * dropped without a repaint.
+   */
   const setView = (view: BlockView): void => {
     if (!Number.isFinite(view.start) || !Number.isFinite(view.end)) return;
+
     const clamped = clampView(view, state.totalBlocks);
     if (sameView(clamped, pendingView ?? state.view)) return;
+
     const hasPendingFrame = pendingView !== undefined;
     pendingView = clamped;
     if (!hasPendingFrame) viewFrame = requestAnimationFrame(commitView);
   };
+
   const resetView = (): void => setView(fullView(state.totalBlocks));
 
+  /**
+   * One bin per device pixel, so the map never shows more detail than the
+   * screen can resolve. The early return matters for more than speed:
+   * assigning canvas.width clears the backing store, so a no-op resize would
+   * blank the canvas until the next frame.
+   */
   const layout = (): void => {
     const binCount = Math.round(cssWidth * dpr);
     if (binCount === state.binCount) return;
+
     canvas.width = binCount;
     state.resize(binCount);
     renderer.markAllDirty();
@@ -137,6 +190,9 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     watchDpr();
   };
 
+  // The query only tells us when the ratio stops being what it was, so it is
+  // a one-shot listener that is re-armed at the new ratio each time - page
+  // zoom and dragging the window to another display both land here.
   const watchDpr = (): void => {
     dprMedia?.removeEventListener("change", onDprChange);
     dprMedia = matchMedia(dprQuery(dpr));
@@ -151,10 +207,19 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   });
   resizeObserver.observe(container);
 
+  /**
+   * Hit test for the tooltip, mirroring how the renderer chose to paint:
+   * fewer blocks than columns means each block spans several columns and the
+   * readout names a single block, otherwise a column is a bin and the readout
+   * is a coverage count. The column is clamped because offsetX can reach the
+   * far edge, and suppressed while dragging, where the pointer means pan.
+   */
   const onPointerMove = (event: PointerEvent): void => {
     if (dragging) return;
+
     const { binCount, view } = state;
     if (binCount === 0) return;
+
     const column = Math.min(binCount - 1, Math.max(0, Math.floor(event.offsetX * dpr)));
     const length = viewLength(view);
     let text: string;
@@ -166,10 +231,14 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     }
     tooltip.show(event.offsetX, text);
   };
+
   const onPointerLeave = (): void => tooltip.hide();
 
   canvas.addEventListener("pointermove", onPointerMove);
   canvas.addEventListener("pointerleave", onPointerLeave);
+
+  // Interaction reads the live view and total through getters rather than
+  // captured values, since both change under it as zoom and resize happen.
   const detachInteraction =
     options.interactive === false
       ? undefined
@@ -188,12 +257,19 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
             dragging = false;
           },
         });
+
   const unwatchTheme = watchTheme(applyTheme);
   watchDpr();
   applyTheme();
+
+  // Ranges first, then loose blocks on top: initialRanges replaces the whole
+  // bitset, so the opposite order would discard the individual blocks.
   if (options.initialRanges) state.replaceRanges(options.initialRanges);
   if (options.initialBlocks) renderer.markDirty(state.add(options.initialBlocks));
 
+  // Every mutating method checks `destroyed`, so a late async update from a
+  // caller that has already torn the map down is a no-op rather than a write
+  // to a detached canvas.
   return {
     setBlocks: (indices) => {
       if (destroyed) return;
@@ -205,6 +281,8 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       state.replaceRanges(ranges);
       renderer.markAllDirty();
     },
+
+    // The incremental paths repaint only the bins the state reports changed.
     addBlocks: (indices) => {
       if (destroyed) return;
       renderer.markDirty(state.add(indices));
@@ -217,6 +295,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       if (destroyed) return;
       renderer.markDirty(state.removeRanges(ranges));
     },
+
     setView: (view) => {
       if (destroyed) return;
       setView(view);
@@ -226,25 +305,35 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       resetView();
     },
     getView,
+
+    // Built from the committed view, so the scale always matches what is on
+    // screen rather than a change still waiting for its frame.
     getScale: () => createScale(state.getView(), cssWidth),
+
     setHighlight: (on) => {
       if (destroyed) return;
       highlightOn = on;
       applyHighlight();
     },
     getProgress: () => (destroyed ? { completed: 0, total: state.totalBlocks } : state.progress()),
+
+    // Idempotent, and unwinds in the reverse order of construction: pending
+    // frame, observers, listeners, owned children, then the canvas itself.
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
+
       if (viewFrame !== NO_FRAME) cancelAnimationFrame(viewFrame);
       viewFrame = NO_FRAME;
       pendingView = undefined;
+
       resizeObserver.disconnect();
       unwatchTheme();
       dprMedia?.removeEventListener("change", onDprChange);
       canvas.removeEventListener("pointermove", onPointerMove);
       canvas.removeEventListener("pointerleave", onPointerLeave);
       detachInteraction?.();
+
       renderer.destroy();
       tooltip.destroy();
       axis?.destroy();

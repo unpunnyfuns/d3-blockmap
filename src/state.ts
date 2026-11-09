@@ -1,3 +1,10 @@
+/**
+ * The model: which blocks are complete (bitset), how they fold into the
+ * current view's bins, and which bins changed. Deliberately free of DOM, D3
+ * and canvas imports so it stays portable - it could run in a worker and
+ * post dirty-bin arrays back to the renderer unchanged.
+ */
+
 import { createBitset } from "./bitset";
 import { createBins } from "./bins";
 import type { Bins, BlockRange } from "./bins";
@@ -32,6 +39,8 @@ export type BlockState = {
   progress(): Progress;
 };
 
+// Shared immutable "nothing changed" result, so the common case allocates no
+// array at all.
 const EMPTY_DIRTY = new Uint32Array(0);
 
 const isValidIndex = (index: number, totalBlocks: number): boolean =>
@@ -41,6 +50,10 @@ export const createBlockState = (totalBlocks: number): BlockState => {
   if (!Number.isInteger(totalBlocks) || totalBlocks < 1) {
     throw new RangeError(`totalBlocks must be a positive integer, got ${totalBlocks}`);
   }
+
+  // The bitset addresses bytes with `index >>> BYTE_SHIFT`, and the unsigned
+  // shift coerces its operand to a uint32: an index past 2^32 - 1 would wrap
+  // round and corrupt an unrelated block, so reject it up front.
   if (totalBlocks > MAX_BLOCKS) {
     throw new RangeError(
       `totalBlocks must fit in an unsigned 32-bit integer (<= ${MAX_BLOCKS}), got ${totalBlocks}`,
@@ -49,32 +62,55 @@ export const createBlockState = (totalBlocks: number): BlockState => {
 
   const bitset = createBitset(totalBlocks);
   let view: BlockView = fullView(totalBlocks);
+
+  // Bins are created empty: binCount is unknown until the container has been
+  // measured, so nothing can be binned before the first resize.
   let bins: Bins = createBins(view, 0);
 
   const inView = (index: number): boolean => index >= view.start && index < view.end;
 
+  /**
+   * Incremental add of individual indices. bitset.set reports whether the bit
+   * actually flipped, so an already-complete block costs no bin update and
+   * does not report its bin dirty. A Set then Uint32Array.from().sort() gives
+   * the ascending, deduplicated result the renderer expects; typed-array sort
+   * is numeric, so no comparator is needed.
+   */
   const add = (indices: ArrayLike<number>): Uint32Array => {
     const hasBins = bins.binCount > 0;
     const dirty = new Set<number>();
+
     for (let i = 0; i < indices.length; i += 1) {
       const index = indices[i];
       if (!isValidIndex(index, totalBlocks) || !bitset.set(index)) continue;
       if (!hasBins || !inView(index)) continue;
+
       const bin = bins.binOf(index);
       bins.counts[bin] += 1;
       dirty.add(bin);
     }
+
     return dirty.size === 0 ? EMPTY_DIRTY : Uint32Array.from(dirty).sort();
   };
 
+  /**
+   * Shared body of addRanges and removeRanges. Incoming ranges may overlap
+   * bits that are already in the target state, so the change per bin cannot
+   * be derived from the range bounds alone - hence countRange before each
+   * mutation for the global delta, and a recount of every touched bin from
+   * the bitset afterwards. The alternative, recounting all bins, would cost a
+   * full pass over millions of blocks per update.
+   */
   const applyRanges = (input: RangeInput, complete: boolean): Uint32Array => {
     const flat = normalizeRanges(input, totalBlocks);
     const dirty = new Set<number>();
     let delta = 0;
+
     for (let i = 0; i < flat.length; i += RANGE_PAIR) {
       const start = flat[i];
       const end = flat[i + 1];
       const present = bitset.countRange(start, end);
+
       if (complete) {
         bitset.fill(start, end);
         delta += end - start - present;
@@ -82,10 +118,13 @@ export const createBlockState = (totalBlocks: number): BlockState => {
         bitset.clearRange(start, end);
         delta -= present;
       }
+
       for (const bin of bins.binsTouching(start, end)) dirty.add(bin);
     }
+
     bins.recountBins(dirty, bitset.countRange);
     bitset.setCount(bitset.count + delta);
+
     return dirty.size === 0 ? EMPTY_DIRTY : Uint32Array.from(dirty).sort();
   };
 
@@ -97,43 +136,68 @@ export const createBlockState = (totalBlocks: number): BlockState => {
     get view() {
       return view;
     },
+
+    // Column count changed: the bin boundaries move, so rebuild from the
+    // bitset rather than trying to redistribute the old counts.
     resize: (binCount) => {
       bins = createBins(view, binCount);
       bins.rebuild(bitset.countRange);
     },
+
+    // Returns whether anything moved, so callers can skip a repaint. Zoom and
+    // pan feed in unclamped candidates, hence the finite check and clamp.
     setView: (next) => {
       if (!Number.isFinite(next.start) || !Number.isFinite(next.end)) return false;
+
       const clamped = clampView(next, totalBlocks);
       if (sameView(clamped, view)) return false;
+
       view = clamped;
       bins = createBins(view, bins.binCount);
       bins.rebuild(bitset.countRange);
       return true;
     },
+
+    // A copy, because `view` is live and handed to external callbacks.
     getView: () => ({ ...view }),
+
     add,
+
     replace: (indices) => {
       bitset.clear();
       bins.counts.fill(0);
       add(indices);
     },
+
+    /**
+     * Ranges are already merged and disjoint, so each one's blocks are new to
+     * the bitset: bins.addRange can add sizes arithmetically and the total is
+     * just the summed range lengths, with no counting pass.
+     */
     replaceRanges: (input) => {
       const flat = normalizeRanges(input, totalBlocks);
       bitset.clear();
       bins.counts.fill(0);
+
       for (let i = 0; i < flat.length; i += RANGE_PAIR) {
         bitset.fill(flat[i], flat[i + 1]);
         bins.addRange(flat[i], flat[i + 1]);
       }
+
       bitset.setCount(rangesLength(flat));
     },
+
     addRanges: (input) => applyRanges(input, true),
     removeRanges: (input) => applyRanges(input, false),
+
     has: bitset.has,
+
+    // Coverage in [0, 1], which is what the colour scale is indexed by.
     fraction: (bin) => {
       const size = bins.sizeOf(bin);
       return size === 0 ? 0 : bins.counts[bin] / size;
     },
+
     countOf: (bin) => bins.counts[bin],
     sizeOf: (bin) => bins.sizeOf(bin),
     rangeOf: (bin) => bins.rangeOf(bin),
