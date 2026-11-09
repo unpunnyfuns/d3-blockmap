@@ -8,6 +8,6 @@ export { createBlockMap } from "./blockMap";
 export type { BlockClickEvent, BlockMap, BlockMapOptions } from "./blockMap";
 export type { Progress } from "./state";
 export type { PartialStyle, Theme } from "./colors";
-export type { BlockRange, BlockRangeTuple, RangeInput } from "./ranges";
+export type { BlockRange, RangeInput } from "./ranges";
 export type { BlockScale, BlockView } from "./view";
 export type { AxisOptions } from "./axis";
