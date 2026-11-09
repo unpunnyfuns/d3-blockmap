@@ -20,6 +20,7 @@ import {
   PERCENT,
   REDUCED_MOTION_QUERY,
 } from "./constants";
+import { canvasX } from "./dom";
 import { attachInteraction } from "./interaction";
 import { createRenderer } from "./renderer";
 import type { Renderer } from "./renderer";
@@ -367,12 +368,6 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   });
   resizeObserver.observe(container);
 
-  // Pointer events are listened for on the container, so offsetX would be
-  // relative to whichever child was hit; the canvas rect is the frame the
-  // renderer and the tooltip both work in.
-  const surfaceX = (event: { clientX: number }): number =>
-    event.clientX - canvas.getBoundingClientRect().left;
-
   type Hit = {
     column: number;
     block: number;
@@ -425,7 +420,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   const onPointerMove = (event: PointerEvent): void => {
     if (dragging) return;
 
-    const x = surfaceX(event);
+    const x = canvasX(canvas, event);
     const hit = locate(x);
     if (!hit) return;
 
@@ -458,7 +453,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     }
     if (!options.onBlockClick) return;
 
-    const hit = locate(surfaceX(event));
+    const hit = locate(canvasX(canvas, event));
     if (!hit) return;
 
     const { column: _column, ...rest } = hit;

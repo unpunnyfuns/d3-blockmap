@@ -6,7 +6,6 @@
 
 export { createBlockMap } from "./blockMap";
 export type { BlockClickEvent, BlockMap, BlockMapOptions } from "./blockMap";
-export type { BrushOverlay } from "./brush";
 export type { Progress } from "./state";
 export type { PartialStyle, Theme } from "./colors";
 export type { BlockRange, BlockRangeTuple, RangeInput } from "./ranges";

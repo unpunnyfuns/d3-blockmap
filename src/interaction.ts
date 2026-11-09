@@ -13,6 +13,7 @@
  */
 
 import { DRAG_THRESHOLD_PX, KEY_PAN_FRACTION, KEY_PAN_FRACTION_FAST, ZOOM_STEP } from "./constants";
+import { canvasX } from "./dom";
 import { panView, viewLength, zoomView } from "./view";
 import type { BlockView } from "./view";
 
@@ -56,12 +57,6 @@ export const attachInteraction = (
 ): (() => void) => {
   let drag: DragState | undefined;
 
-  // The canvas rect, not the surface rect, is the coordinate frame the
-  // renderer paints in, and it is read per event because scrolling or a
-  // layout change moves it without any resize the map hears about.
-  const surfaceX = (event: { clientX: number }): number =>
-    event.clientX - canvas.getBoundingClientRect().left;
-
   // CSS pixels to blocks: scale to device pixels (one per column), take that
   // as a fraction of the columns across, and spend it over the view length.
   const columnsToBlocks = (px: number, view: BlockView): number =>
@@ -80,7 +75,7 @@ export const attachInteraction = (
     event.preventDefault();
 
     const view = deps.getView();
-    const anchor = view.start + columnsToBlocks(surfaceX(event), view);
+    const anchor = view.start + columnsToBlocks(canvasX(canvas, event), view);
     const factor = event.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
     deps.setView(zoomView(view, anchor, factor, deps.getTotalBlocks()));
   };
@@ -105,7 +100,7 @@ export const attachInteraction = (
     if (deps.panRequiresShift() && event.pointerType !== TOUCH_POINTER && !event.shiftKey) return;
 
     drag = {
-      downX: surfaceX(event),
+      downX: canvasX(canvas, event),
       view: deps.getView(),
       pointerId: event.pointerId ?? NO_POINTER,
       active: false,
@@ -125,7 +120,7 @@ export const attachInteraction = (
   const onPointerMove = (event: PointerEvent): void => {
     if (!drag) return;
 
-    const dx = surfaceX(event) - drag.downX;
+    const dx = canvasX(canvas, event) - drag.downX;
     if (!drag.active) {
       if (Math.abs(dx) < DRAG_THRESHOLD_PX) return;
       drag.active = true;

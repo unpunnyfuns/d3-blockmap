@@ -6,13 +6,12 @@
 
 import { RANGE_PAIR } from "./constants";
 
+// A half-open [start, end) pair: both what callers hand in as range input and
+// what the map reports back from hit tests and the brush. Two names for the
+// one shape, because each reads better at its own end of the API.
 export type BlockRangeTuple = readonly [start: number, end: number];
+export type BlockRange = BlockRangeTuple;
 export type RangeInput = ArrayLike<BlockRangeTuple> | ArrayLike<number>;
-
-// Half-open [start, end) pair handed back from hit tests - the tooltip and
-// click readouts - and from the brush. Distinct from BlockRangeTuple, which
-// describes caller-supplied range input rather than something the map reports.
-export type BlockRange = readonly [number, number];
 
 type Pair = [number, number];
 
