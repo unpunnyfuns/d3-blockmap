@@ -141,13 +141,12 @@ describe("createBlockState", () => {
     expect(state.progress().completed).toBe(50);
   });
 
-  it("setView ignores same, inverted and non-finite input appropriately", () => {
+  it("setView reports no change for the view it already has", () => {
     const state = createBlockState(100);
     state.resize(5);
     expect(state.setView({ start: 0, end: 100 })).toBe(false);
-    expect(state.setView({ start: 60, end: 40 })).toBe(true);
-    expect(state.getView()).toEqual({ start: 40, end: 60 });
-    expect(state.setView({ start: Number.NaN, end: 10 })).toBe(false);
+    expect(state.setView({ start: 40, end: 60 })).toBe(true);
+    expect(state.setView({ start: 40, end: 60 })).toBe(false);
     expect(state.getView()).toEqual({ start: 40, end: 60 });
   });
 

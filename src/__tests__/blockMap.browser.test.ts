@@ -230,6 +230,31 @@ describe("createBlockMap", () => {
     map.destroy();
   });
 
+  it("clamps a requested view at once and ignores a non-finite one", () => {
+    const container = dom.mount();
+    const onViewChange = vi.fn();
+    const map = createBlockMap(container, { totalBlocks: 1000, onViewChange });
+    dom.triggerResize(50);
+    map.setView({ start: 950, end: 1100 });
+    expect(map.getView()).toEqual({ start: 850, end: 1000 });
+    map.setView({ start: Number.NaN, end: 10 });
+    expect(map.getView()).toEqual({ start: 850, end: 1000 });
+    dom.flushFrames();
+    expect(onViewChange).toHaveBeenCalledTimes(1);
+    expect(onViewChange).toHaveBeenCalledWith({ start: 850, end: 1000 });
+    map.destroy();
+  });
+
+  it("ignores a non-finite initial view", () => {
+    const container = dom.mount();
+    const map = createBlockMap(container, {
+      totalBlocks: 1000,
+      view: { start: 0, end: Number.NaN },
+    });
+    expect(map.getView()).toEqual({ start: 0, end: 1000 });
+    map.destroy();
+  });
+
   it("applies an initial view without reporting it", () => {
     const container = dom.mount();
     const onViewChange = vi.fn();

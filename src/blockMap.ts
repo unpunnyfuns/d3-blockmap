@@ -29,7 +29,7 @@ import type { BlockRange, RangeInput } from "./ranges";
 import { createBlockState } from "./state";
 import type { Progress } from "./state";
 import { createTooltip, formatBinTooltip, formatBlockTooltip } from "./tooltip";
-import { clampView, createScale, fullView, sameView, viewLength } from "./view";
+import { createScale, fullView, legalView, sameView, viewLength } from "./view";
 import type { BlockScale, BlockView } from "./view";
 
 export type BlockMapOptions = {
@@ -102,7 +102,8 @@ const dprQuery = (dpr: number): string => `(resolution: ${dpr}dppx)`;
 
 export const createBlockMap = (container: HTMLElement, options: BlockMapOptions): BlockMap => {
   const state = createBlockState(options.totalBlocks);
-  if (options.view) state.setView(options.view);
+  const initialView = options.view && legalView(options.view, state.totalBlocks);
+  if (initialView) state.setView(initialView);
 
   // One pixel row stretched to fill the container: width is set in layout
   // once the container has been measured. touchAction none so a drag pans
@@ -266,12 +267,10 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
    * where it started is dropped without a repaint.
    */
   const setView = (view: BlockView): void => {
-    if (!Number.isFinite(view.start) || !Number.isFinite(view.end)) return;
+    const legal = legalView(view, state.totalBlocks);
+    if (!legal || sameView(legal, pendingView ?? state.getView())) return;
 
-    const clamped = clampView(view, state.totalBlocks);
-    if (sameView(clamped, pendingView ?? state.getView())) return;
-
-    pendingView = clamped;
+    pendingView = legal;
     if (viewFrame !== NO_FRAME) return;
     viewFrame = requestAnimationFrame(commitView);
   };

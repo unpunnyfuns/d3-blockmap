@@ -1,5 +1,14 @@
 import { ZOOM_STEP } from "../constants";
-import { clampView, createScale, fullView, panView, sameView, viewLength, zoomView } from "../view";
+import {
+  clampView,
+  createScale,
+  fullView,
+  legalView,
+  panView,
+  sameView,
+  viewLength,
+  zoomView,
+} from "../view";
 
 describe("view helpers", () => {
   it("fullView, viewLength, sameView", () => {
@@ -13,6 +22,13 @@ describe("view helpers", () => {
     expect(clampView({ start: 8, end: 3 }, 10)).toEqual({ start: 3, end: 8 });
     expect(clampView({ start: 4, end: 4 }, 10)).toEqual({ start: 4, end: 5 });
     expect(clampView({ start: 9.6, end: 9.6 }, 10)).toEqual({ start: 9, end: 10 });
+  });
+
+  it("legalView clamps a finite view and rejects a non-finite one", () => {
+    expect(legalView({ start: 60, end: 40 }, 100)).toEqual({ start: 40, end: 60 });
+    expect(legalView({ start: -5, end: 150 }, 100)).toEqual({ start: 0, end: 100 });
+    expect(legalView({ start: Number.NaN, end: 10 }, 100)).toBeUndefined();
+    expect(legalView({ start: 0, end: Number.POSITIVE_INFINITY }, 100)).toBeUndefined();
   });
 
   it("clampView keeps the view inside the block range", () => {

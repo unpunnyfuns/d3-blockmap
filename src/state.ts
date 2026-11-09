@@ -11,7 +11,7 @@ import type { Bins } from "./bins";
 import { MAX_BLOCKS, RANGE_PAIR } from "./constants";
 import { normalizeRanges, rangesLength } from "./ranges";
 import type { BlockRange, RangeInput } from "./ranges";
-import { clampView, fullView, sameView } from "./view";
+import { fullView, sameView } from "./view";
 import type { BlockView } from "./view";
 
 export type Progress = { completed: number; total: number };
@@ -138,15 +138,13 @@ export const createBlockState = (totalBlocks: number): BlockState => {
       bins.rebuild(bitset.countRange);
     },
 
-    // Returns whether anything moved, so callers can skip a repaint. Zoom and
-    // pan feed in unclamped candidates, hence the finite check and clamp.
+    // Takes a view legalView has already checked, so the façade validates once
+    // per request rather than again at commit. Returns whether anything moved,
+    // so callers can skip a repaint.
     setView: (next) => {
-      if (!Number.isFinite(next.start) || !Number.isFinite(next.end)) return false;
+      if (sameView(next, view)) return false;
 
-      const clamped = clampView(next, totalBlocks);
-      if (sameView(clamped, view)) return false;
-
-      view = clamped;
+      view = { ...next };
       bins = createBins(view, bins.binCount);
       bins.rebuild(bitset.countRange);
       return true;

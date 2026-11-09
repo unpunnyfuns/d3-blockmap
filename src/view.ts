@@ -55,6 +55,16 @@ export const clampView = (view: BlockView, totalBlocks: number): BlockView => {
 };
 
 /**
+ * The one check a caller's view goes through before it reaches the state:
+ * non-finite bounds cannot be clamped into anything meaningful, so they are
+ * no view at all, and everything else is clamped.
+ */
+export const legalView = (view: BlockView, totalBlocks: number): BlockView | undefined =>
+  Number.isFinite(view.start) && Number.isFinite(view.end)
+    ? clampView(view, totalBlocks)
+    : undefined;
+
+/**
  * Scales the view by `factor` while holding `anchor` (the block under the
  * cursor) at the same fractional offset, so the block you point at does not
  * drift. Rounding follows the gesture's direction: zooming in (factor < 1)
