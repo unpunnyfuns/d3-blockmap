@@ -1,14 +1,15 @@
-import { ticks } from "d3-array";
+import { tickStep } from "d3-array";
 import { CSS_VAR_AXIS_COLOR, EDGE_ANCHOR_RATIO, MIN_TICKS, TICK_SPACING_PX } from "./constants";
+import { ensureRelative } from "./dom";
 import { viewLength } from "./view";
 import type { BlockView } from "./view";
 
 export type AxisOptions = {
-  format?: (block: number) => string;
+  format?: (block: number, step: number) => string;
   tickCount?: number;
 };
 
-export type Tick = { block: number; x: number };
+export type Tick = { block: number; x: number; step: number };
 
 export type BlockScale = {
   domain: readonly [number, number];
@@ -28,14 +29,33 @@ const FULL = "100%";
 const CENTER = "translateX(-50%)";
 const LEFT_EDGE = "translateX(0)";
 const RIGHT_EDGE = "translateX(-100%)";
-const MAX_FRACTION_DIGITS = 1;
+const COMPACT_THRESHOLD = 1000;
+const MAGNITUDE_STEP = 3;
+const MAX_COMPACT_FRACTION_DIGITS = 3;
 
-const compact = new Intl.NumberFormat("en-US", {
-  notation: "compact",
-  maximumFractionDigits: MAX_FRACTION_DIGITS,
-});
+const groupedFormat = new Intl.NumberFormat("en-US");
+const compactFormatters = new Map<number, Intl.NumberFormat>();
 
-export const defaultFormat = (block: number): string => compact.format(block);
+const compactFormatterFor = (digits: number): Intl.NumberFormat => {
+  const cached = compactFormatters.get(digits);
+  if (cached) return cached;
+  const formatter = new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: digits,
+  });
+  compactFormatters.set(digits, formatter);
+  return formatter;
+};
+
+export const defaultFormat = (block: number, step = 1): string => {
+  if (block < COMPACT_THRESHOLD) return groupedFormat.format(block);
+  const magnitude =
+    Math.floor(Math.log10(Math.max(Math.abs(block), 1)) / MAGNITUDE_STEP) * MAGNITUDE_STEP;
+  const unit = 10 ** magnitude;
+  const digits = Math.max(0, Math.ceil(Math.log10(unit / step)));
+  if (digits > MAX_COMPACT_FRACTION_DIGITS) return groupedFormat.format(block);
+  return compactFormatterFor(digits).format(block);
+};
 
 export const createScale = (view: BlockView, cssWidth: number): BlockScale => {
   const length = viewLength(view);
@@ -51,22 +71,32 @@ export const computeTicks = (view: BlockView, cssWidth: number, tickCount?: numb
   if (cssWidth <= 0) return [];
   const count = tickCount ?? Math.max(MIN_TICKS, Math.floor(cssWidth / TICK_SPACING_PX));
   const scale = createScale(view, cssWidth);
-  return ticks(view.start, view.end, count)
-    .filter((value) => value >= view.start && value <= view.end)
-    .map((value) => ({ block: value, x: scale.x(value) }));
+  const rawStep = tickStep(view.start, view.end, count);
+  const step = Math.max(1, rawStep);
+  const first = Math.ceil(view.start / step) * step;
+  const result: Tick[] = [];
+  for (let value = first; value <= view.end; value += step) {
+    result.push({ block: value, x: scale.x(value), step });
+  }
+  return result;
 };
 
-const anchorFor = (x: number, cssWidth: number): string => {
+export const anchorFor = (x: number, cssWidth: number): string => {
   const edge = TICK_SPACING_PX * EDGE_ANCHOR_RATIO;
-  if (x < edge) return LEFT_EDGE;
-  if (cssWidth - x < edge) return RIGHT_EDGE;
+  const nearLeft = x < edge;
+  const nearRight = cssWidth - x < edge;
+  if (nearLeft && nearRight) return x < cssWidth - x ? LEFT_EDGE : RIGHT_EDGE;
+  if (nearLeft) return LEFT_EDGE;
+  if (nearRight) return RIGHT_EDGE;
   return CENTER;
 };
 
 export const createAxis = (container: HTMLElement, options: AxisOptions): Axis => {
   const format = options.format ?? defaultFormat;
+  ensureRelative(container);
   const root = document.createElement("div");
   root.setAttribute(AXIS_ATTRIBUTE, "");
+  root.setAttribute("aria-hidden", "true");
   Object.assign(root.style, {
     position: "absolute",
     left: "0",
@@ -75,7 +105,6 @@ export const createAxis = (container: HTMLElement, options: AxisOptions): Axis =
     pointerEvents: "none",
     userSelect: "none",
     color: `var(${CSS_VAR_AXIS_COLOR}, currentColor)`,
-    font: "inherit",
   });
   container.append(root);
 
@@ -85,7 +114,7 @@ export const createAxis = (container: HTMLElement, options: AxisOptions): Axis =
         const span = document.createElement("span");
         span.setAttribute(TICK_ATTRIBUTE, "");
         span.dataset.block = String(tick.block);
-        span.textContent = format(tick.block);
+        span.textContent = format(tick.block, tick.step);
         Object.assign(span.style, {
           display: "block",
           position: "absolute",

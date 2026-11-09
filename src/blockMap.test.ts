@@ -447,4 +447,34 @@ describe("createBlockMap", () => {
     expect(map.getScale().block(200)).toBe(550);
     map.destroy();
   });
+
+  it("getScale lags getView by one frame during a coalesced view change", () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      frames.push(cb);
+      return frames.length;
+    });
+    const flush = () => {
+      while (frames.length > 0) {
+        const pending = frames.slice();
+        frames.length = 0;
+        pending.forEach((cb) => cb(0));
+      }
+    };
+    const container = mount();
+    const map = createBlockMap(container, { totalBlocks: 1000 });
+    triggerResize(400);
+    flush();
+
+    map.setView({ start: 100, end: 200 });
+
+    expect(map.getView()).toEqual({ start: 100, end: 200 });
+    expect(map.getScale().domain).toEqual([0, 1000]);
+
+    flush();
+
+    expect(map.getView()).toEqual({ start: 100, end: 200 });
+    expect(map.getScale().domain).toEqual([100, 200]);
+    map.destroy();
+  });
 });

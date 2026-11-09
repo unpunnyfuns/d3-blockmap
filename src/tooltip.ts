@@ -1,5 +1,6 @@
 import type { BlockRange } from "./bins";
 import { PERCENT, PERCENT_FRACTION_DIGITS, TOOLTIP_OFFSET_PX } from "./constants";
+import { ensureRelative } from "./dom";
 
 export type Tooltip = {
   show(x: number, text: string): void;
@@ -58,8 +59,7 @@ export const createTooltip = (container: HTMLElement): Tooltip => {
     whiteSpace: "nowrap",
     transform: "translateY(-100%)",
   });
-  const pos = getComputedStyle(container).position;
-  if (pos === "static" || !pos) container.style.position = "relative";
+  ensureRelative(container);
   container.append(el);
 
   return {

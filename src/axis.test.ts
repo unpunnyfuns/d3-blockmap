@@ -1,4 +1,4 @@
-import { computeTicks, createAxis, createScale, defaultFormat } from "./axis";
+import { anchorFor, computeTicks, createAxis, createScale, defaultFormat } from "./axis";
 
 describe("computeTicks", () => {
   it("returns nice values inside the view with linear x", () => {
@@ -33,14 +33,49 @@ describe("computeTicks", () => {
   it("returns nothing for zero width", () => {
     expect(computeTicks({ start: 0, end: 100 }, 0)).toEqual([]);
   });
+
+  it("uses an integer step and carries it on each tick for an offset view", () => {
+    const ticks = computeTicks({ start: 4_250_000, end: 4_260_000 }, 400, 5);
+    expect(ticks.map((t) => t.block)).toEqual([
+      4_250_000, 4_252_000, 4_254_000, 4_256_000, 4_258_000, 4_260_000,
+    ]);
+    expect(ticks.every((t) => t.step === 2000)).toBe(true);
+    const labels = ticks.map((t) => defaultFormat(t.block, t.step));
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it("uses integer blocks by default for a tiny view, with no fractions", () => {
+    const ticks = computeTicks({ start: 0, end: 5 }, 800);
+    expect(ticks.map((t) => t.block)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(ticks.every((t) => Number.isInteger(t.block))).toBe(true);
+  });
+
+  it("steps by whole blocks for a short explicit view", () => {
+    const ticks = computeTicks({ start: 0, end: 2 }, 400, 5);
+    expect(ticks.map((t) => t.block)).toEqual([0, 1, 2]);
+  });
 });
 
 describe("defaultFormat", () => {
-  it("formats compactly", () => {
-    expect(defaultFormat(0)).toBe("0");
-    expect(defaultFormat(450)).toBe("450");
-    expect(defaultFormat(450_000)).toBe("450K");
-    expect(defaultFormat(1_250_000)).toBe("1.3M");
+  it("formats small blocks as grouped integers", () => {
+    expect(defaultFormat(0, 1)).toBe("0");
+  });
+
+  it("formats compactly when the step divides the compact unit evenly", () => {
+    expect(defaultFormat(450_000, 50_000)).toBe("450K");
+  });
+
+  it("widens precision so adjacent ticks stay distinct", () => {
+    expect(defaultFormat(1_250_000, 250_000)).toBe("1.3M");
+    expect(defaultFormat(4_252_000, 2_000)).toBe("4.252M");
+  });
+
+  it("stays compact down to a single fraction digit for a small step", () => {
+    expect(defaultFormat(1_500, 500)).toBe("1.5K");
+  });
+
+  it("falls back to grouped integers when the step is far below the compact unit", () => {
+    expect(defaultFormat(1_000_000, 1)).toBe("1,000,000");
   });
 });
 
@@ -91,6 +126,28 @@ describe("createAxis", () => {
     expect(spans[0].style.transform).toBe("translateX(0)");
     expect(spans[spans.length - 1].style.transform).toBe("translateX(-100%)");
     expect(spans[2].style.transform).toBe("translateX(-50%)");
+    axis.destroy();
+    container.remove();
+  });
+
+  it("anchors to the nearer edge when both edge conditions hold", () => {
+    expect(anchorFor(29, 30)).toBe("translateX(-100%)");
+  });
+
+  it("sets position: relative on a static container, same as the tooltip", () => {
+    const container = mount();
+    expect(container.style.position).toBe("");
+    const axis = createAxis(container, {});
+    expect(container.style.position).toBe("relative");
+    axis.destroy();
+    container.remove();
+  });
+
+  it("is aria-hidden since labels duplicate tooltip information", () => {
+    const container = mount();
+    const axis = createAxis(container, {});
+    const root = container.querySelector("[data-blockmap-axis]") as HTMLElement;
+    expect(root.getAttribute("aria-hidden")).toBe("true");
     axis.destroy();
     container.remove();
   });

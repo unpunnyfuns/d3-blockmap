@@ -216,7 +216,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       resetView();
     },
     getView,
-    getScale: () => createScale(getView(), cssWidth),
+    getScale: () => createScale(state.getView(), cssWidth),
     setHighlight: (on) => {
       if (destroyed) return;
       highlightOn = on;

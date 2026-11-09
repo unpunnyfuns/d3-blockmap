@@ -190,4 +190,12 @@ describe("<BlockMap>", () => {
     expect(instance.getScale).toHaveBeenCalled();
     spy.mockRestore();
   });
+
+  it("passes a boolean axis prop through as a create option", () => {
+    const instance = createInstance();
+    const spy = vi.spyOn(core, "createBlockMap").mockReturnValue(instance);
+    render(<BlockMap totalBlocks={10} axis={true} />);
+    expect(spy.mock.calls[0][1]).toMatchObject({ axis: true });
+    spy.mockRestore();
+  });
 });
