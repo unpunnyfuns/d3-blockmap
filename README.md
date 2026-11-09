@@ -13,7 +13,7 @@ npm i d3-blockmap
 | Export | From | Purpose |
 |---|---|---|
 | `createBlockMap(container, options)` | `d3-blockmap` | Vanilla factory. Returns `BlockMap`. |
-| `BlockMap`, `BlockMapOptions`, `Progress`, `Theme`, `BlockRangeTuple`, `RangeInput`, `PartialStyle`, `BlockView` | `d3-blockmap` | Types. |
+| `BlockMap`, `BlockMapOptions`, `Progress`, `Theme`, `BlockRangeTuple`, `RangeInput`, `PartialStyle`, `BlockView`, `AxisOptions`, `BlockScale` | `d3-blockmap` | Types. |
 | `<BlockMap>` | `d3-blockmap/react` | React wrapper, `forwardRef` to `BlockMapHandle`. |
 | `BlockMapProps`, `BlockMapHandle` | `d3-blockmap/react` | Types. |
 
@@ -70,7 +70,7 @@ A new `blocks` array identity triggers `setBlocks`; keep the reference stable be
 | `view` | `BlockView` | Optional. Initial `{ start, end }` window in block indices, `end` exclusive. |
 | `interactive` | `boolean` | Default `true`. Ctrl+wheel or pinch zooms around the cursor, drag pans, double-click resets. |
 | `onViewChange` | `(view: BlockView) => void` | Called after the view changes by API or interaction. |
-| `axis` | `boolean \| { format?, tickCount? }` | Default off. `true` renders compact tick labels under the bar, one per ~80 CSS px. |
+| `axis` | `boolean \| AxisOptions` (`{ format?, tickCount? }`) | Default off. `true` renders compact tick labels under the bar, one per ~80 CSS px. `format` is `(block: number, step: number) => string`; the default widens compact precision so adjacent ticks stay distinct and falls back to grouped integers (`Intl.NumberFormat("en-US")`) when the step is far below the compact unit or the block is small. `tickCount` overrides the density; labels are not collision-checked beyond edge-anchoring the first and last, so a large `tickCount` on a narrow container can overlap. |
 
 Returns:
 
@@ -84,7 +84,7 @@ Returns:
 | `resetView()` | Back to the full range. |
 | `getView()` | Current `{ start, end }`. |
 | `setHighlight(on)` | Blink every incomplete bin between its colour and `--blockmap-highlight` at 1 Hz (toggles every 500 ms). Steady under `prefers-reduced-motion`. |
-| `getScale()` | `{ domain, range, x(block), block(x) }` for the current view, in CSS px. |
+| `getScale()` | `{ domain, range, x(block), block(x) }` for the committed view (what is painted), in CSS px; during a coalesced view change it lags `getView()` by one frame. |
 | `destroy()` | Remove canvas, tooltip, observers. Idempotent. |
 
 ### Theming
@@ -130,7 +130,8 @@ The tooltip element carries the attribute `data-blockmap-tooltip` and ships unst
 - Bins are computed over the current view, so zooming far enough in switches to discrete per-block segments.
 - View changes from the API or interaction are coalesced to one rebuild per animation frame.
 - There is no keyboard affordance for zoom or pan yet.
-- The axis renders below the container at `top: 100%`; leave space under the bar. Ticks use nice values (1, 2, 5 × 10ⁿ) within the current view.
+- The axis renders below the container at `top: 100%`; leave space under the bar. Ticks land on integer block values, spaced by a nice step (1, 2, 5 × 10ⁿ) within the current view.
+- `overflow: hidden` on the container clips the axis, since it renders outside the container's height at `top: 100%`.
 
 ## Development
 

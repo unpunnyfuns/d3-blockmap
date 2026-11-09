@@ -138,8 +138,33 @@ leave space below the bar.
 
 ## Dependencies
 
-Add `d3-array` (runtime) and `@types/d3-array` (dev). `d3-array` has no
-dependencies.
+Add `d3-array` (runtime) and `@types/d3-array` (dev). `d3-array` depends
+on `internmap`, pre-bundled into its ESM dist (`d3-array.mjs`), so the
+demo import map needs no entry for it.
+
+## Implementation notes
+
+The initial implementation (this spec) was revised in a follow-up fix
+wave:
+
+- `computeTicks` uses `tickStep` from `d3-array` instead of `ticks`, so
+  tick values land on integer blocks (`first = ceil(view.start / step) *
+  step`, walking by `step` while `<= view.end`), with `step =
+  Math.max(1, rawStep)`. Each `Tick` carries its `step`.
+- `defaultFormat(block, step)` is step-aware: it widens compact
+  precision so adjacent ticks stay distinct (digits computed from how
+  far the step is below the block's compact unit) and falls back to
+  grouped integers (`Intl.NumberFormat("en-US")`) when the step is far
+  below the unit or the block is small. Formatters are cached per
+  digit count rather than built per call. Intl's actual compact output
+  is `450K` for `450_000`/step `50_000`.
+- `getScale()` on `BlockMap` reads the committed view
+  (`state.getView()`), not the pending one, so it reflects what is
+  currently painted; during a coalesced view change it lags
+  `getView()` by one animation frame.
+- `ensureRelative` (the static-position check previously inlined in
+  `createTooltip`) moved to a shared `src/dom.ts`, used by both the
+  tooltip and the axis.
 
 ## Testing
 
