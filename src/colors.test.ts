@@ -1,14 +1,6 @@
 import { DEFAULT_THEME } from "./constants";
 import { createColorScale, highlightColor, readTheme, watchTheme } from "./colors";
-
-const theme = {
-  missing: "#000000",
-  partialLow: "#ff0000",
-  partialHigh: "#0000ff",
-  partial: "#ff0000",
-  complete: "#ffffff",
-  highlight: "#00ff00",
-};
+import { TEST_THEME as theme } from "./testing";
 
 describe("createColorScale", () => {
   it("returns exact endpoint colours", () => {

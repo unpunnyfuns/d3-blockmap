@@ -1,5 +1,6 @@
 import { attachInteraction } from "./interaction";
 import type { InteractionDeps } from "./interaction";
+import { fire } from "./testing";
 
 const PRIMARY_BUTTON = 0;
 
@@ -19,19 +20,6 @@ const createDeps = (view = { start: 0, end: 1000 }) => {
     onDragEnd: vi.fn(),
   };
   return { deps, calls };
-};
-
-const fire = (
-  target: EventTarget,
-  type: string,
-  init: Record<string, unknown>,
-  props: Record<string, unknown> = {},
-) => {
-  const Ctor = type === "wheel" ? WheelEvent : MouseEvent;
-  const event = new Ctor(type, { bubbles: true, cancelable: true, ...init });
-  Object.entries(props).forEach(([key, value]) => Object.defineProperty(event, key, { value }));
-  target.dispatchEvent(event);
-  return event;
 };
 
 describe("attachInteraction", () => {

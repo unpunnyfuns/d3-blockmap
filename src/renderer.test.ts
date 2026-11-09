@@ -1,82 +1,14 @@
 import { createColorScale, highlightColor } from "./colors";
 import { createRenderer } from "./renderer";
-import type {
-  Canvas2dLike,
-  ImageDataLike,
-  IntervalTimer,
-  RenderSource,
-  Scheduler,
-} from "./renderer";
+import type { ImageDataLike, RenderSource, Scheduler } from "./renderer";
 import { createBlockState } from "./state";
-
-const theme = {
-  missing: "#000000",
-  partialLow: "#ff0000",
-  partialHigh: "#0000ff",
-  partial: "#ff0000",
-  complete: "#ffffff",
-  highlight: "#00ff00",
-};
-
-const createStubContext = () => {
-  const puts: ImageDataLike[] = [];
-  const ctx: Canvas2dLike = {
-    createImageData: (width, height) => ({
-      width,
-      height,
-      data: new Uint8ClampedArray(width * height * 4),
-    }),
-    putImageData: (image) => {
-      puts.push(image);
-    },
-  };
-  return { ctx, puts };
-};
-
-const createManualScheduler = () => {
-  const queue = new Map<number, () => void>();
-  let next = 1;
-  const scheduler: Scheduler = {
-    request: (callback) => {
-      const handle = next;
-      next += 1;
-      queue.set(handle, callback);
-      return handle;
-    },
-    cancel: (handle) => {
-      queue.delete(handle);
-    },
-  };
-  const flush = () => {
-    const callbacks = Array.from(queue.values());
-    queue.clear();
-    callbacks.forEach((callback) => callback());
-  };
-  return { scheduler, flush, pending: () => queue.size };
-};
-
-const createManualTimer = () => {
-  const timers = new Map<number, () => void>();
-  let next = 1;
-  const cleared: number[] = [];
-  const timer: IntervalTimer = {
-    set: (callback) => {
-      const id = next;
-      next += 1;
-      timers.set(id, callback);
-      return id;
-    },
-    clear: (id) => {
-      cleared.push(id);
-      timers.delete(id);
-    },
-  };
-  const tick = () => timers.forEach((callback) => callback());
-  return { timer, tick, cleared, active: () => timers.size };
-};
-
-const pixel = (image: ImageDataLike, column: number) =>
-  Array.from(image.data.subarray(column * 4, column * 4 + 4));
+import {
+  TEST_THEME as theme,
+  createManualScheduler,
+  createManualTimer,
+  createStubContext,
+  pixel,
+} from "./testing";
 
 describe("createRenderer", () => {
   it("paints one column per bin, once per frame", () => {

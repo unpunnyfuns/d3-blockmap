@@ -1,124 +1,82 @@
-import { rgb } from "d3-color";
-import { DEFAULT_THEME } from "./constants";
 import { createBlockMap } from "./blockMap";
+import {
+  COMPLETE_RGBA,
+  HIGHLIGHT_RGBA,
+  MISSING_RGBA,
+  ctrlWheel,
+  installDom,
+  pointer,
+} from "./testing";
+import type { InstalledDom } from "./testing";
 
-type ResizeCallback = (entries: ResizeObserverEntry[]) => void;
-type MediaListener = { query: string; listener: () => void };
-
-const observers: ResizeCallback[] = [];
-const puts: ImageData[] = [];
-const mediaListeners: MediaListener[] = [];
-const removed: string[] = [];
-
-class StubResizeObserver {
-  constructor(callback: ResizeCallback) {
-    observers.push(callback);
-  }
-  observe() {}
-  disconnect() {}
-}
-
-const triggerResize = (width: number) =>
-  observers.forEach((cb) => cb([{ contentRect: { width } } as unknown as ResizeObserverEntry]));
+let dom: InstalledDom;
 
 beforeEach(() => {
-  observers.length = 0;
-  puts.length = 0;
-  mediaListeners.length = 0;
-  removed.length = 0;
-  vi.stubGlobal("ResizeObserver", StubResizeObserver);
-  vi.stubGlobal("devicePixelRatio", 2);
-  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-    cb(0);
-    return 1;
-  });
-  vi.stubGlobal("cancelAnimationFrame", () => {});
-  vi.stubGlobal("matchMedia", (query: string) => ({
-    matches: false,
-    addEventListener: (_type: string, listener: () => void) => {
-      mediaListeners.push({ query, listener });
-    },
-    removeEventListener: (_type: string) => {
-      removed.push(query);
-    },
-  }));
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-    createImageData: (width: number, height: number) =>
-      ({ width, height, data: new Uint8ClampedArray(width * height * 4) }) as unknown as ImageData,
-    putImageData: (image: ImageData) => {
-      puts.push(image);
-    },
-  } as unknown as CanvasRenderingContext2D);
+  dom = installDom();
 });
 
 afterEach(() => {
+  dom.restore();
   vi.restoreAllMocks();
-  vi.unstubAllGlobals();
 });
-
-const mount = () => {
-  const container = document.createElement("div");
-  document.body.append(container);
-  return container;
-};
 
 describe("createBlockMap", () => {
   it("appends a canvas and sizes bins to width times dpr", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 100 });
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     expect(canvas).not.toBeNull();
-    triggerResize(50);
+    dom.triggerResize(50);
     expect(canvas.width).toBe(100);
     expect(canvas.height).toBe(1);
-    expect(puts.at(-1)?.width).toBe(100);
+    expect(dom.puts.at(-1)?.width).toBe(100);
     map.destroy();
   });
 
   it("does not repaint on an identical resize", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 100 });
-    triggerResize(50);
-    expect(puts).toHaveLength(1);
-    expect(puts[0]?.width).toBe(100);
-    triggerResize(50);
-    expect(puts).toHaveLength(1);
+    dom.triggerResize(50);
+    expect(dom.puts).toHaveLength(1);
+    expect(dom.puts[0]?.width).toBe(100);
+    dom.triggerResize(50);
+    expect(dom.puts).toHaveLength(1);
     map.destroy();
   });
 
   it("shrinks bin count and repaints when width decreases", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 100 });
-    triggerResize(50);
+    dom.triggerResize(50);
     map.addBlocks([0, 1, 2]);
-    triggerResize(20);
+    dom.triggerResize(20);
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     expect(canvas.width).toBe(40);
-    expect(puts.at(-1)?.width).toBe(40);
+    expect(dom.puts.at(-1)?.width).toBe(40);
     map.destroy();
   });
 
   it("re-reads devicePixelRatio on resolution change and re-arms", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 100 });
-    triggerResize(50);
+    dom.triggerResize(50);
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     expect(canvas.width).toBe(100);
 
     vi.stubGlobal("devicePixelRatio", 3);
-    const resolutionListener = mediaListeners
+    const resolutionListener = dom.mediaListeners
       .filter((entry) => entry.query.includes("resolution"))
       .at(-1);
     resolutionListener?.listener();
 
     expect(canvas.width).toBe(150);
-    expect(mediaListeners.some((entry) => entry.query.includes("3dppx"))).toBe(true);
-    expect(removed).toContain("(resolution: 2dppx)");
+    expect(dom.mediaListeners.some((entry) => entry.query.includes("3dppx"))).toBe(true);
+    expect(dom.removedQueries).toContain("(resolution: 2dppx)");
     map.destroy();
   });
 
   it("applies initialBlocks, setBlocks and addBlocks to progress", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 10, initialBlocks: [0, 1] });
     expect(map.getProgress()).toEqual({ completed: 2, total: 10 });
     map.addBlocks([1, 2]);
@@ -129,15 +87,13 @@ describe("createBlockMap", () => {
   });
 
   it("shows a tooltip for the hovered column and hides on leave", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 100 });
-    triggerResize(5);
+    dom.triggerResize(5);
     map.addBlocks([0, 1, 2, 3, 4]);
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     const tooltip = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
-    const move = new MouseEvent("pointermove", { bubbles: true });
-    Object.defineProperty(move, "offsetX", { value: 0 });
-    canvas.dispatchEvent(move);
+    pointer(canvas, "pointermove", 0);
     expect(tooltip.style.display).toBe("block");
     expect(tooltip.textContent).toBe("Blocks 0–9 · 5 / 10 (50.0%)");
     canvas.dispatchEvent(new MouseEvent("pointerleave"));
@@ -146,18 +102,18 @@ describe("createBlockMap", () => {
   });
 
   it("destroy removes elements and makes methods no-ops", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 10 });
     map.destroy();
     expect(container.querySelector("canvas")).toBeNull();
     expect(container.querySelector("[data-blockmap-tooltip]")).toBeNull();
     expect(() => map.addBlocks([1])).not.toThrow();
     expect(() => map.destroy()).not.toThrow();
-    expect(removed).toContain("(resolution: 2dppx)");
+    expect(dom.removedQueries).toContain("(resolution: 2dppx)");
   });
 
   it("returns zeroed progress after destroy", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 10, initialBlocks: [0, 1] });
     map.destroy();
     expect(map.getProgress()).toEqual({ completed: 0, total: 10 });
@@ -165,25 +121,25 @@ describe("createBlockMap", () => {
 
   it("throws when the 2d context is unavailable", () => {
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
-    expect(() => createBlockMap(mount(), { totalBlocks: 10 })).toThrow(/2d/);
+    expect(() => createBlockMap(dom.mount(), { totalBlocks: 10 })).toThrow(/2d/);
   });
 
   it("setRanges replaces state and repaints", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 10, initialBlocks: [9] });
-    triggerResize(5);
-    const before = puts.length;
+    dom.triggerResize(5);
+    const before = dom.puts.length;
     map.setRanges([
       [0, 2],
       [4, 7],
     ]);
     expect(map.getProgress()).toEqual({ completed: 5, total: 10 });
-    expect(puts.length).toBe(before + 1);
+    expect(dom.puts.length).toBe(before + 1);
     map.destroy();
   });
 
   it("applies initialRanges then initialBlocks", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, {
       totalBlocks: 10,
       initialRanges: new Uint32Array([0, 2]),
@@ -199,11 +155,11 @@ describe("createBlockMap", () => {
       getPropertyValue: (name: string) =>
         ({ "--blockmap-missing": "#000000", "--blockmap-complete": "#ffffff" })[name] ?? "",
     } as unknown as CSSStyleDeclaration);
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 100, partial: "coverage" });
-    triggerResize(5);
+    dom.triggerResize(5);
     map.setRanges([[0, 5]]);
-    const image = puts.at(-1) as ImageData;
+    const image = dom.puts.at(-1) as ImageData;
     const [r, g, b] = Array.from(image.data.subarray(0, 4));
     expect(r).toBeGreaterThan(200);
     expect(g).toBeGreaterThan(100);
@@ -214,45 +170,33 @@ describe("createBlockMap", () => {
   });
 
   it("discrete mode paints each block as its own segment across more bins than blocks", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 128 });
-    triggerResize(100);
+    dom.triggerResize(100);
     map.setRanges([
       [0, 32],
       [96, 128],
     ]);
     expect(map.getProgress().completed).toBe(64);
 
-    const image = puts.at(-1) as ImageData;
+    const image = dom.puts.at(-1) as ImageData;
     expect(image.width).toBe(200);
-    const complete = rgb(DEFAULT_THEME.complete);
-    const missing = rgb(DEFAULT_THEME.missing);
-    expect(Array.from(image.data.subarray(0, 4))).toEqual([
-      complete.r,
-      complete.g,
-      complete.b,
-      255,
-    ]);
+    expect(Array.from(image.data.subarray(0, 4))).toEqual(COMPLETE_RGBA);
     const columnOffset = 100 * 4;
-    expect(Array.from(image.data.subarray(columnOffset, columnOffset + 4))).toEqual([
-      missing.r,
-      missing.g,
-      missing.b,
-      255,
-    ]);
+    expect(Array.from(image.data.subarray(columnOffset, columnOffset + 4))).toEqual(MISSING_RGBA);
     map.destroy();
   });
 
   it("setView repaints and reports changes only when the view changes", () => {
-    const container = mount();
+    const container = dom.mount();
     const onViewChange = vi.fn();
     const map = createBlockMap(container, { totalBlocks: 1000, onViewChange });
-    triggerResize(50);
-    const before = puts.length;
+    dom.triggerResize(50);
+    const before = dom.puts.length;
     map.setView({ start: 100, end: 200 });
     expect(map.getView()).toEqual({ start: 100, end: 200 });
     expect(onViewChange).toHaveBeenCalledWith({ start: 100, end: 200 });
-    expect(puts.length).toBe(before + 1);
+    expect(dom.puts.length).toBe(before + 1);
     map.setView({ start: 100, end: 200 });
     expect(onViewChange).toHaveBeenCalledTimes(1);
     map.resetView();
@@ -262,7 +206,7 @@ describe("createBlockMap", () => {
   });
 
   it("applies an initial view without reporting it", () => {
-    const container = mount();
+    const container = dom.mount();
     const onViewChange = vi.fn();
     const map = createBlockMap(container, {
       totalBlocks: 1000,
@@ -275,25 +219,19 @@ describe("createBlockMap", () => {
   });
 
   it("ctrl+wheel zooms by default and does nothing when interactive is false", () => {
-    const zoomable = mount();
+    const zoomable = dom.mount();
     const map = createBlockMap(zoomable, { totalBlocks: 1000 });
-    triggerResize(50);
+    dom.triggerResize(50);
     const canvas = zoomable.querySelector("canvas") as HTMLCanvasElement;
-    const wheel = new WheelEvent("wheel", { deltaY: -100, bubbles: true, cancelable: true });
-    Object.defineProperty(wheel, "ctrlKey", { value: true });
-    Object.defineProperty(wheel, "offsetX", { value: 25 });
-    canvas.dispatchEvent(wheel);
+    ctrlWheel(canvas, -100, 25);
     expect(map.getView()).toEqual({ start: 100, end: 900 });
     map.destroy();
 
-    const fixed = mount();
+    const fixed = dom.mount();
     const still = createBlockMap(fixed, { totalBlocks: 1000, interactive: false });
-    triggerResize(50);
+    dom.triggerResize(50);
     const canvas2 = fixed.querySelector("canvas") as HTMLCanvasElement;
-    const wheel2 = new WheelEvent("wheel", { deltaY: -100, bubbles: true, cancelable: true });
-    Object.defineProperty(wheel2, "ctrlKey", { value: true });
-    Object.defineProperty(wheel2, "offsetX", { value: 25 });
-    canvas2.dispatchEvent(wheel2);
+    ctrlWheel(canvas2, -100, 25);
     expect(still.getView()).toEqual({ start: 0, end: 1000 });
     still.destroy();
   });
@@ -301,14 +239,14 @@ describe("createBlockMap", () => {
   it("setHighlight paints incomplete bins with the highlight colour and starts a blink timer", () => {
     const setInterval = vi.spyOn(window, "setInterval");
     const clearInterval = vi.spyOn(window, "clearInterval");
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 10 });
-    triggerResize(5);
+    dom.triggerResize(5);
     map.addBlocks([0]);
     map.setHighlight(true);
-    const image = puts.at(-1) as ImageData;
-    expect(Array.from(image.data.subarray(0, 4))).toEqual([46, 204, 113, 255]);
-    expect(Array.from(image.data.subarray(4, 8))).toEqual([255, 77, 79, 255]);
+    const image = dom.puts.at(-1) as ImageData;
+    expect(Array.from(image.data.subarray(0, 4))).toEqual(COMPLETE_RGBA);
+    expect(Array.from(image.data.subarray(4, 8))).toEqual(HIGHLIGHT_RGBA);
     expect(setInterval).toHaveBeenCalledTimes(1);
     map.setHighlight(false);
     expect(clearInterval).toHaveBeenCalledTimes(1);
@@ -316,26 +254,23 @@ describe("createBlockMap", () => {
   });
 
   it("highlight is steady under reduced motion", () => {
-    vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: query.includes("reduced-motion"),
-      addEventListener: () => {},
-      removeEventListener: () => {},
-    }));
+    dom.restore();
+    dom = installDom({ media: (q) => q.includes("reduced-motion") });
     const setInterval = vi.spyOn(window, "setInterval");
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 10 });
-    triggerResize(5);
+    dom.triggerResize(5);
     map.setHighlight(true);
     expect(setInterval).not.toHaveBeenCalled();
-    expect(Array.from((puts.at(-1) as ImageData).data.subarray(0, 4))).toEqual([255, 77, 79, 255]);
+    expect(Array.from((dom.puts.at(-1) as ImageData).data.subarray(0, 4))).toEqual(HIGHLIGHT_RGBA);
     map.destroy();
   });
 
   it("discrete tooltip reports the exact block the renderer painted at every column", () => {
-    const container = mount();
+    const container = dom.mount();
     const totalBlocks = 7;
     const map = createBlockMap(container, { totalBlocks });
-    triggerResize(50);
+    dom.triggerResize(50);
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     const tooltip = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
     const binCount = 100;
@@ -350,9 +285,7 @@ describe("createBlockMap", () => {
     const checkColumns = [14, 15, 28, 29, 42, 43];
     const checked = new Set<number>();
     for (let column = 0; column < binCount; column += 1) {
-      const move = new MouseEvent("pointermove", { bubbles: true });
-      Object.defineProperty(move, "offsetX", { value: column / 2 });
-      canvas.dispatchEvent(move);
+      pointer(canvas, "pointermove", column / 2);
       const expectedBlock = expectedBlockFor(column);
       expect(tooltip.textContent).toBe(`Block ${expectedBlock} · missing`);
       if (checkColumns.includes(column)) checked.add(column);
@@ -362,24 +295,14 @@ describe("createBlockMap", () => {
   });
 
   it("coalesces rapid setView calls into one commit per animation frame", () => {
-    const frames: FrameRequestCallback[] = [];
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-      frames.push(cb);
-      return frames.length;
-    });
-    const flush = () => {
-      while (frames.length > 0) {
-        const pending = frames.slice();
-        frames.length = 0;
-        pending.forEach((cb) => cb(0));
-      }
-    };
-    const container = mount();
+    dom.restore();
+    dom = installDom({ deferFrames: true });
+    const container = dom.mount();
     const onViewChange = vi.fn();
     const map = createBlockMap(container, { totalBlocks: 1000, onViewChange });
-    triggerResize(50);
-    flush();
-    const before = puts.length;
+    dom.triggerResize(50);
+    dom.flushFrames();
+    const before = dom.puts.length;
 
     map.setView({ start: 10, end: 20 });
     map.setView({ start: 20, end: 30 });
@@ -387,42 +310,41 @@ describe("createBlockMap", () => {
 
     expect(map.getView()).toEqual({ start: 30, end: 40 });
     expect(onViewChange).not.toHaveBeenCalled();
-    expect(puts.length).toBe(before);
+    expect(dom.puts.length).toBe(before);
 
-    flush();
+    dom.flushFrames();
+    dom.flushFrames();
 
     expect(map.getView()).toEqual({ start: 30, end: 40 });
     expect(onViewChange).toHaveBeenCalledTimes(1);
     expect(onViewChange).toHaveBeenCalledWith({ start: 30, end: 40 });
-    expect(puts.length).toBe(before + 1);
+    expect(dom.puts.length).toBe(before + 1);
     map.destroy();
   });
 
   it("tooltip shows absolute block ranges under a view", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 1000, view: { start: 500, end: 600 } });
-    triggerResize(5);
+    dom.triggerResize(5);
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     const tooltip = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
-    const move = new MouseEvent("pointermove", { bubbles: true });
-    Object.defineProperty(move, "offsetX", { value: 0 });
-    canvas.dispatchEvent(move);
+    pointer(canvas, "pointermove", 0);
     expect(tooltip.textContent).toBe("Blocks 500–509 · 0 / 10 (0%)");
     map.destroy();
   });
 
   it("renders no axis by default", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 1000 });
-    triggerResize(400);
+    dom.triggerResize(400);
     expect(container.querySelector("[data-blockmap-axis]")).toBeNull();
     map.destroy();
   });
 
   it("renders axis ticks after layout and updates after a view change", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 1000, axis: { tickCount: 5 } });
-    triggerResize(400);
+    dom.triggerResize(400);
     const blocks = () =>
       Array.from(container.querySelectorAll("[data-blockmap-tick]")).map(
         (s) => (s as HTMLElement).dataset.block,
@@ -435,10 +357,10 @@ describe("createBlockMap", () => {
   });
 
   it("getScale reflects layout and view", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 1000 });
     expect(map.getScale().range).toEqual([0, 0]);
-    triggerResize(400);
+    dom.triggerResize(400);
     expect(map.getScale().domain).toEqual([0, 1000]);
     expect(map.getScale().range).toEqual([0, 400]);
     expect(map.getScale().x(500)).toBe(200);
@@ -449,29 +371,19 @@ describe("createBlockMap", () => {
   });
 
   it("getScale lags getView by one frame during a coalesced view change", () => {
-    const frames: FrameRequestCallback[] = [];
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-      frames.push(cb);
-      return frames.length;
-    });
-    const flush = () => {
-      while (frames.length > 0) {
-        const pending = frames.slice();
-        frames.length = 0;
-        pending.forEach((cb) => cb(0));
-      }
-    };
-    const container = mount();
+    dom.restore();
+    dom = installDom({ deferFrames: true });
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 1000 });
-    triggerResize(400);
-    flush();
+    dom.triggerResize(400);
+    dom.flushFrames();
 
     map.setView({ start: 100, end: 200 });
 
     expect(map.getView()).toEqual({ start: 100, end: 200 });
     expect(map.getScale().domain).toEqual([0, 1000]);
 
-    flush();
+    dom.flushFrames();
 
     expect(map.getView()).toEqual({ start: 100, end: 200 });
     expect(map.getScale().domain).toEqual([100, 200]);
@@ -479,48 +391,38 @@ describe("createBlockMap", () => {
   });
 
   it("addRanges repaints only touched columns and removeRanges reverts them", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 100 });
-    triggerResize(5);
-    const before = puts.length;
+    dom.triggerResize(5);
+    const before = dom.puts.length;
     map.addRanges([[20, 30]]);
-    expect(puts.length).toBe(before + 1);
-    let image = puts.at(-1) as ImageData;
-    expect(Array.from(image.data.subarray(2 * 4, 2 * 4 + 4))).toEqual([46, 204, 113, 255]);
-    expect(Array.from(image.data.subarray(3 * 4, 3 * 4 + 4))).toEqual([43, 43, 43, 255]);
+    expect(dom.puts.length).toBe(before + 1);
+    let image = dom.puts.at(-1) as ImageData;
+    expect(Array.from(image.data.subarray(2 * 4, 2 * 4 + 4))).toEqual(COMPLETE_RGBA);
+    expect(Array.from(image.data.subarray(3 * 4, 3 * 4 + 4))).toEqual(MISSING_RGBA);
     expect(map.getProgress().completed).toBe(10);
     map.removeRanges([[25, 35]]);
-    image = puts.at(-1) as ImageData;
+    image = dom.puts.at(-1) as ImageData;
     expect(map.getProgress().completed).toBe(5);
-    expect(Array.from(image.data.subarray(2 * 4, 2 * 4 + 4))).not.toEqual([46, 204, 113, 255]);
+    expect(Array.from(image.data.subarray(2 * 4, 2 * 4 + 4))).not.toEqual(COMPLETE_RGBA);
     map.destroy();
     expect(() => map.addRanges([[0, 1]])).not.toThrow();
   });
 
   it("addRanges before a pending view flush does not throw and resolves after flush", () => {
-    const frames: FrameRequestCallback[] = [];
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-      frames.push(cb);
-      return frames.length;
-    });
-    const flush = () => {
-      while (frames.length > 0) {
-        const pending = frames.slice();
-        frames.length = 0;
-        pending.forEach((cb) => cb(0));
-      }
-    };
-    const container = mount();
+    dom.restore();
+    dom = installDom({ deferFrames: true });
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 1000 });
-    triggerResize(50);
-    flush();
-    const widthBefore = puts.at(-1)?.width;
+    dom.triggerResize(50);
+    dom.flushFrames();
+    const widthBefore = dom.puts.at(-1)?.width;
 
     map.setView({ start: 500, end: 600 });
     expect(() => map.addRanges([[0, 10]])).not.toThrow();
-    expect(puts.at(-1)?.width).toBe(widthBefore);
+    expect(dom.puts.at(-1)?.width).toBe(widthBefore);
 
-    flush();
+    dom.flushFrames();
 
     expect(map.getProgress().completed).toBe(10);
     expect(map.getView()).toEqual({ start: 500, end: 600 });
@@ -528,29 +430,17 @@ describe("createBlockMap", () => {
   });
 
   it("discrete mode removeRanges paints the missing colour for only the affected block", () => {
-    const container = mount();
+    const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 20 });
-    triggerResize(50);
+    dom.triggerResize(50);
     map.addRanges([[0, 20]]);
     map.removeRanges([[5, 6]]);
-    const image = puts.at(-1) as ImageData;
-    const missing = rgb(DEFAULT_THEME.missing);
-    const complete = rgb(DEFAULT_THEME.complete);
+    const image = dom.puts.at(-1) as ImageData;
     for (let column = 25; column <= 29; column += 1) {
-      expect(Array.from(image.data.subarray(column * 4, column * 4 + 4))).toEqual([
-        missing.r,
-        missing.g,
-        missing.b,
-        255,
-      ]);
+      expect(Array.from(image.data.subarray(column * 4, column * 4 + 4))).toEqual(MISSING_RGBA);
     }
     for (let column = 20; column <= 24; column += 1) {
-      expect(Array.from(image.data.subarray(column * 4, column * 4 + 4))).toEqual([
-        complete.r,
-        complete.g,
-        complete.b,
-        255,
-      ]);
+      expect(Array.from(image.data.subarray(column * 4, column * 4 + 4))).toEqual(COMPLETE_RGBA);
     }
     map.destroy();
   });

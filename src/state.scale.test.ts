@@ -19,7 +19,7 @@ describe("createBlockState at 100M blocks", () => {
     expect(state.countOf(0)).toBe(state.sizeOf(0));
     expect(state.countOf(3999)).toBeGreaterThan(0);
     expect(state.fraction(2001)).toBe(0);
-    expect(elapsedMs).toBeLessThan(1500);
+    expect(elapsedMs, `resize took ${elapsedMs}ms`).toBeLessThan(1500);
 
     const dirty = state.add([50_000_002]);
     expect(dirty.length).toBe(1);
