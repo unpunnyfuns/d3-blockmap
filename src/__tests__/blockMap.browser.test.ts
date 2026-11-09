@@ -713,6 +713,21 @@ describe("createBlockMap", () => {
       map.destroy();
     });
 
+    it("does not fire for a click past either canvas edge", () => {
+      const container = dom.mount(800);
+      const onBlockClick = vi.fn();
+      const map = createBlockMap(container, { totalBlocks: 10, onBlockClick });
+      dom.triggerResize(800, container);
+      const rect = (container.querySelector("canvas") as HTMLCanvasElement).getBoundingClientRect();
+      const y = rect.top + rect.height / 2;
+
+      fire(container, "click", { clientX: rect.right + 5, clientY: y });
+      fire(container, "click", { clientX: rect.left - 5, clientY: y });
+
+      expect(onBlockClick).not.toHaveBeenCalled();
+      map.destroy();
+    });
+
     it("does not throw when onBlockClick is absent", () => {
       const container = dom.mount();
       const map = createBlockMap(container, { totalBlocks: 100 });
@@ -746,6 +761,14 @@ describe("createBlockMap", () => {
       fire(partOf(container, ".overlay"), "mousedown", mouseAt(container, fromX));
       fire(window, "mousemove", mouseAt(container, toX));
       fire(window, "mouseup", mouseAt(container, toX));
+    };
+
+    // The same sequence without the move: what a plain click on the map sends
+    // once the brush overlay is in the way.
+    const brushClick = (container: HTMLElement, x: number): void => {
+      fire(container, "pointerdown", { ...at(container, x), pointerId: 1, button: 0 });
+      fire(partOf(container, ".overlay"), "mousedown", mouseAt(container, x));
+      fire(window, "mouseup", mouseAt(container, x));
     };
 
     // d3-drag suppresses the click after a moved gesture with its own capturing
@@ -843,19 +866,108 @@ describe("createBlockMap", () => {
       map.destroy();
     });
 
-    it("swallows only the click that ends a brush gesture", async () => {
+    it("swallows the click that ends a moved brush gesture", async () => {
       const onBlockClick = vi.fn();
       const { container, map } = mountBrushed({ onBlockClick });
 
       brushDrag(container, 160, 400);
       await afterD3ClickGuard();
       fire(container, "click", at(container, 400));
-      expect(onBlockClick).not.toHaveBeenCalled();
 
+      expect(onBlockClick).not.toHaveBeenCalled();
+      map.destroy();
+    });
+
+    it("reports a block for a click that selected nothing", () => {
+      const onBlockClick = vi.fn();
+      const onBrushEnd = vi.fn();
+      const { container, map } = mountBrushed({ onBlockClick, onBrushEnd });
+
+      brushClick(container, 400);
+      fire(container, "click", at(container, 400));
+
+      expect(onBrushEnd).not.toHaveBeenCalled();
+      expect(onBlockClick).toHaveBeenCalledTimes(1);
+      expect(onBlockClick.mock.calls[0][0].block).toBe(5);
+      map.destroy();
+    });
+
+    it("reports a double click on the overlay as neither selection nor change", () => {
+      const onBrushEnd = vi.fn();
+      const { container, map } = mountBrushed({ onBrushEnd });
+
+      brushClick(container, 400);
+      brushClick(container, 400);
+
+      expect(onBrushEnd).not.toHaveBeenCalled();
+      map.destroy();
+    });
+
+    it("clears an existing selection once and leaves no suppression behind", async () => {
+      const onBlockClick = vi.fn();
+      const onBrushEnd = vi.fn();
+      const { container, map } = mountBrushed({ onBlockClick, onBrushEnd });
+      map.setBrush([2, 5]);
+
+      brushClick(container, 600);
+
+      expect(onBrushEnd).toHaveBeenCalledTimes(1);
+      expect(onBrushEnd).toHaveBeenCalledWith(null);
+      expect(map.getBrush()).toBeNull();
+
+      // d3-drag guards the click after a gesture it treated as a move of the
+      // existing selection, so what matters here is that none of the map's
+      // own suppression outlives it: the next plain click still reports.
+      await afterD3ClickGuard();
       fire(container, "pointerdown", { ...at(container, 400), pointerId: 1, button: 0 });
       fire(container, "click", at(container, 400));
+
       expect(onBlockClick).toHaveBeenCalledTimes(1);
       map.destroy();
+    });
+
+    it("prevents the overlay mousedown default so focus stays on the canvas", () => {
+      const { container, map } = mountBrushed();
+      fire(container, "pointerdown", { ...at(container, 400), pointerId: 1, button: 0 });
+
+      const event = fire(partOf(container, ".overlay"), "mousedown", mouseAt(container, 400));
+
+      expect(event.defaultPrevented).toBe(true);
+      fire(window, "mouseup", mouseAt(container, 400));
+      map.destroy();
+    });
+
+    it("refreshes the brush extent when only the height changes", () => {
+      const container = dom.mount(800);
+      const map = createBlockMap(container, { totalBlocks: 10, brush: true });
+      dom.triggerResize(800, container, 24);
+      expect(partOf(container, ".overlay").getAttribute("height")).toBe("24");
+
+      dom.triggerResize(800, container, 48);
+
+      expect(partOf(container, ".overlay").getAttribute("height")).toBe("48");
+      map.destroy();
+    });
+
+    it("pans a touch drag, which the brush leaves alone", () => {
+      const container = dom.mount(100);
+      const map = createBlockMap(container, { totalBlocks: 1000, brush: true });
+      dom.triggerResize(100, container);
+      map.setView({ start: 200, end: 400 });
+
+      fire(container, "pointerdown", { ...at(container, 50), pointerId: 1, pointerType: "touch" });
+      fire(container, "pointermove", { ...at(container, 60), pointerId: 1, pointerType: "touch" });
+
+      expect(map.getView()).toEqual({ start: 180, end: 380 });
+      fire(container, "pointerup", { ...at(container, 60), pointerId: 1, pointerType: "touch" });
+      map.destroy();
+    });
+
+    it("reports no selection once destroyed", () => {
+      const { map } = mountBrushed();
+      map.setBrush([2, 5]);
+      map.destroy();
+      expect(map.getBrush()).toBeNull();
     });
 
     it("paints the selection with the themed brush colour", () => {

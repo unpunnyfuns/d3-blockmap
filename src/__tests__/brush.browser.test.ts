@@ -1,3 +1,4 @@
+import { select } from "d3-selection";
 import { createBrushOverlay } from "../brush";
 import type { BlockRange } from "../ranges";
 import type { BlockView } from "../view";
@@ -36,7 +37,7 @@ const mount = (totalBlocks = TOTAL): Harness => {
     getHeight: () => HEIGHT,
     getTotalBlocks: () => totalBlocks,
     onBrush: (selection: BlockRange | null) => onBrush(selection),
-    onBrushEnd: (selection: BlockRange | null) => onBrushEnd(selection),
+    onBrushEnd: (selection: BlockRange | null, moved: boolean) => onBrushEnd(selection, moved),
   });
 
   return {
@@ -230,7 +231,7 @@ describe("createBrushOverlay", () => {
     drag(harness.container, 160, 400);
     expect(harness.onBrush).toHaveBeenCalledWith([2, 5]);
     expect(harness.onBrushEnd).toHaveBeenCalledTimes(1);
-    expect(harness.onBrushEnd).toHaveBeenCalledWith([2, 5]);
+    expect(harness.onBrushEnd).toHaveBeenCalledWith([2, 5], true);
     expect(harness.onBrush.mock.invocationCallOrder[0]).toBeLessThan(
       harness.onBrushEnd.mock.invocationCallOrder[0],
     );
@@ -241,7 +242,7 @@ describe("createBrushOverlay", () => {
   it("snaps the drawn rectangle to block boundaries on release", () => {
     const harness = mount();
     drag(harness.container, 167, 391);
-    expect(harness.onBrushEnd).toHaveBeenCalledWith([2, 5]);
+    expect(harness.onBrushEnd).toHaveBeenCalledWith([2, 5], true);
     const rect = selectionRect(harness.container);
     expect(rect.getAttribute("x")).toBe("160");
     expect(rect.getAttribute("width")).toBe("240");
@@ -251,7 +252,7 @@ describe("createBrushOverlay", () => {
   it("reports no selection from a drag when the map has no blocks", () => {
     const harness = mount(0);
     drag(harness.container, 160, 400);
-    expect(harness.onBrushEnd).toHaveBeenCalledWith(null);
+    expect(harness.onBrushEnd).toHaveBeenCalledWith(null, true);
     expect(harness.overlay.getSelection()).toBeNull();
     harness.cleanup();
   });
@@ -260,8 +261,49 @@ describe("createBrushOverlay", () => {
     const harness = mount();
     harness.overlay.setSelection([2, 5]);
     drag(harness.container, 400, 400);
-    expect(harness.onBrushEnd).toHaveBeenCalledWith(null);
+    expect(harness.onBrushEnd).toHaveBeenCalledTimes(1);
+    expect(harness.onBrushEnd).toHaveBeenCalledWith(null, false);
     expect(harness.overlay.getSelection()).toBeNull();
+    harness.cleanup();
+  });
+
+  it("reports nothing for a click that neither moved nor changed anything", () => {
+    const harness = mount();
+    drag(harness.container, 400, 400);
+    expect(harness.onBrush).not.toHaveBeenCalled();
+    expect(harness.onBrushEnd).not.toHaveBeenCalled();
+    harness.cleanup();
+  });
+
+  it("reports nothing for either half of a double click", () => {
+    const harness = mount();
+    drag(harness.container, 400, 400);
+    drag(harness.container, 400, 400);
+    expect(harness.onBrushEnd).not.toHaveBeenCalled();
+    harness.cleanup();
+  });
+
+  it("prevents the mousedown default so focus stays on the canvas", () => {
+    const harness = mount();
+    const overlay = svgOf(harness.container).querySelector(".overlay") as SVGRectElement;
+    const event = new MouseEvent("mousedown", {
+      ...mouseInit(harness.container, 400),
+      cancelable: true,
+    });
+    overlay.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    release(harness.container, 400);
+    harness.cleanup();
+  });
+
+  it("declines touch so a touch drag reaches the map's own pan", () => {
+    const harness = mount();
+    const group = svgOf(harness.container).querySelector("g") as SVGGElement;
+    const names = ((group as unknown as WithD3Listeners).__on ?? []).map(
+      (entry) => `${entry.type}.${entry.name}`,
+    );
+    expect(names).toContain("mousedown.brush");
+    expect(names.some((name) => name.startsWith("touch"))).toBe(false);
     harness.cleanup();
   });
 
@@ -310,6 +352,18 @@ describe("createBrushOverlay", () => {
     expect(harness.onBrushEnd).not.toHaveBeenCalled();
     expect(harness.container.querySelector("svg[data-blockmap-brush]")).toBeNull();
     harness.container.remove();
+  });
+
+  it("leaves foreign window listeners alone when destroyed between gestures", () => {
+    const harness = mount();
+    const foreign = vi.fn();
+    select(window).on("mouseup.brush", foreign);
+
+    harness.cleanup();
+
+    expect(gestureListeners()).toContain("mouseup.brush");
+    select(window).on("mouseup.brush", null);
+    expect(gestureListeners()).toEqual([]);
   });
 
   it("removes the overlay and stops listening on destroy", () => {

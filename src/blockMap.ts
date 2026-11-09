@@ -172,12 +172,14 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
           getTotalBlocks: () => state.totalBlocks,
           onBrush: (selection) => options.onBrush?.(selection),
 
-          // A brush gesture is driven by mouse events, so the browser fires a
-          // click on release just as it does after a pan; the container's
-          // pointerdown already cleared the flag at the start of this
-          // gesture, so setting it here is what the click then consumes.
-          onBrushEnd: (selection) => {
-            suppressClick = true;
+          // A brush gesture that moved is driven by mouse events, so the
+          // browser fires a click on release just as it does after a pan; the
+          // container's pointerdown already cleared the flag at the start of
+          // this gesture, so setting it here is what the click then consumes.
+          // A press that only cleared the selection moved nothing, and the
+          // click it ends with is still a click on a block.
+          onBrushEnd: (selection, moved) => {
+            if (moved) suppressClick = true;
             options.onBrushEnd?.(selection);
           },
         })
@@ -255,16 +257,18 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     if (labelPending) labelFrame = handle;
   };
 
-  // The css width the chrome was last built for; distinct from binCount,
-  // which rounds to whole device pixels and so can stay put across a
-  // sub-pixel css width change that the chrome still needs to reflect.
+  // The css size the chrome was last built for; distinct from binCount, which
+  // rounds to whole device pixels and ignores height entirely, so it can stay
+  // put across a size change that the chrome still needs to reflect.
   let lastChromeWidth: number | undefined;
+  let lastChromeHeight: number | undefined;
 
   // The axis and the brush overlay are both laid out in css pixels against
   // the current view, so neither can be refreshed without the other.
   const updateChrome = (): void => {
     axis?.update(state.view, cssWidth);
     lastChromeWidth = cssWidth;
+    lastChromeHeight = cssHeight;
     overlay?.update();
   };
 
@@ -325,10 +329,11 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
 
     const binCount = Math.round(cssWidth * dpr);
     if (binCount === state.binCount) {
-      // The device-pixel bin count can stay put across a sub-pixel css
-      // width change (rounding absorbs it), but the axis ticks and the brush
-      // rectangle are placed in css pixels and still need refreshing.
-      if (cssWidth !== lastChromeWidth) updateChrome();
+      // The device-pixel bin count can stay put across a css size change -
+      // rounding absorbs a sub-pixel width, and height never feeds into it at
+      // all - but the axis ticks and the brush extent are placed in css
+      // pixels and still need refreshing.
+      if (cssWidth !== lastChromeWidth || cssHeight !== lastChromeHeight) updateChrome();
       return;
     }
 
@@ -380,14 +385,17 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
    * Hit test shared by the tooltip and the click listener, mirroring how the
    * renderer chose to paint: fewer blocks than columns means each block spans
    * several columns and the readout names a single block, otherwise a column
-   * is a bin and the readout is a coverage count. The column is clamped
-   * because the pointer can sit past either canvas edge while still inside
-   * the container. Returns undefined before the first layout, when there
-   * are no bins to hit.
+   * is a bin and the readout is a coverage count. An x outside the canvas hit
+   * nothing: the listeners are on the container, so container padding or a
+   * brush handle sticking out past an edge would otherwise report the nearest
+   * column as a phantom hit. Within the canvas the column is still clamped,
+   * since x scaled by dpr can round onto the column past the last one.
+   * Returns undefined before the first layout too, when there are no bins.
    */
   const locate = (x: number): Hit | undefined => {
     const { binCount, view } = state;
     if (binCount === 0) return undefined;
+    if (x < 0 || x >= cssWidth) return undefined;
 
     const column = Math.min(binCount - 1, Math.max(0, Math.floor(x * dpr)));
     const length = viewLength(view);
@@ -545,12 +553,13 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
 
     // Selections are only meaningful while there is an overlay to draw them:
     // without one setBrush has nothing to store and getBrush nothing to
-    // report.
+    // report. A destroyed map reports none either, rather than whatever the
+    // detached overlay was last holding.
     setBrush: (selection) => {
       if (destroyed) return;
       overlay?.setSelection(selection);
     },
-    getBrush: () => overlay?.getSelection() ?? null,
+    getBrush: () => (destroyed ? null : (overlay?.getSelection() ?? null)),
 
     setHighlight: (on) => {
       if (destroyed) return;

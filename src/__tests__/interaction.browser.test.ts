@@ -157,6 +157,17 @@ describe("attachInteraction", () => {
     expect(deps.onDragEnd).toHaveBeenCalledTimes(1);
   });
 
+  it("pans a touch drag without shift when panRequiresShift is true", () => {
+    const { deps, calls } = createDeps({ start: 100, end: 200 }, true);
+    attachInteraction(surface, canvas, deps);
+    press(surface, 50, { pointerType: "touch" });
+    pointer(surface, "pointermove", 60);
+    expect(deps.onDragStart).toHaveBeenCalledTimes(1);
+    expect(calls.at(-1)).toEqual({ start: 90, end: 190 });
+    pointer(surface, "pointerup", 60);
+    expect(deps.onDragEnd).toHaveBeenCalledTimes(1);
+  });
+
   it("ignores ctrl+wheel while a drag is active", () => {
     const { deps, calls } = createDeps({ start: 100, end: 200 });
     attachInteraction(surface, canvas, deps);

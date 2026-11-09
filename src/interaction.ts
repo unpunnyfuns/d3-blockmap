@@ -23,14 +23,15 @@ export type InteractionDeps = {
   getBinCount(): number;
   getDpr(): number;
   getTotalBlocks(): number;
-  // True while another gesture owns the plain drag - the brush - so panning
-  // only happens with Shift held.
+  // True while another gesture owns the plain drag - the brush - so a mouse
+  // or pen pan only happens with Shift held.
   panRequiresShift(): boolean;
   onDragStart(): void;
   onDragEnd(): void;
 };
 
 const PRIMARY_BUTTON = 0;
+const TOUCH_POINTER = "touch";
 const GRABBING = "grabbing";
 const NO_POINTER = -1;
 const HALF = 2;
@@ -99,7 +100,9 @@ export const attachInteraction = (
       canvas.focus({ preventScroll: true });
     }
 
-    if (deps.panRequiresShift() && !event.shiftKey) return;
+    // The brush only claims mouse and pen drags, so a touch drag is the only
+    // pan a touch user has and never needs the modifier they cannot hold.
+    if (deps.panRequiresShift() && event.pointerType !== TOUCH_POINTER && !event.shiftKey) return;
 
     drag = {
       downX: surfaceX(event),

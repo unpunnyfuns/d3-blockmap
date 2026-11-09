@@ -20,7 +20,10 @@ export type BrushOverlayDeps = {
   getHeight(): number;
   getTotalBlocks(): number;
   onBrush(selection: BlockRange | null): void;
-  onBrushEnd(selection: BlockRange | null): void;
+  // `moved` separates a real drag from a bare press on the overlay, which the
+  // caller needs in order to decide whether the click the browser fires on
+  // release is a gesture artefact or an intentional click.
+  onBrushEnd(selection: BlockRange | null, moved: boolean): void;
 };
 
 export type BrushOverlay = {
@@ -139,18 +142,39 @@ export const createBrushOverlay = (
 
   const g = select(svg).append("g");
 
-  // A held modifier means the gesture belongs to panning, and a non-primary
-  // button to the context menu, so the brush declines both.
-  const brush = brushX().filter(
-    (event: BrushGestureEvent) =>
-      !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.button,
-  );
+  // A mousedown on the overlay would otherwise move focus off the canvas -
+  // an svg is not focusable, so the browser walks up to the body - and the
+  // keyboard gestures would stop working after the first brush. Capturing, so
+  // the default is cancelled whatever d3-brush decides to do with the event.
+  const onMouseDown = (event: MouseEvent): void => {
+    event.preventDefault();
+  };
+  svg.addEventListener("mousedown", onMouseDown, true);
+
+  // Touch is declined so a touch drag falls through to the map's own pan: a
+  // brush and a pan are the same gesture, and a touch user has no modifier
+  // key to tell them apart. A held modifier means the gesture belongs to
+  // panning, and a non-primary button to the context menu, so the brush
+  // declines both of those too.
+  const brush = brushX()
+    .touchable(() => false)
+    .filter(
+      (event: BrushGestureEvent) =>
+        !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.button,
+    );
 
   let selection: BlockRange | null = null;
   let color: string = DEFAULT_THEME.brush;
   // d3-brush emits start/brush/end for programmatic moves too; they carry no
   // sourceEvent, and this flag covers a future version that supplies one.
   let silent = false;
+  // A gesture is in flight, which is the only state in which d3 holds the
+  // page-wide window listeners that destroy has to clean up by hand.
+  let active = false;
+  // The pointer has actually travelled during this gesture. d3-brush emits
+  // `end` for a bare press just as it does for a drag, so without this a
+  // click would be indistinguishable from a selection.
+  let moved = false;
 
   // The .selection rect does not exist until the behaviour has been applied,
   // and d3-brush gives it default colours as it creates it, so repainting
@@ -185,18 +209,36 @@ export const createBrushOverlay = (
     return toBlocks(span, deps.getView(), deps.getWidth(), deps.getTotalBlocks());
   };
 
+  brush.on("start", (event: D3BrushEvent<unknown>) => {
+    if (!event.sourceEvent || silent) return;
+    active = true;
+    moved = false;
+  });
+
   brush.on("brush", (event: D3BrushEvent<unknown>) => {
     if (!event.sourceEvent || silent) return;
+    moved = true;
     deps.onBrush(blocksFrom(event.selection));
   });
 
-  // Release is where the selection becomes block space: snap, store, then
-  // re-project so the rectangle sits on the block boundaries it reports.
+  /**
+   * Release is where the selection becomes block space: snap, store, then
+   * re-project so the rectangle sits on the block boundaries it reports. A
+   * press that never moved and left the selection as it found it is not a
+   * gesture at all - a stray click on the map, either half of a double click -
+   * so it reports nothing; a press that cleared an existing selection still
+   * does, because the selection genuinely changed.
+   */
   brush.on("end", (event: D3BrushEvent<unknown>) => {
     if (!event.sourceEvent || silent) return;
-    selection = normalize(blocksFrom(event.selection), deps.getTotalBlocks());
+    active = false;
+
+    const next = normalize(blocksFrom(event.selection), deps.getTotalBlocks());
+    if (!moved && !selection && !next) return;
+
+    selection = next;
     update();
-    deps.onBrushEnd(selection);
+    deps.onBrushEnd(selection, moved);
   });
 
   update();
@@ -221,10 +263,14 @@ export const createBrushOverlay = (
     // hand or they outlive the map. Every targeted browser has
     // onselectstart, so d3-drag suppresses selection with a listener rather
     // than an inline style and removing the listeners is the whole cleanup.
+    // Those listeners are removed by name, which would take another
+    // component's brush or drag down with them, so this only runs for a
+    // gesture that is actually in flight.
     destroy: () => {
-      brush.on("brush", null).on("end", null);
+      brush.on("start", null).on("brush", null).on("end", null);
       g.on(".brush", null);
-      select(window).on(GESTURE_LISTENERS, null);
+      svg.removeEventListener("mousedown", onMouseDown, true);
+      if (active) select(window).on(GESTURE_LISTENERS, null);
       svg.remove();
     },
   };
