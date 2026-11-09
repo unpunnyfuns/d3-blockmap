@@ -2,6 +2,8 @@
 
 Canvas progress bar for millions of blocks: one pixel column per bin, drawn from a packed bitset. Zoomable, themable with CSS variables, with an optional axis and a React component.
 
+![10 million blocks as a zoomable canvas bar with axis ticks](demo/example.png)
+
 ## Install
 
 ```bash
