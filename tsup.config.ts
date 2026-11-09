@@ -6,7 +6,7 @@ export const config = defineConfig({
   dts: true,
   clean: true,
   sourcemap: true,
-  external: ["react", "react/jsx-runtime"],
+  external: ["react", "react/jsx-runtime", /^d3-/],
 });
 
 export default config;

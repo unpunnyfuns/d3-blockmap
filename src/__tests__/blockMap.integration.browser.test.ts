@@ -28,59 +28,58 @@ const setup = (totalBlocks: number, width: number) => {
   const map = createBlockMap(container, { totalBlocks, onViewChange });
   dom.triggerResize(width);
   dom.flushFrames();
-  const canvas = container.querySelector("canvas") as HTMLCanvasElement;
-  return { container, map, canvas, onViewChange };
+  return { container, map, onViewChange };
 };
 
 describe("createBlockMap integration", () => {
   it("ignores wheel zoom during a drag and pans from the drag baseline", () => {
-    const { map, canvas } = setup(1000, 100);
+    const { map, container } = setup(1000, 100);
     map.setView({ start: 200, end: 400 });
     dom.flushFrames();
 
-    pointer(canvas, "pointerdown", 50);
-    pointer(canvas, "pointermove", 60);
+    pointer(container, "pointerdown", 50);
+    pointer(container, "pointermove", 60);
     dom.flushFrames();
     expect(map.getView()).toEqual({ start: 180, end: 380 });
 
-    ctrlWheel(canvas, -100, 60);
+    ctrlWheel(container, -100, 60);
     dom.flushFrames();
     expect(map.getView()).toEqual({ start: 180, end: 380 });
 
-    pointer(canvas, "pointermove", 70);
+    pointer(container, "pointermove", 70);
     dom.flushFrames();
     expect(map.getView()).toEqual({ start: 160, end: 360 });
 
-    pointer(canvas, "pointerup", 70);
+    pointer(container, "pointerup", 70);
     map.destroy();
   });
 
   it("keeps the view exact and clamped when a resize happens mid-drag", () => {
-    const { map, canvas } = setup(1000, 100);
+    const { map, container } = setup(1000, 100);
     map.setView({ start: 200, end: 400 });
     dom.flushFrames();
-    pointer(canvas, "pointerdown", 50);
-    pointer(canvas, "pointermove", 55);
+    pointer(container, "pointerdown", 50);
+    pointer(container, "pointermove", 55);
     dom.triggerResize(50);
-    pointer(canvas, "pointermove", 60);
+    pointer(container, "pointermove", 60);
     dom.flushFrames();
     expect(map.getView()).toEqual({ start: 160, end: 360 });
-    pointer(canvas, "pointerup", 60);
+    pointer(container, "pointerup", 60);
     map.destroy();
   });
 
   it("destroy during a drag is safe and later moves have no effect", () => {
-    const { map, canvas } = setup(1000, 100);
+    const { map, container } = setup(1000, 100);
     map.setView({ start: 200, end: 400 });
     dom.flushFrames();
-    pointer(canvas, "pointerdown", 50);
-    pointer(canvas, "pointermove", 60);
+    pointer(container, "pointerdown", 50);
+    pointer(container, "pointermove", 60);
     dom.flushFrames();
     const before = map.getView();
     expect(before).toEqual({ start: 180, end: 380 });
     expect(() => map.destroy()).not.toThrow();
-    expect(canvas.hasPointerCapture(1)).toBe(false);
-    pointer(canvas, "pointermove", 90);
+    expect(container.hasPointerCapture(1)).toBe(false);
+    pointer(container, "pointermove", 90);
     dom.flushFrames();
     expect(map.getView()).toEqual(before);
   });
@@ -107,8 +106,8 @@ describe("createBlockMap integration", () => {
   });
 
   it("zooming out at the full view does not report a view change", () => {
-    const { map, canvas, onViewChange } = setup(1000, 100);
-    ctrlWheel(canvas, 100, 50);
+    const { map, container, onViewChange } = setup(1000, 100);
+    ctrlWheel(container, 100, 50);
     dom.flushFrames();
     expect(onViewChange).not.toHaveBeenCalled();
     expect(map.getView()).toEqual({ start: 0, end: 1000 });
@@ -116,8 +115,8 @@ describe("createBlockMap integration", () => {
   });
 
   it("meta+wheel zooms like ctrl+wheel and respects the full-view clamp", () => {
-    const { map, canvas, onViewChange } = setup(1000, 100);
-    metaWheel(canvas, 100, 50);
+    const { map, container, onViewChange } = setup(1000, 100);
+    metaWheel(container, 100, 50);
     dom.flushFrames();
     expect(onViewChange).not.toHaveBeenCalled();
     expect(map.getView()).toEqual({ start: 0, end: 1000 });

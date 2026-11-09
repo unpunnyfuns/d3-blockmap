@@ -1,9 +1,15 @@
 /**
- * Translates pointer, wheel and keyboard input on the canvas into view
- * changes: ctrl/meta-wheel zooms, drag pans, double click resets, and the
- * keys below mirror those gestures for anyone who can't use a pointer. It
- * computes the new view with the pure helpers in view.ts and hands it to
- * deps.setView; it never touches state, pixels or the tooltip directly.
+ * Translates pointer, wheel and keyboard input into view changes:
+ * ctrl/meta-wheel zooms, drag pans, double click resets, and the keys below
+ * mirror those gestures for anyone who can't use a pointer. Pointer, wheel
+ * and dblclick listeners sit on the surface - the container - rather than
+ * the canvas, so an overlay stacked above the canvas (the brush) cannot
+ * swallow them; keydown stays on the canvas because that is the focusable
+ * element. Positions therefore come from clientX minus the canvas rect
+ * instead of offsetX, which would be relative to whichever child the event
+ * happened to hit. It computes the new view with the pure helpers in view.ts
+ * and hands it to deps.setView; it never touches state, pixels or the
+ * tooltip directly.
  */
 
 import { DRAG_THRESHOLD_PX, KEY_PAN_FRACTION, KEY_PAN_FRACTION_FAST, ZOOM_STEP } from "./constants";
@@ -17,6 +23,9 @@ export type InteractionDeps = {
   getBinCount(): number;
   getDpr(): number;
   getTotalBlocks(): number;
+  // True while another gesture owns the plain drag - the brush - so panning
+  // only happens with Shift held.
+  panRequiresShift(): boolean;
   onDragStart(): void;
   onDragEnd(): void;
 };
@@ -40,10 +49,17 @@ const RESET_KEYS = new Set(["0", "Home"]);
 type DragState = { downX: number; view: BlockView; pointerId: number; active: boolean };
 
 export const attachInteraction = (
+  surface: HTMLElement,
   canvas: HTMLCanvasElement,
   deps: InteractionDeps,
 ): (() => void) => {
   let drag: DragState | undefined;
+
+  // The canvas rect, not the surface rect, is the coordinate frame the
+  // renderer paints in, and it is read per event because scrolling or a
+  // layout change moves it without any resize the map hears about.
+  const surfaceX = (event: { clientX: number }): number =>
+    event.clientX - canvas.getBoundingClientRect().left;
 
   // CSS pixels to blocks: scale to device pixels (one per column), take that
   // as a fraction of the columns across, and spend it over the view length.
@@ -63,18 +79,30 @@ export const attachInteraction = (
     event.preventDefault();
 
     const view = deps.getView();
-    const anchor = view.start + columnsToBlocks(event.offsetX, view);
+    const anchor = view.start + columnsToBlocks(surfaceX(event), view);
     const factor = event.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
     deps.setView(zoomView(view, anchor, factor, deps.getTotalBlocks()));
   };
 
-  // Records the baseline but claims nothing yet: a press that never moves must
-  // still reach dblclick and leave the cursor alone.
+  /**
+   * Records the baseline but claims nothing yet: a press that never moves
+   * must still reach dblclick and leave the cursor alone. Focus moves to the
+   * canvas on every primary press, before the shift check, so the keyboard
+   * gestures stay reachable even when the press belongs to another gesture;
+   * preventScroll keeps a map below the fold from jumping into view. The
+   * guard covers test doubles and elements without the focus API.
+   */
   const onPointerDown = (event: PointerEvent): void => {
     if (event.button !== PRIMARY_BUTTON) return;
 
+    if (document.activeElement !== canvas && typeof canvas.focus === "function") {
+      canvas.focus({ preventScroll: true });
+    }
+
+    if (deps.panRequiresShift() && !event.shiftKey) return;
+
     drag = {
-      downX: event.offsetX,
+      downX: surfaceX(event),
       view: deps.getView(),
       pointerId: event.pointerId ?? NO_POINTER,
       active: false,
@@ -85,20 +113,23 @@ export const attachInteraction = (
    * Panning is always computed from the pointerdown baseline and the total
    * travel, never incrementally from the last frame, so rounding cannot make
    * a slow drag creep. Capture is taken on the first real movement so the
-   * gesture survives the pointer leaving the canvas, and the delta is negated
-   * because dragging right moves the content right, i.e. the view left.
+   * gesture survives the pointer leaving the surface, and the delta is
+   * negated because dragging right moves the content right, i.e. the view
+   * left. Capture and the cursor go on the surface because that is the
+   * element the listeners are on; capturing the canvas would retarget the
+   * remaining events to an element that never hears them.
    */
   const onPointerMove = (event: PointerEvent): void => {
     if (!drag) return;
 
-    const dx = event.offsetX - drag.downX;
+    const dx = surfaceX(event) - drag.downX;
     if (!drag.active) {
       if (Math.abs(dx) < DRAG_THRESHOLD_PX) return;
       drag.active = true;
-      if (typeof canvas.setPointerCapture === "function" && drag.pointerId !== NO_POINTER) {
-        canvas.setPointerCapture(drag.pointerId);
+      if (typeof surface.setPointerCapture === "function" && drag.pointerId !== NO_POINTER) {
+        surface.setPointerCapture(drag.pointerId);
       }
-      canvas.style.cursor = GRABBING;
+      surface.style.cursor = GRABBING;
       deps.onDragStart();
     }
 
@@ -114,11 +145,11 @@ export const attachInteraction = (
 
     if (drag.active) {
       const hasCapture =
-        drag.pointerId !== NO_POINTER && (canvas.hasPointerCapture?.(drag.pointerId) ?? true);
-      if (typeof canvas.releasePointerCapture === "function" && hasCapture) {
-        canvas.releasePointerCapture(drag.pointerId);
+        drag.pointerId !== NO_POINTER && (surface.hasPointerCapture?.(drag.pointerId) ?? true);
+      if (typeof surface.releasePointerCapture === "function" && hasCapture) {
+        surface.releasePointerCapture(drag.pointerId);
       }
-      canvas.style.cursor = "";
+      surface.style.cursor = "";
       deps.onDragEnd();
     }
 
@@ -164,24 +195,24 @@ export const attachInteraction = (
     event.preventDefault();
   };
 
-  canvas.addEventListener("wheel", onWheel, { passive: false });
-  canvas.addEventListener("pointerdown", onPointerDown);
-  canvas.addEventListener("pointermove", onPointerMove);
-  canvas.addEventListener("pointerup", endDrag);
-  canvas.addEventListener("pointercancel", endDrag);
-  canvas.addEventListener("dblclick", onDblClick);
+  surface.addEventListener("wheel", onWheel, { passive: false });
+  surface.addEventListener("pointerdown", onPointerDown);
+  surface.addEventListener("pointermove", onPointerMove);
+  surface.addEventListener("pointerup", endDrag);
+  surface.addEventListener("pointercancel", endDrag);
+  surface.addEventListener("dblclick", onDblClick);
   canvas.addEventListener("keydown", onKeyDown);
 
   // Teardown ends any drag in flight first, so capture and the grabbing
   // cursor are released even if the map is destroyed mid-gesture.
   return () => {
     endDrag();
-    canvas.removeEventListener("wheel", onWheel);
-    canvas.removeEventListener("pointerdown", onPointerDown);
-    canvas.removeEventListener("pointermove", onPointerMove);
-    canvas.removeEventListener("pointerup", endDrag);
-    canvas.removeEventListener("pointercancel", endDrag);
-    canvas.removeEventListener("dblclick", onDblClick);
+    surface.removeEventListener("wheel", onWheel);
+    surface.removeEventListener("pointerdown", onPointerDown);
+    surface.removeEventListener("pointermove", onPointerMove);
+    surface.removeEventListener("pointerup", endDrag);
+    surface.removeEventListener("pointercancel", endDrag);
+    surface.removeEventListener("dblclick", onDblClick);
     canvas.removeEventListener("keydown", onKeyDown);
   };
 };

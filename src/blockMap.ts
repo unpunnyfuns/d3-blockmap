@@ -305,12 +305,19 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   });
   resizeObserver.observe(container);
 
+  // Pointer events are listened for on the container, so offsetX would be
+  // relative to whichever child was hit; the canvas rect is the frame the
+  // renderer and the tooltip both work in.
+  const surfaceX = (event: { clientX: number }): number =>
+    event.clientX - canvas.getBoundingClientRect().left;
+
   /**
    * Hit test for the tooltip, mirroring how the renderer chose to paint:
    * fewer blocks than columns means each block spans several columns and the
    * readout names a single block, otherwise a column is a bin and the readout
-   * is a coverage count. The column is clamped because offsetX can reach the
-   * far edge, and suppressed while dragging, where the pointer means pan.
+   * is a coverage count. The column is clamped because the pointer can sit
+   * past either canvas edge while still inside the container, and suppressed
+   * while dragging, where the pointer means pan.
    */
   const onPointerMove = (event: PointerEvent): void => {
     if (dragging) return;
@@ -318,7 +325,8 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     const { binCount, view } = state;
     if (binCount === 0) return;
 
-    const column = Math.min(binCount - 1, Math.max(0, Math.floor(event.offsetX * dpr)));
+    const x = surfaceX(event);
+    const column = Math.min(binCount - 1, Math.max(0, Math.floor(x * dpr)));
     const length = viewLength(view);
     let text: string;
     if (length < binCount) {
@@ -327,26 +335,27 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     } else {
       text = formatBinTooltip(state.rangeOf(column), state.countOf(column));
     }
-    tooltip.show(event.offsetX, text);
+    tooltip.show(x, text);
   };
 
   const onPointerLeave = (): void => tooltip.hide();
 
-  canvas.addEventListener("pointermove", onPointerMove);
-  canvas.addEventListener("pointerleave", onPointerLeave);
+  container.addEventListener("pointermove", onPointerMove);
+  container.addEventListener("pointerleave", onPointerLeave);
 
   // Interaction reads the live view and total through getters rather than
   // captured values, since both change under it as zoom and resize happen.
   const detachInteraction =
     options.interactive === false
       ? undefined
-      : attachInteraction(canvas, {
+      : attachInteraction(container, canvas, {
           getView,
           setView,
           resetView,
           getBinCount: () => state.binCount,
           getDpr: () => dpr,
           getTotalBlocks: () => state.totalBlocks,
+          panRequiresShift: () => false,
           onDragStart: () => {
             dragging = true;
             tooltip.hide();
@@ -439,8 +448,8 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       unwatchTheme();
       dprMedia?.removeEventListener("change", onDprChange);
       motionMedia.removeEventListener("change", onMotionChange);
-      canvas.removeEventListener("pointermove", onPointerMove);
-      canvas.removeEventListener("pointerleave", onPointerLeave);
+      container.removeEventListener("pointermove", onPointerMove);
+      container.removeEventListener("pointerleave", onPointerLeave);
       detachInteraction?.();
 
       renderer.destroy();

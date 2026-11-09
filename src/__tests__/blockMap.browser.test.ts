@@ -95,12 +95,11 @@ describe("createBlockMap", () => {
     const map = createBlockMap(container, { totalBlocks: 100 });
     dom.triggerResize(5);
     map.addBlocks([0, 1, 2, 3, 4]);
-    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     const tooltip = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
-    pointer(canvas, "pointermove", 0);
+    pointer(container, "pointermove", 0);
     expect(tooltip.style.display).toBe("block");
     expect(tooltip.textContent).toBe("Blocks 0–9 · 5 / 10 (50.0%)");
-    fire(canvas, "pointerleave", at(canvas, 0));
+    fire(container, "pointerleave", at(container, 0));
     expect(tooltip.style.display).toBe("none");
     map.destroy();
   });
@@ -222,16 +221,14 @@ describe("createBlockMap", () => {
     const zoomable = dom.mount(50);
     const map = createBlockMap(zoomable, { totalBlocks: 1000 });
     dom.triggerResize(50);
-    const canvas = zoomable.querySelector("canvas") as HTMLCanvasElement;
-    ctrlWheel(canvas, -100, 25);
+    ctrlWheel(zoomable, -100, 25);
     expect(map.getView()).toEqual({ start: 100, end: 900 });
     map.destroy();
 
     const fixed = dom.mount(50);
     const still = createBlockMap(fixed, { totalBlocks: 1000, interactive: false });
     dom.triggerResize(50);
-    const canvas2 = fixed.querySelector("canvas") as HTMLCanvasElement;
-    ctrlWheel(canvas2, -100, 25);
+    ctrlWheel(fixed, -100, 25);
     expect(still.getView()).toEqual({ start: 0, end: 1000 });
     still.destroy();
   });
@@ -347,7 +344,6 @@ describe("createBlockMap", () => {
     const container = dom.mount(50);
     const map = createBlockMap(container, { totalBlocks: 7 });
     dom.triggerResize(50);
-    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     const tooltip = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
     // 7 blocks over 100 bins, boundaries at columns [0, 14, 28, 42, 57, 71, 85, 100];
     // offsetX = column / 2 (DPR 2). Pairs straddle the boundaries at columns 14, 42, 85.
@@ -360,7 +356,7 @@ describe("createBlockMap", () => {
       [42.5, 6],
     ];
     for (const [offsetX, expectedBlock] of cases) {
-      pointer(canvas, "pointermove", offsetX);
+      pointer(container, "pointermove", offsetX);
       expect(tooltip.textContent).toBe(`Block ${expectedBlock} · missing`);
     }
     map.destroy();
@@ -397,9 +393,8 @@ describe("createBlockMap", () => {
     const container = dom.mount(5);
     const map = createBlockMap(container, { totalBlocks: 1000, view: { start: 500, end: 600 } });
     dom.triggerResize(5);
-    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     const tooltip = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
-    pointer(canvas, "pointermove", 0);
+    pointer(container, "pointermove", 0);
     expect(tooltip.textContent).toBe("Blocks 500–509 · 0 / 10 (0%)");
     map.destroy();
   });
