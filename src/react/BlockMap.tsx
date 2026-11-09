@@ -5,7 +5,7 @@
  * effects instead.
  */
 
-import { useEffect, useImperativeHandle, useRef, useState } from "react";
+import { useLayoutEffect, useImperativeHandle, useRef, useState } from "react";
 import type { CSSProperties, Ref } from "react";
 import type { AxisOptions } from "../axis";
 import type { PartialStyle } from "../colors";
@@ -81,12 +81,17 @@ export const BlockMap = ({
   latest.current = { onViewChange, onBrush, onBrushEnd, onBlockClick, label };
 
   /**
+   * Layout effects throughout: the instance reaches the effects below through
+   * a state update, and a state update made in a layout effect re-renders
+   * before the browser paints, so a new map never shows a frame without its
+   * blocks.
+   *
    * Only the options that cannot be changed after construction are
    * dependencies here; everything else is pushed by the effects below, which
    * re-run against each new instance. Pass `axis` as a stable value - a fresh
    * object literal each render would recreate the map every time.
    */
-  useEffect(() => {
+  useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return undefined;
 
@@ -114,7 +119,7 @@ export const BlockMap = ({
 
   // `ranges` wins when both props are given: it replaces the bitset, so the
   // loose blocks have to be added on top of it afterwards.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!instance) return;
 
     if (ranges !== undefined) {
@@ -126,11 +131,11 @@ export const BlockMap = ({
   }, [instance, ranges, blocks]);
 
   // Leaving `view` undefined hands control to the map's own interaction.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (view !== undefined) instance?.setView(view);
   }, [instance, view]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     instance?.setHighlight(highlight ?? false);
   }, [instance, highlight]);
 
