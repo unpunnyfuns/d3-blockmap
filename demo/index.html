@@ -192,6 +192,7 @@ document.querySelector("#reset").onclick = () => {
   small.setBlocks([]);
   rangeMap.setRanges([]);
   rangeDeltas.length = 0;
+  rangeTick = 0;
   seedRuns();
   rangeMap.addRanges(rangeDeltas);
   rangeDeltas.length = 0;
