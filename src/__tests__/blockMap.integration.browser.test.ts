@@ -123,6 +123,37 @@ describe("createBlockMap integration", () => {
     map.destroy();
   });
 
+  it("keeps a brush selection in block space across a zoom and a resize", () => {
+    const container = dom.mount(800);
+    const map = createBlockMap(container, { totalBlocks: 10, brush: true });
+    dom.triggerResize(800, container);
+    dom.flushFrames();
+    map.setBrush([2, 4]);
+
+    const rect = container.querySelector("svg[data-blockmap-brush] .selection") as SVGRectElement;
+
+    // Asserted against the public scale rather than fixed pixels: the point
+    // is that the rectangle and the reported blocks never drift apart.
+    const expectDrawnAsScaled = (): void => {
+      const scale = map.getScale();
+      expect(map.getBrush()).toEqual([2, 4]);
+      expect(Number(rect.getAttribute("x"))).toBeCloseTo(scale.x(2));
+      expect(Number(rect.getAttribute("width"))).toBeCloseTo(scale.x(4) - scale.x(2));
+    };
+
+    expectDrawnAsScaled();
+
+    ctrlWheel(container, -100, 400);
+    dom.flushFrames();
+    expect(map.getView()).not.toEqual({ start: 0, end: 10 });
+    expectDrawnAsScaled();
+
+    dom.triggerResize(400, container);
+    dom.flushFrames();
+    expectDrawnAsScaled();
+    map.destroy();
+  });
+
   it("initial ranges with an initial view paint only in-view blocks and count all", () => {
     const container = dom.mount();
     const map = createBlockMap(container, {

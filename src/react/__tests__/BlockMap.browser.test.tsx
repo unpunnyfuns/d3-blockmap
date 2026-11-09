@@ -26,6 +26,8 @@ const createInstance = (): BlockMapInstance => ({
     x: () => 0,
     block: () => 0,
   })),
+  setBrush: vi.fn(),
+  getBrush: vi.fn(() => null),
   setHighlight: vi.fn(),
   getProgress: vi.fn(() => ({ completed: 0, total: 0 })),
   destroy: vi.fn(),

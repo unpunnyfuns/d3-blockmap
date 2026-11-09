@@ -1,13 +1,15 @@
 /**
- * The façade: creates the canvas, wires state, renderer, tooltip, axis and
- * interaction together, and owns everything with a lifetime - observers,
- * media queries, the pending-view frame. The pieces it composes stay
- * unaware of each other; all cross-cutting policy (when to repaint, what a
- * gesture means for the model) lives here.
+ * The façade: creates the canvas, wires state, renderer, tooltip, axis,
+ * brush overlay and interaction together, and owns everything with a
+ * lifetime - observers, media queries, the pending-view frame. The pieces it
+ * composes stay unaware of each other; all cross-cutting policy (when to
+ * repaint, what a gesture means for the model) lives here.
  */
 
 import { createAxis, createScale } from "./axis";
 import type { Axis, AxisOptions, BlockScale } from "./axis";
+import { createBrushOverlay } from "./brush";
+import type { BrushOverlay } from "./brush";
 import { createColorScale, highlightColor, readTheme, watchTheme } from "./colors";
 import type { PartialStyle, Theme } from "./colors";
 import {
@@ -36,8 +38,11 @@ export type BlockMapOptions = {
   view?: BlockView;
   interactive?: boolean;
   axis?: boolean | AxisOptions;
+  brush?: boolean;
   onViewChange?: (view: BlockView) => void;
   onBlockClick?: (event: BlockClickEvent) => void;
+  onBrush?: (selection: BlockRange | null) => void;
+  onBrushEnd?: (selection: BlockRange | null) => void;
   label?: (progress: Progress) => string;
 };
 
@@ -63,6 +68,8 @@ export type BlockMap = {
   resetView(): void;
   getView(): BlockView;
   getScale(): BlockScale;
+  setBrush(selection: BlockRange | null): void;
+  getBrush(): BlockRange | null;
   setHighlight(on: boolean): void;
   getProgress(): Progress;
   destroy(): void;
@@ -136,6 +143,46 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   }
 
   const renderer: Renderer = createRenderer(ctx, state);
+
+  // Declared before the children below because the overlay measures the
+  // container through these the moment it is created.
+  let destroyed = false;
+  let cssWidth = 0;
+  let cssHeight = 0;
+  let dpr = devicePixelRatio;
+  let dprMedia: MediaQueryList | undefined;
+  let theme: Theme = readTheme(container);
+  let highlightOn = false;
+  let dragging = false;
+  // Set when a pan or a brush gesture ends, so the click the browser fires
+  // right after pointerup is swallowed instead of reaching onBlockClick as a
+  // false hit.
+  let suppressClick = false;
+
+  // Appended straight after the canvas so it covers the bar, and before the
+  // tooltip and the axis so those keep painting over it. The committed view
+  // is what the canvas shows, so the overlay projects against that rather
+  // than a view change still waiting for its frame.
+  const overlay: BrushOverlay | undefined =
+    options.brush === true
+      ? createBrushOverlay(container, {
+          getView: () => state.getView(),
+          getWidth: () => cssWidth,
+          getHeight: () => cssHeight,
+          getTotalBlocks: () => state.totalBlocks,
+          onBrush: (selection) => options.onBrush?.(selection),
+
+          // A brush gesture is driven by mouse events, so the browser fires a
+          // click on release just as it does after a pan; the container's
+          // pointerdown already cleared the flag at the start of this
+          // gesture, so setting it here is what the click then consumes.
+          onBrushEnd: (selection) => {
+            suppressClick = true;
+            options.onBrushEnd?.(selection);
+          },
+        })
+      : undefined;
+
   const tooltip = createTooltip(container);
 
   // `axis: true` means defaults, an object means those options, and both
@@ -147,17 +194,6 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
         ? undefined
         : options.axis;
   const axis: Axis | undefined = axisOptions ? createAxis(container, axisOptions) : undefined;
-
-  let destroyed = false;
-  let cssWidth = 0;
-  let dpr = devicePixelRatio;
-  let dprMedia: MediaQueryList | undefined;
-  let theme: Theme = readTheme(container);
-  let highlightOn = false;
-  let dragging = false;
-  // Set when a pan ends, so the click the browser fires right after pointerup
-  // is swallowed instead of reaching onBlockClick as a false hit.
-  let suppressClick = false;
 
   // Created once and read live, rather than re-queried per call, so the
   // change listener below can be attached to this exact MediaQueryList.
@@ -182,6 +218,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     theme = readTheme(container);
     renderer.setColors(createColorScale(theme, options.partial));
     if (highlightOn) renderer.setHighlightColor(highlightColor(theme));
+    overlay?.setColor(theme.brush);
   };
 
   let labelPending = false;
@@ -218,14 +255,17 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     if (labelPending) labelFrame = handle;
   };
 
-  // The css width the axis was last built for; distinct from binCount, which
-  // rounds to whole device pixels and so can stay put across a sub-pixel
-  // css width change that the axis still needs to reflect.
-  let lastAxisWidth: number | undefined;
+  // The css width the chrome was last built for; distinct from binCount,
+  // which rounds to whole device pixels and so can stay put across a
+  // sub-pixel css width change that the chrome still needs to reflect.
+  let lastChromeWidth: number | undefined;
 
-  const updateAxis = (): void => {
+  // The axis and the brush overlay are both laid out in css pixels against
+  // the current view, so neither can be refreshed without the other.
+  const updateChrome = (): void => {
     axis?.update(state.view, cssWidth);
-    lastAxisWidth = cssWidth;
+    lastChromeWidth = cssWidth;
+    overlay?.update();
   };
 
   let pendingView: BlockView | undefined;
@@ -247,7 +287,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     if (!next || !state.setView(next)) return;
 
     renderer.markAllDirty();
-    updateAxis();
+    updateChrome();
     options.onViewChange?.(state.getView());
   };
 
@@ -275,7 +315,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
    * One bin per device pixel, so the map never shows more detail than the
    * screen can resolve. A zero css width means the container has not been
    * measured yet (or has collapsed), so there is nothing to lay out and the
-   * axis is left alone rather than refreshed against a width of zero. The
+   * chrome is left alone rather than refreshed against a width of zero. The
    * binCount early return matters for more than speed: assigning
    * canvas.width clears the backing store, so a no-op resize would blank the
    * canvas until the next frame.
@@ -286,16 +326,16 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     const binCount = Math.round(cssWidth * dpr);
     if (binCount === state.binCount) {
       // The device-pixel bin count can stay put across a sub-pixel css
-      // width change (rounding absorbs it), but the axis is laid out in css
-      // pixels and still needs its tick positions refreshed.
-      if (cssWidth !== lastAxisWidth) updateAxis();
+      // width change (rounding absorbs it), but the axis ticks and the brush
+      // rectangle are placed in css pixels and still need refreshing.
+      if (cssWidth !== lastChromeWidth) updateChrome();
       return;
     }
 
     canvas.width = binCount;
     state.resize(binCount);
     renderer.markAllDirty();
-    updateAxis();
+    updateChrome();
   };
 
   const onDprChange = (): void => {
@@ -317,6 +357,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     const entry = entries[0];
     if (!entry) return;
     cssWidth = entry.contentRect.width;
+    cssHeight = entry.contentRect.height;
     layout();
   });
   resizeObserver.observe(container);
@@ -433,7 +474,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
           getBinCount: () => state.binCount,
           getDpr: () => dpr,
           getTotalBlocks: () => state.totalBlocks,
-          panRequiresShift: () => false,
+          panRequiresShift: () => overlay !== undefined,
           onDragStart: () => {
             dragging = true;
             tooltip.hide();
@@ -502,6 +543,15 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     // screen rather than a change still waiting for its frame.
     getScale: () => createScale(state.getView(), cssWidth),
 
+    // Selections are only meaningful while there is an overlay to draw them:
+    // without one setBrush has nothing to store and getBrush nothing to
+    // report.
+    setBrush: (selection) => {
+      if (destroyed) return;
+      overlay?.setSelection(selection);
+    },
+    getBrush: () => overlay?.getSelection() ?? null,
+
     setHighlight: (on) => {
       if (destroyed) return;
       highlightOn = on;
@@ -536,6 +586,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       renderer.destroy();
       tooltip.destroy();
       axis?.destroy();
+      overlay?.destroy();
       canvas.remove();
     },
   };

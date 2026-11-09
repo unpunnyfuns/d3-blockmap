@@ -1,4 +1,6 @@
 import { createBlockMap } from "../blockMap";
+import type { BlockMapOptions } from "../blockMap";
+import { CSS_VAR_BRUSH } from "../constants";
 import type { ImageDataLike } from "../renderer";
 import {
   COMPLETE_RGBA,
@@ -718,6 +720,160 @@ describe("createBlockMap", () => {
 
       expect(() => fire(container, "click", at(container, 1.2))).not.toThrow();
       map.destroy();
+    });
+  });
+
+  describe("brush", () => {
+    const BRUSH_SELECTOR = "svg[data-blockmap-brush]";
+
+    const overlayOf = (container: HTMLElement): SVGSVGElement | null =>
+      container.querySelector(BRUSH_SELECTOR);
+
+    const partOf = (container: HTMLElement, part: string): SVGRectElement =>
+      container.querySelector(`${BRUSH_SELECTOR} ${part}`) as SVGRectElement;
+
+    // d3-brush reads mouse events, not pointer events, and takes move/up from
+    // `event.view`, so a gesture needs both families: the pointerdown the
+    // browser would send first (which clears the click suppression), then the
+    // mouse sequence d3 actually listens to.
+    const mouseAt = (container: HTMLElement, x: number): Record<string, unknown> => {
+      const rect = container.getBoundingClientRect();
+      return { clientX: rect.left + x, clientY: rect.top + rect.height / 2, view: window };
+    };
+
+    const brushDrag = (container: HTMLElement, fromX: number, toX: number): void => {
+      fire(container, "pointerdown", { ...at(container, fromX), pointerId: 1, button: 0 });
+      fire(partOf(container, ".overlay"), "mousedown", mouseAt(container, fromX));
+      fire(window, "mousemove", mouseAt(container, toX));
+      fire(window, "mouseup", mouseAt(container, toX));
+    };
+
+    // d3-drag suppresses the click after a moved gesture with its own capturing
+    // window listener, cleared on a macrotask; waiting for that is what leaves
+    // the map's own suppression as the only thing in the click's way.
+    const afterD3ClickGuard = (): Promise<void> =>
+      new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    const mountBrushed = (options: Partial<BlockMapOptions> = {}) => {
+      const container = dom.mount(800);
+      const map = createBlockMap(container, { totalBlocks: 10, brush: true, ...options });
+      dom.triggerResize(800, container);
+      return { container, map };
+    };
+
+    it("renders no overlay unless brush is on", () => {
+      const container = dom.mount();
+      const map = createBlockMap(container, { totalBlocks: 10 });
+      dom.triggerResize(50);
+      expect(overlayOf(container)).toBeNull();
+      expect(map.getBrush()).toBeNull();
+      expect(() => map.setBrush([1, 2])).not.toThrow();
+      expect(map.getBrush()).toBeNull();
+      map.destroy();
+    });
+
+    it("renders an overlay stretched over the measured container", () => {
+      const { container, map } = mountBrushed();
+      expect(overlayOf(container)).not.toBeNull();
+      expect(container.querySelector("canvas")?.nextElementSibling).toBe(overlayOf(container));
+      const rect = partOf(container, ".overlay");
+      expect(rect.getAttribute("width")).toBe("800");
+      expect(rect.getAttribute("height")).toBe("12");
+      map.destroy();
+    });
+
+    it("setBrush projects blocks to pixels and getBrush reports them", () => {
+      const { container, map } = mountBrushed();
+      map.setBrush([2, 5]);
+      expect(map.getBrush()).toEqual([2, 5]);
+      const rect = partOf(container, ".selection");
+      expect(rect.getAttribute("x")).toBe("160");
+      expect(rect.getAttribute("width")).toBe("240");
+      map.setBrush(null);
+      expect(map.getBrush()).toBeNull();
+      map.destroy();
+    });
+
+    it("re-projects the selection once a view change commits", () => {
+      dom.restore();
+      dom = installDom({ deferFrames: true });
+      const { container, map } = mountBrushed();
+      dom.flushFrames();
+      map.setBrush([2, 5]);
+      const rect = partOf(container, ".selection");
+      expect(rect.getAttribute("x")).toBe("160");
+
+      map.setView({ start: 0, end: 5 });
+      expect(rect.getAttribute("x")).toBe("160");
+
+      dom.flushFrames();
+
+      expect(rect.getAttribute("x")).toBe("320");
+      expect(rect.getAttribute("width")).toBe("480");
+      expect(map.getBrush()).toEqual([2, 5]);
+      map.destroy();
+    });
+
+    it("reports a dragged selection in blocks", () => {
+      const onBrush = vi.fn();
+      const onBrushEnd = vi.fn();
+      const { container, map } = mountBrushed({ onBrush, onBrushEnd });
+      brushDrag(container, 160, 400);
+      expect(onBrush).toHaveBeenCalledWith([2, 5]);
+      expect(onBrushEnd).toHaveBeenCalledWith([2, 5]);
+      expect(map.getBrush()).toEqual([2, 5]);
+      map.destroy();
+    });
+
+    it("leaves panning to shift+drag while the brush owns a plain drag", () => {
+      const container = dom.mount(100);
+      const map = createBlockMap(container, { totalBlocks: 1000, brush: true });
+      dom.triggerResize(100, container);
+      map.setView({ start: 200, end: 400 });
+
+      pointer(container, "pointerdown", 50);
+      pointer(container, "pointermove", 60);
+      expect(map.getView()).toEqual({ start: 200, end: 400 });
+      pointer(container, "pointerup", 60);
+
+      fire(container, "pointerdown", { ...at(container, 50), pointerId: 1, shiftKey: true });
+      fire(container, "pointermove", { ...at(container, 60), pointerId: 1, shiftKey: true });
+      expect(map.getView()).toEqual({ start: 180, end: 380 });
+      fire(container, "pointerup", { ...at(container, 60), pointerId: 1, shiftKey: true });
+      map.destroy();
+    });
+
+    it("swallows only the click that ends a brush gesture", async () => {
+      const onBlockClick = vi.fn();
+      const { container, map } = mountBrushed({ onBlockClick });
+
+      brushDrag(container, 160, 400);
+      await afterD3ClickGuard();
+      fire(container, "click", at(container, 400));
+      expect(onBlockClick).not.toHaveBeenCalled();
+
+      fire(container, "pointerdown", { ...at(container, 400), pointerId: 1, button: 0 });
+      fire(container, "click", at(container, 400));
+      expect(onBlockClick).toHaveBeenCalledTimes(1);
+      map.destroy();
+    });
+
+    it("paints the selection with the themed brush colour", () => {
+      const container = dom.mount(800);
+      container.style.setProperty(CSS_VAR_BRUSH, "#ff00ff");
+      const map = createBlockMap(container, { totalBlocks: 10, brush: true });
+      dom.triggerResize(800, container);
+      map.setBrush([2, 5]);
+      const rect = partOf(container, ".selection");
+      expect(rect.getAttribute("fill")).toBe("#ff00ff");
+      expect(rect.getAttribute("stroke")).toBe("#ff00ff");
+      map.destroy();
+    });
+
+    it("destroy removes the overlay", () => {
+      const { container, map } = mountBrushed();
+      map.destroy();
+      expect(overlayOf(container)).toBeNull();
     });
   });
 });

@@ -11,7 +11,7 @@ export type DomOptions = {
 export type MediaListener = { query: string; listener: () => void };
 export type InstalledDom = {
   mount(width?: number): HTMLElement;
-  triggerResize(width: number, container?: HTMLElement): void;
+  triggerResize(width: number, container?: HTMLElement, height?: number): void;
   flushFrames(): void;
   puts: ImageDataLike[];
   mediaListeners: MediaListener[];
@@ -29,7 +29,8 @@ const KNOWN_QUERIES = [
 const DEFAULT_DPR = 2;
 const MAX_FLUSH_ROUNDS = 10;
 const DEFAULT_MOUNT_WIDTH = 200;
-const MOUNT_HEIGHT_PX = "12px";
+const MOUNT_HEIGHT = 12;
+const MOUNT_HEIGHT_PX = `${MOUNT_HEIGHT}px`;
 
 const defaultMedia = (query: string): boolean => {
   if (!KNOWN_QUERIES.some((pattern) => pattern.test(query))) {
@@ -46,8 +47,8 @@ const unimplementedEntry = (name: string): never => {
   throw new Error(`unimplemented: ResizeObserverEntry.${name}`);
 };
 
-const createResizeEntry = (width: number): ResizeObserverEntry => {
-  const target = { contentRect: { width } };
+const createResizeEntry = (width: number, height: number): ResizeObserverEntry => {
+  const target = { contentRect: { width, height } };
   return new Proxy(target, {
     get: (obj, name) => {
       if (typeof name === "symbol") return undefined;
@@ -171,13 +172,13 @@ export const installDom = (options: DomOptions = {}): InstalledDom => {
       mounted.push(container);
       return container;
     },
-    triggerResize: (width, container) => {
+    triggerResize: (width, container, height = MOUNT_HEIGHT) => {
       if (instances.length === 0) throw new Error("triggerResize: no observers");
       const targets = container ? [container] : mounted;
       targets.forEach((el) => {
         el.style.width = `${width}px`;
       });
-      const entry = createResizeEntry(width);
+      const entry = createResizeEntry(width, height);
       const notified = container
         ? instances.filter((instance) => instance.targets.includes(container))
         : instances;
