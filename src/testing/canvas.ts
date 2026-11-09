@@ -1,8 +1,8 @@
 import { BYTES_PER_PIXEL } from "../constants";
 import type { Canvas2dLike, ImageDataLike } from "../renderer";
 
-const unimplemented = (name: string | symbol): never => {
-  throw new Error(`unimplemented: CanvasRenderingContext2D.${String(name)}`);
+const unimplemented = (name: string): never => {
+  throw new Error(`unimplemented: CanvasRenderingContext2D.${name}`);
 };
 
 export const createStubContext = (): { ctx: Canvas2dLike; puts: ImageDataLike[] } => {
@@ -18,8 +18,11 @@ export const createStubContext = (): { ctx: Canvas2dLike; puts: ImageDataLike[] 
     },
   };
   const ctx = new Proxy(base, {
-    get: (target, name) =>
-      name in target ? target[name as keyof Canvas2dLike] : unimplemented(name),
+    get: (target, name) => {
+      if (typeof name === "symbol") return undefined;
+      if (name in target) return target[name as keyof Canvas2dLike];
+      return unimplemented(name);
+    },
   });
   return { ctx, puts };
 };
