@@ -213,6 +213,8 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       if (destroyed) return;
       destroyed = true;
       if (viewFrame !== NO_FRAME) cancelAnimationFrame(viewFrame);
+      viewFrame = NO_FRAME;
+      pendingView = undefined;
       resizeObserver.disconnect();
       unwatchTheme();
       dprMedia?.removeEventListener("change", onDprChange);
