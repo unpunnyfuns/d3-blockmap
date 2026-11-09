@@ -19,6 +19,8 @@ export type BlockState = {
   add(indices: ArrayLike<number>): Uint32Array;
   replace(indices: ArrayLike<number>): void;
   replaceRanges(input: RangeInput): void;
+  addRanges(input: RangeInput): Uint32Array;
+  removeRanges(input: RangeInput): Uint32Array;
   has(index: number): boolean;
   fraction(bin: number): number;
   countOf(bin: number): number;
@@ -62,6 +64,27 @@ export const createBlockState = (totalBlocks: number): BlockState => {
     return dirty.size === 0 ? EMPTY_DIRTY : Uint32Array.from(dirty);
   };
 
+  const applyRanges = (input: RangeInput, complete: boolean): Uint32Array => {
+    const flat = normalizeRanges(input, totalBlocks);
+    const dirty = new Set<number>();
+    let delta = 0;
+    for (let i = 0; i < flat.length; i += RANGE_PAIR) {
+      const start = flat[i];
+      const end = flat[i + 1];
+      const present = bitset.countRange(start, end);
+      if (complete) {
+        bitset.fill(start, end);
+        delta += end - start - present;
+      } else {
+        bitset.clearRange(start, end);
+        delta -= present;
+      }
+      for (const bin of bins.recount(start, end, bitset.countRange)) dirty.add(bin);
+    }
+    bitset.setCount(bitset.count + delta);
+    return dirty.size === 0 ? EMPTY_DIRTY : Uint32Array.from(dirty).sort();
+  };
+
   return {
     totalBlocks,
     get binCount() {
@@ -100,6 +123,8 @@ export const createBlockState = (totalBlocks: number): BlockState => {
       }
       bitset.setCount(rangesLength(flat));
     },
+    addRanges: (input) => applyRanges(input, true),
+    removeRanges: (input) => applyRanges(input, false),
     has: bitset.has,
     fraction: (bin) => {
       const size = bins.sizeOf(bin);

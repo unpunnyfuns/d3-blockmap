@@ -181,4 +181,63 @@ describe("createBlockState", () => {
     state.resize(4);
     expect(state.rangeOf(3)).toEqual({ start: 55, end: 60 });
   });
+
+  it("addRanges counts only newly completed blocks and recounts touched bins", () => {
+    const state = createBlockState(100);
+    state.resize(10);
+    state.add([5, 6, 50]);
+    const dirty = state.addRanges([
+      [0, 10],
+      [8, 12],
+      [48, 52],
+    ]);
+    expect(Array.from(dirty)).toEqual([0, 1, 4, 5]);
+    expect(state.progress().completed).toBe(16);
+    expect([0, 1, 4, 5].map(state.countOf)).toEqual([10, 2, 2, 2]);
+    const fresh = createBlockState(100);
+    fresh.resize(10);
+    fresh.replaceRanges([
+      [0, 12],
+      [48, 52],
+    ]);
+    expect([0, 1, 2, 4, 5].map(state.countOf)).toEqual([0, 1, 2, 4, 5].map(fresh.countOf));
+  });
+
+  it("addRanges outside the view updates progress but not bins", () => {
+    const state = createBlockState(100);
+    state.resize(5);
+    state.setView({ start: 40, end: 60 });
+    const dirty = state.addRanges([
+      [0, 10],
+      [58, 70],
+    ]);
+    expect(Array.from(dirty)).toEqual([4]);
+    expect(state.progress().completed).toBe(22);
+    expect([0, 1, 2, 3, 4].map(state.countOf)).toEqual([0, 0, 0, 0, 2]);
+  });
+
+  it("removeRanges subtracts only present blocks and recounts", () => {
+    const state = createBlockState(100);
+    state.resize(10);
+    state.replaceRanges([[0, 30]]);
+    const dirty = state.removeRanges([
+      [5, 15],
+      [25, 40],
+    ]);
+    expect(Array.from(dirty)).toEqual([0, 1, 2, 3]);
+    expect(state.progress().completed).toBe(15);
+    expect([0, 1, 2, 3].map(state.countOf)).toEqual([5, 5, 5, 0]);
+    expect(state.has(4)).toBe(true);
+    expect(state.has(5)).toBe(false);
+    expect(Array.from(state.removeRanges([[50, 60]]))).toEqual([5]);
+    expect(state.progress().completed).toBe(15);
+  });
+
+  it("addRanges with no bins still sets bits and progress", () => {
+    const state = createBlockState(100);
+    expect(Array.from(state.addRanges([[10, 20]]))).toEqual([]);
+    expect(state.progress().completed).toBe(10);
+    state.resize(10);
+    expect(state.countOf(1)).toBe(10);
+  });
 });
