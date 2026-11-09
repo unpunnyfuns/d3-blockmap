@@ -144,6 +144,27 @@ npm run lint
 npm run format
 npm run typecheck
 npm run build
+npm run verify
 ```
 
-`npm run lint` enforces no `any`, `import type` for types, no inline end-of-line comments, and no unnamed numeric literals in library source (test files exempt). Naming conventions are reviewed by hand; oxlint has no working naming rule.
+`npm run verify` runs lint, format check, typecheck, tests, and the build, in that order; it is the same gate CI (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request.
+
+`npm run lint` enforces, in library source (test files are exempt from the numeric-literal rule only):
+
+- no `any`
+- `import type` for type-only imports
+- no inline end-of-line comments
+- no unnamed numeric literals, including `let` initialisers
+- `prefer-const`
+- `eqeqeq`
+- no focused tests (`it.only`/`describe.only`)
+- no disabled tests (`it.skip`/`describe.skip`)
+- no duplicate test titles
+- every test asserts something (`expect-expect`)
+- no import cycles
+
+Naming conventions are reviewed by hand; oxlint has no working naming rule.
+
+### Test harness
+
+`src/testing/` is the contributor-facing test harness shared by every suite: `installDom()` stubs `ResizeObserver`, `matchMedia`, `requestAnimationFrame`/`cancelAnimationFrame`, `devicePixelRatio`, and `HTMLCanvasElement.getContext` with strict fakes that throw on anything the library doesn't actually use, so a suite can't accidentally pass against unimplemented behaviour. It also provides event helpers (`pointer`, `ctrlWheel`, `metaWheel`) for dispatching pointer and wheel interactions, and fixtures (`TEST_THEME`, `COMPLETE_RGBA`, `MISSING_RGBA`, `HIGHLIGHT_RGBA`, `pixel()`) for asserting on painted colours without hand-rolled byte offsets.

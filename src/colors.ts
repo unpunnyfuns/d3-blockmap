@@ -49,16 +49,10 @@ const parseOr = (value: string, fallback: string): string => {
   }
 };
 
-const BLUE_BYTE_OFFSET = 2;
-const ALPHA_BYTE_OFFSET = 3;
-
 const writeColor = (table: Uint8ClampedArray, index: number, css: string): void => {
   const color = rgb(css);
   const offset = index * BYTES_PER_PIXEL;
-  table[offset] = color.r;
-  table[offset + 1] = color.g;
-  table[offset + BLUE_BYTE_OFFSET] = color.b;
-  table[offset + ALPHA_BYTE_OFFSET] = OPAQUE_ALPHA;
+  table.set([color.r, color.g, color.b, OPAQUE_ALPHA], offset);
 };
 
 export const readTheme = (el: HTMLElement): Theme => {

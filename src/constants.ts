@@ -41,3 +41,4 @@ export const CSS_VAR_AXIS_COLOR = "--blockmap-axis-color";
 export const TICK_SPACING_PX = 80;
 export const MIN_TICKS = 2;
 export const EDGE_ANCHOR_RATIO = 0.5;
+export const DECIMAL_BASE = 10;

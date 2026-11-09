@@ -28,7 +28,8 @@
     "format": "oxfmt src",
     "format:check": "oxfmt --check src",
     "typecheck": "tsc --noEmit",
-    "demo": "python3 -m http.server 4173"
+    "demo": "python3 -m http.server 4173",
+    "verify": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
     "d3-array": "^3.2.5",

@@ -1,5 +1,11 @@
 import { tickStep } from "d3-array";
-import { CSS_VAR_AXIS_COLOR, EDGE_ANCHOR_RATIO, MIN_TICKS, TICK_SPACING_PX } from "./constants";
+import {
+  CSS_VAR_AXIS_COLOR,
+  DECIMAL_BASE,
+  EDGE_ANCHOR_RATIO,
+  MIN_TICKS,
+  TICK_SPACING_PX,
+} from "./constants";
 import { ensureRelative } from "./dom";
 import { viewLength } from "./view";
 import type { BlockView } from "./view";
@@ -32,7 +38,6 @@ const RIGHT_EDGE = "translateX(-100%)";
 const COMPACT_THRESHOLD = 1000;
 const MAGNITUDE_STEP = 3;
 const MAX_COMPACT_FRACTION_DIGITS = 3;
-const DECIMAL_BASE = 10;
 
 const groupedFormat = new Intl.NumberFormat("en-US");
 const compactFormatters = new Map<number, Intl.NumberFormat>();

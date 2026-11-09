@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "eslint"],
+  "plugins": ["typescript", "eslint", "vitest", "import"],
   "categories": { "correctness": "error" },
   "rules": {
     "typescript/no-explicit-any": "error",
@@ -8,14 +8,21 @@
     "eslint/no-inline-comments": "error",
     "eslint/no-magic-numbers": [
       "error",
-      { "ignore": [0, 1, -1], "ignoreArrayIndexes": true, "detectObjects": false, "enforceConst": false }
+      { "ignore": [0, 1, -1], "ignoreArrayIndexes": true, "detectObjects": false, "enforceConst": true }
     ],
     "eslint/prefer-const": "error",
-    "eslint/eqeqeq": "error"
+    "eslint/eqeqeq": "error",
+    "vitest/no-focused-tests": "error",
+    "vitest/no-disabled-tests": "error",
+    "vitest/no-identical-title": "error",
+    "vitest/expect-expect": "error",
+    "vitest/require-mock-type-parameters": "off",
+    "vitest/no-conditional-expect": "off",
+    "import/no-cycle": "error"
   },
   "overrides": [
     {
-      "files": ["**/*.test.ts", "**/*.test.tsx", "src/testing/**"],
+      "files": ["**/*.test.ts", "**/*.test.tsx", "**/testing/**"],
       "rules": { "eslint/no-magic-numbers": "off" }
     }
   ]

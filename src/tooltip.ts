@@ -1,5 +1,5 @@
 import type { BlockRange } from "./bins";
-import { PERCENT, PERCENT_FRACTION_DIGITS, TOOLTIP_OFFSET_PX } from "./constants";
+import { DECIMAL_BASE, PERCENT, PERCENT_FRACTION_DIGITS, TOOLTIP_OFFSET_PX } from "./constants";
 import { ensureRelative } from "./dom";
 
 export type Tooltip = {
@@ -15,7 +15,6 @@ const EN_DASH = "–";
 
 const countFormat = new Intl.NumberFormat(LOCALE);
 
-const DECIMAL_BASE = 10;
 const MIN_PARTIAL_STEP = 1 / DECIMAL_BASE ** PERCENT_FRACTION_DIGITS;
 const MAX_PARTIAL = (PERCENT - MIN_PARTIAL_STEP).toFixed(PERCENT_FRACTION_DIGITS);
 const MIN_PARTIAL = MIN_PARTIAL_STEP.toFixed(PERCENT_FRACTION_DIGITS);
