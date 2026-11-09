@@ -430,48 +430,43 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   if (options.initialBlocks) renderer.markDirty(state.add(options.initialBlocks));
   writeLabel();
 
-  // Every mutating method checks `destroyed`, so a late async update from a
+  // Every mutating method runs through this, so a late async update from a
   // caller that has already torn the map down is a no-op rather than a write
   // to a detached canvas.
+  const live =
+    <A extends unknown[]>(method: (...args: A) => void) =>
+    (...args: A): void => {
+      if (!destroyed) method(...args);
+    };
+
   return {
-    setBlocks: (indices) => {
-      if (destroyed) return;
+    setBlocks: live((indices) => {
       state.replace(indices);
       renderer.markAllDirty();
       writeLabel();
-    },
-    setRanges: (ranges) => {
-      if (destroyed) return;
+    }),
+    setRanges: live((ranges) => {
       state.replaceRanges(ranges);
       renderer.markAllDirty();
       writeLabel();
-    },
+    }),
 
     // The incremental paths repaint only the bins the state reports changed.
-    addBlocks: (indices) => {
-      if (destroyed) return;
+    addBlocks: live((indices) => {
       renderer.markDirty(state.add(indices));
       writeLabel();
-    },
-    addRanges: (ranges) => {
-      if (destroyed) return;
+    }),
+    addRanges: live((ranges) => {
       renderer.markDirty(state.addRanges(ranges));
       writeLabel();
-    },
-    removeRanges: (ranges) => {
-      if (destroyed) return;
+    }),
+    removeRanges: live((ranges) => {
       renderer.markDirty(state.removeRanges(ranges));
       writeLabel();
-    },
+    }),
 
-    setView: (view) => {
-      if (destroyed) return;
-      setView(view);
-    },
-    resetView: () => {
-      if (destroyed) return;
-      resetView();
-    },
+    setView: live(setView),
+    resetView: live(resetView),
     getView,
 
     // Built from the committed view, so the scale always matches what is on
@@ -482,23 +477,18 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     // without one setBrush has nothing to store and getBrush nothing to
     // report. A destroyed map reports none either, rather than whatever the
     // detached overlay was last holding.
-    setBrush: (selection) => {
-      if (destroyed) return;
-      overlay?.setSelection(selection);
-    },
+    setBrush: live((selection) => overlay?.setSelection(selection)),
     getBrush: () => (destroyed ? null : (overlay?.getSelection() ?? null)),
 
-    setHighlight: (on) => {
-      if (destroyed) return;
+    setHighlight: live((on) => {
       highlightOn = on;
       applyHighlight();
-    },
+    }),
     getProgress: () => (destroyed ? { completed: 0, total: state.totalBlocks } : state.progress()),
 
     // Idempotent, and unwinds in the reverse order of construction: pending
     // frame, observers, listeners, owned children, then the canvas itself.
-    destroy: () => {
-      if (destroyed) return;
+    destroy: live(() => {
       destroyed = true;
 
       if (viewFrame !== NO_FRAME) cancelAnimationFrame(viewFrame);
@@ -520,6 +510,6 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       axis?.destroy();
       overlay?.destroy();
       canvas.remove();
-    },
+    }),
   };
 };
