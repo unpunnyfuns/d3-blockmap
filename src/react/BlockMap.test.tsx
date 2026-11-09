@@ -179,4 +179,15 @@ describe("<BlockMap>", () => {
     expect(second.setHighlight).toHaveBeenCalledWith(true);
     spy.mockRestore();
   });
+
+  it("passes axis as a create option and exposes getScale", () => {
+    const instance = createInstance();
+    const spy = vi.spyOn(core, "createBlockMap").mockReturnValue(instance);
+    const ref = createRef<BlockMapHandle>();
+    render(<BlockMap ref={ref} totalBlocks={10} axis={{ tickCount: 3 }} />);
+    expect(spy.mock.calls[0][1]).toMatchObject({ axis: { tickCount: 3 } });
+    expect(ref.current?.getScale().range).toEqual([0, 0]);
+    expect(instance.getScale).toHaveBeenCalled();
+    spy.mockRestore();
+  });
 });
