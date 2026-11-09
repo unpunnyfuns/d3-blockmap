@@ -60,6 +60,10 @@ export const Download = ({ totalBlocks }: { totalBlocks: number }) => {
 | `interactive` | `boolean` | `true` | Ctrl/⌘+wheel zooms, drag pans, double-click resets; keyboard controls when focused, see Behaviour. |
 | `onViewChange` | `(view) => void` | | Called when the view changes. |
 | `axis` | `boolean \| { format?, tickCount? }` | `false` | Tick labels under the bar. |
+| `brush` | `boolean` | `false` | Drag selects a block range; panning then needs Shift. See Behaviour. |
+| `onBrush` | `(selection) => void` | | Called on every brush move with the live `[start, end)` or `null`. |
+| `onBrushEnd` | `(selection) => void` | | Called when the gesture ends, with the snapped `[start, end)` or `null`. |
+| `onBlockClick` | `(event) => void` | | Called on click with `{ block, range, completed, total, originalEvent }`. Works even when `interactive` is `false`. |
 | `label` | `(progress) => string` | | Overrides the canvas `aria-label`. See Behaviour. |
 
 ## Methods
@@ -73,6 +77,8 @@ export const Download = ({ totalBlocks }: { totalBlocks: number }) => {
 | `removeRanges(ranges)` | Mark ranges missing again. |
 | `getProgress()` | `{ completed, total }`. |
 | `setView(view)` / `resetView()` / `getView()` | Zoom window control. |
+| `setBrush(selection)` | Select `[start, end)` blocks, or `null` to clear. Fires no callbacks. |
+| `getBrush()` | The current selection as a copy, or `null`. |
 | `setHighlight(on)` | Blink incomplete columns. Steady under `prefers-reduced-motion`. |
 | `getScale()` | `{ domain, range, x(block), block(x) }` to draw your own axis. |
 | `destroy()` | Remove everything. |
@@ -83,13 +89,16 @@ Ranges use exclusive ends: `[0, 10]` means blocks 0 through 9. Unsorted, overlap
 
 - The canvas is focusable (`tabindex="0"`) when `interactive` isn't `false`, and announces progress through `role="img"` plus an `aria-label`: `label` overrides the default `Download progress: 4,343,270 of 10,000,000 blocks (43%)` text.
 - With the canvas focused: `+`/`-` (or `=`/`_`) zoom in or out around the centre of the current view, arrow keys pan by 10% of the view length, Shift+arrow by 50%, and `Home` or `0` resets to the full range.
+- With `brush: true`, drag selects a block range and Shift+drag pans; click an empty spot to clear.
+- `onBlockClick` reports the block under the pointer, or the column's range when a column covers several blocks. It does not fire for the click that ends a pan or a brush gesture.
 
 ## React
 
-Props mirror the options, including `label`, plus `blocks`, `ranges`, `highlight`, `className`, `style`. `ref` is a plain prop exposing the methods above, except `setBlocks` and `destroy`, as `BlockMapHandle`.
+Props mirror the options, including `label`, `brush`, `onBrush`, `onBrushEnd`, `onBlockClick`, plus `blocks`, `ranges`, `highlight`, `className`, `style`. `ref` is a plain prop exposing the methods above, including `setBrush` and `getBrush`, except `setBlocks` and `destroy`, as `BlockMapHandle`.
 
 - `blocks` and `ranges` apply when their identity changes, so keep the references stable.
-- `partial`, `interactive`, and `axis` recreate the instance when they change; memoise an object `axis`.
+- `partial`, `interactive`, `axis`, and `brush` recreate the instance when they change; memoise an object `axis`.
+- `onViewChange`, `onBrush`, `onBrushEnd`, and `onBlockClick` can be inline: the latest function is called without recreating the instance.
 - For high-frequency updates use the ref (`addBlocks`, `addRanges`) rather than props.
 
 ## Theming
@@ -103,17 +112,20 @@ Set these CSS custom properties on the container or an ancestor:
 | `--blockmap-partial` | `#e0a500` | midpoint of the `coverage` fade |
 | `--blockmap-partial-low` / `-high` | `#5b3a00` / `#e0a500` | the `gradient` style |
 | `--blockmap-highlight` | `#ff4d4f` | blinking incomplete columns |
+| `--blockmap-brush` | `#ffffff` | brush selection |
 | `--blockmap-axis-color` | `currentColor` | tick labels |
 
 `coverage` fades missing → partial → complete by how full a column is, so range edges look crisp. `gradient` fades low → high instead, which shows density when blocks arrive scattered.
 
-The tooltip is a `div[data-blockmap-tooltip]` and ticks are `span[data-blockmap-tick]` inside `div[data-blockmap-axis]`; style them with CSS.
+The tooltip is a `div[data-blockmap-tooltip]`, ticks are `span[data-blockmap-tick]` inside `div[data-blockmap-axis]`, and the brush overlay is an `svg[data-blockmap-brush]`; style them with CSS.
 
 ## Notes
 
 - Memory is 1 bit per block plus one counter per pixel column. Updates cost in proportion to what changed, not to `totalBlocks`.
 - When the view is narrower than the pixel width, each block is drawn as a discrete segment.
 - The axis sits just below the container at `top: 100%`; don't clip it with `overflow: hidden`.
+- d3 packages are external imports, not bundled; they dedupe with your own D3.
+- Editing a selection that is partly outside the view re-derives both edges from the visible span, so the off-screen edge snaps to the view bound.
 
 ## Development
 

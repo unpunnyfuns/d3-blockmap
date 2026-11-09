@@ -10,8 +10,8 @@ import type { CSSProperties, Ref } from "react";
 import type { AxisOptions } from "../axis";
 import type { PartialStyle } from "../colors";
 import { createBlockMap, defaultLabel } from "../blockMap";
-import type { BlockMap as BlockMapInstance, BlockMapOptions } from "../blockMap";
-import type { RangeInput } from "../ranges";
+import type { BlockClickEvent, BlockMap as BlockMapInstance, BlockMapOptions } from "../blockMap";
+import type { BlockRange, RangeInput } from "../ranges";
 import type { Progress } from "../state";
 import type { BlockView } from "../view";
 
@@ -23,7 +23,11 @@ export type BlockMapProps = {
   view?: BlockView;
   interactive?: boolean;
   axis?: boolean | AxisOptions;
+  brush?: boolean;
   onViewChange?: (view: BlockView) => void;
+  onBrush?: (selection: BlockRange | null) => void;
+  onBrushEnd?: (selection: BlockRange | null) => void;
+  onBlockClick?: (event: BlockClickEvent) => void;
   label?: (progress: Progress) => string;
   highlight?: boolean;
   className?: string;
@@ -44,6 +48,8 @@ export type BlockMapHandle = Pick<
   | "resetView"
   | "getView"
   | "getScale"
+  | "setBrush"
+  | "getBrush"
   | "setHighlight"
   | "getProgress"
 >;
@@ -61,7 +67,11 @@ export const BlockMap = ({
   view,
   interactive,
   axis,
+  brush,
   onViewChange,
+  onBrush,
+  onBrushEnd,
+  onBlockClick,
   label,
   highlight,
   className,
@@ -75,6 +85,16 @@ export const BlockMap = ({
   // appear as a changed dependency and tear the whole map down.
   const onViewChangeRef = useRef(onViewChange);
   onViewChangeRef.current = onViewChange;
+
+  // The brush and click callbacks follow the same rule: the wrapper is always
+  // installed, so adding or removing a handler after mount works without a
+  // rebuild, and only `brush` itself is a construction option.
+  const onBrushRef = useRef(onBrush);
+  onBrushRef.current = onBrush;
+  const onBrushEndRef = useRef(onBrushEnd);
+  onBrushEndRef.current = onBrushEnd;
+  const onBlockClickRef = useRef(onBlockClick);
+  onBlockClickRef.current = onBlockClick;
 
   // Same idea as onViewChangeRef, but label is also kept out of the create
   // effect's dependencies below: the wrapper is only installed when `label`
@@ -99,11 +119,15 @@ export const BlockMap = ({
     const options: BlockMapOptions = {
       totalBlocks,
       onViewChange: (next) => onViewChangeRef.current?.(next),
+      onBrush: (selection) => onBrushRef.current?.(selection),
+      onBrushEnd: (selection) => onBrushEndRef.current?.(selection),
+      onBlockClick: (event) => onBlockClickRef.current?.(event),
     };
     if (partial) options.partial = partial;
     if (interactive !== undefined) options.interactive = interactive;
     if (view) options.view = view;
     if (axis !== undefined) options.axis = axis;
+    if (brush !== undefined) options.brush = brush;
     if (label !== undefined) {
       options.label = (progress) => (labelRef.current ?? defaultLabel)(progress);
     }
@@ -114,7 +138,7 @@ export const BlockMap = ({
       instance.destroy();
       instanceRef.current = null;
     };
-  }, [totalBlocks, partial, interactive, axis]);
+  }, [totalBlocks, partial, interactive, axis, brush]);
 
   /**
    * The effects that push props repeat the construction dependencies so they
@@ -133,16 +157,16 @@ export const BlockMap = ({
       return;
     }
     instance.setBlocks(blocks ?? EMPTY_BLOCKS);
-  }, [totalBlocks, partial, interactive, axis, ranges, blocks]);
+  }, [totalBlocks, partial, interactive, axis, brush, ranges, blocks]);
 
   // Leaving `view` undefined hands control to the map's own interaction.
   useEffect(() => {
     if (view !== undefined) instanceRef.current?.setView(view);
-  }, [totalBlocks, partial, interactive, axis, view]);
+  }, [totalBlocks, partial, interactive, axis, brush, view]);
 
   useEffect(() => {
     instanceRef.current?.setHighlight(highlight ?? false);
-  }, [totalBlocks, partial, interactive, axis, highlight]);
+  }, [totalBlocks, partial, interactive, axis, brush, highlight]);
 
   // The getters need defaults for the window before the first effect runs and
   // after unmount, so callers never have to handle a missing instance.
@@ -163,6 +187,8 @@ export const BlockMap = ({
           x: () => 0,
           block: () => 0,
         },
+      setBrush: (selection) => instanceRef.current?.setBrush(selection),
+      getBrush: () => instanceRef.current?.getBrush() ?? null,
       setHighlight: (on) => instanceRef.current?.setHighlight(on),
       getProgress: () =>
         instanceRef.current?.getProgress() ?? { ...EMPTY_PROGRESS, total: totalBlocks },

@@ -11,6 +11,7 @@
     --blockmap-partial: #f0b429;
     --blockmap-complete: #3ddc84;
     --blockmap-highlight: #ff4d4f;
+    --blockmap-brush: #9ecbff;
     --blockmap-axis-color: #8b93a7;
     color-scheme: dark;
   }
@@ -21,6 +22,7 @@
     --blockmap-partial: #ff8c00;
     --blockmap-complete: #1a9e4b;
     --blockmap-highlight: #d4380d;
+    --blockmap-brush: #0b63ce;
     --blockmap-axis-color: #5b6472;
     color-scheme: light;
   }
@@ -61,14 +63,21 @@
   <button id="highlight">Highlight incomplete</button>
   <button id="reset-view">Reset view</button>
 </p>
-<p class="label">Ctrl+wheel (or pinch) zooms around the cursor, drag pans, double-click resets. <span id="view"></span></p>
+<p class="label">Ctrl+wheel (or pinch) zooms around the cursor, drag pans, double-click resets. On the third map drag selects a block range, Shift+drag pans, and a click reports the block under the pointer. <span id="view"></span> <span id="selection"></span></p>
 <!-- d3-array.mjs pre-bundles its internmap dependency, so no separate import map entry is needed for it. -->
 <script type="importmap">
 { "imports": {
   "@unpunnyfuns/d3-blockmap": "/dist/index.js",
   "d3-array": "/node_modules/d3-array/dist/d3-array.mjs",
+  "d3-brush": "/node_modules/d3-brush/dist/d3-brush.mjs",
   "d3-color": "/node_modules/d3-color/dist/d3-color.mjs",
-  "d3-interpolate": "/node_modules/d3-interpolate/dist/d3-interpolate.mjs"
+  "d3-dispatch": "/node_modules/d3-dispatch/dist/d3-dispatch.mjs",
+  "d3-drag": "/node_modules/d3-drag/dist/d3-drag.mjs",
+  "d3-ease": "/node_modules/d3-ease/dist/d3-ease.mjs",
+  "d3-interpolate": "/node_modules/d3-interpolate/dist/d3-interpolate.mjs",
+  "d3-selection": "/node_modules/d3-selection/dist/d3-selection.mjs",
+  "d3-timer": "/node_modules/d3-timer/dist/d3-timer.mjs",
+  "d3-transition": "/node_modules/d3-transition/dist/d3-transition.mjs"
 } }
 </script>
 <script type="module">
@@ -85,8 +94,18 @@ const rangeMap = createBlockMap(document.querySelector("#ranges"), {
   totalBlocks: BIG,
   partial: "coverage",
   axis: true,
+  brush: true,
   onViewChange: (view) => {
     document.querySelector("#view").textContent = `View ${fmt.format(view.start)}–${fmt.format(view.end - 1)}`;
+  },
+  onBrushEnd: (selection) => {
+    document.querySelector("#selection").textContent = selection
+      ? `Selected ${fmt.format(selection[0])}–${fmt.format(selection[1] - 1)} (${fmt.format(selection[1] - selection[0])} blocks)`
+      : "No selection";
+  },
+  onBlockClick: ({ range, completed, total }) => {
+    const span = `${fmt.format(range[0])}–${fmt.format(range[1] - 1)}`;
+    document.querySelector("#selection").textContent = `Clicked ${span} · ${fmt.format(completed)} / ${fmt.format(total)} complete`;
   },
 });
 const RUN_SEED = 24;
@@ -196,6 +215,8 @@ document.querySelector("#reset").onclick = () => {
   seedRuns();
   rangeMap.addRanges(rangeDeltas);
   rangeDeltas.length = 0;
+  rangeMap.setBrush(null);
+  document.querySelector("#selection").textContent = "";
   maps.forEach((map) => map.resetView());
   highlighted = false;
   maps.forEach((map) => map.setHighlight(false));

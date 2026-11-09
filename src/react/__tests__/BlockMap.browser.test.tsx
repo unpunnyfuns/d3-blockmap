@@ -2,7 +2,7 @@ import type * as BlockMapModule from "../../blockMap";
 import { act, render } from "@testing-library/react";
 import { createRef } from "react";
 import { createBlockMap } from "../../blockMap";
-import type { BlockMap as BlockMapInstance } from "../../blockMap";
+import type { BlockClickEvent, BlockMap as BlockMapInstance } from "../../blockMap";
 import { BlockMap } from "../BlockMap";
 import type { BlockMapHandle } from "../BlockMap";
 
@@ -218,6 +218,103 @@ describe("<BlockMap>", () => {
     vi.mocked(createBlockMap).mockReturnValue(instance);
     render(<BlockMap totalBlocks={10} />);
     expect(vi.mocked(createBlockMap).mock.calls[0][1]).not.toHaveProperty("label");
+  });
+
+  it("passes brush as a create option and recreates when it changes", () => {
+    const first = createInstance();
+    const second = createInstance();
+    vi.mocked(createBlockMap).mockReturnValueOnce(first).mockReturnValueOnce(second);
+    const { rerender, container } = render(<BlockMap totalBlocks={10} />);
+    expect(vi.mocked(createBlockMap).mock.calls[0][1]).not.toHaveProperty("brush");
+    rerender(<BlockMap totalBlocks={10} brush />);
+    expect(first.destroy).toHaveBeenCalledTimes(1);
+    expect(createBlockMap).toHaveBeenLastCalledWith(
+      container.firstElementChild,
+      expect.objectContaining({ brush: true }),
+    );
+    expect(second.setBlocks).toHaveBeenCalled();
+  });
+
+  it("forwards the latest brush and click callbacks without recreating", () => {
+    const instance = createInstance();
+    vi.mocked(createBlockMap).mockReturnValue(instance);
+    const firstBrush = vi.fn();
+    const firstEnd = vi.fn();
+    const firstClick = vi.fn();
+    const { rerender } = render(
+      <BlockMap
+        totalBlocks={10}
+        brush
+        onBrush={firstBrush}
+        onBrushEnd={firstEnd}
+        onBlockClick={firstClick}
+      />,
+    );
+    const options = vi.mocked(createBlockMap).mock.calls[0][1];
+    const passedBrush = options.onBrush as (s: readonly [number, number] | null) => void;
+    const passedEnd = options.onBrushEnd as (s: readonly [number, number] | null) => void;
+    const passedClick = options.onBlockClick as (e: BlockClickEvent) => void;
+
+    const secondBrush = vi.fn();
+    const secondEnd = vi.fn();
+    const secondClick = vi.fn();
+    rerender(
+      <BlockMap
+        totalBlocks={10}
+        brush
+        onBrush={secondBrush}
+        onBrushEnd={secondEnd}
+        onBlockClick={secondClick}
+      />,
+    );
+    expect(createBlockMap).toHaveBeenCalledTimes(1);
+
+    const click: BlockClickEvent = {
+      block: 3,
+      range: [3, 4],
+      completed: 1,
+      total: 1,
+      originalEvent: new MouseEvent("click"),
+    };
+    passedBrush([1, 4]);
+    passedEnd(null);
+    passedClick(click);
+    expect(firstBrush).not.toHaveBeenCalled();
+    expect(firstEnd).not.toHaveBeenCalled();
+    expect(firstClick).not.toHaveBeenCalled();
+    expect(secondBrush).toHaveBeenCalledWith([1, 4]);
+    expect(secondEnd).toHaveBeenCalledWith(null);
+    expect(secondClick).toHaveBeenCalledWith(click);
+  });
+
+  it("installs the brush and click wrappers even without handlers and tolerates a removed one", () => {
+    const instance = createInstance();
+    vi.mocked(createBlockMap).mockReturnValue(instance);
+    const onBrush = vi.fn();
+    const { rerender } = render(<BlockMap totalBlocks={10} onBrush={onBrush} />);
+    const options = vi.mocked(createBlockMap).mock.calls[0][1];
+    expect(options.onBrushEnd).toBeTypeOf("function");
+    expect(options.onBlockClick).toBeTypeOf("function");
+    const passedBrush = options.onBrush as (s: readonly [number, number] | null) => void;
+
+    rerender(<BlockMap totalBlocks={10} />);
+    expect(createBlockMap).toHaveBeenCalledTimes(1);
+    expect(() => passedBrush([0, 2])).not.toThrow();
+    expect(onBrush).not.toHaveBeenCalled();
+  });
+
+  it("exposes setBrush and getBrush through the handle, falling back to null", () => {
+    const instance = createInstance();
+    vi.mocked(createBlockMap).mockReturnValue(instance);
+    const ref = createRef<BlockMapHandle>();
+    const { unmount } = render(<BlockMap ref={ref} totalBlocks={10} brush />);
+    act(() => ref.current?.setBrush([2, 5]));
+    expect(instance.setBrush).toHaveBeenCalledWith([2, 5]);
+    expect(ref.current?.getBrush()).toBeNull();
+    expect(instance.getBrush).toHaveBeenCalled();
+    const handle = ref.current;
+    unmount();
+    expect(handle?.getBrush()).toBeNull();
   });
 
   it("passes axis as a create option, exposes getScale, and passes a boolean axis prop through", () => {
