@@ -31,8 +31,12 @@
   .map { height: 24px; }
   .map canvas { border-radius: 3px; }
   [data-blockmap-tooltip] { background: #000c; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-top: -6px; }
-  [data-blockmap-axis] { font-size: 11px; padding-top: 4px; }
-  [data-blockmap-tick][style*="translateX(-50%)"]::before { content: ""; position: absolute; left: 0; top: -4px; height: 4px; border-left: 1px solid currentColor; }
+  [data-blockmap-axis] { font-size: 11px; }
+  [data-blockmap-tick] { padding-top: 7px; }
+  [data-blockmap-tick]::before { content: ""; position: absolute; top: 0; height: 5px; border-left: 1px solid currentColor; }
+  [data-blockmap-tick][style*="translateX(-50%)"]::before { left: 50%; }
+  [data-blockmap-tick][style*="translateX(0)"]::before { left: 0; }
+  [data-blockmap-tick][style*="translateX(-100%)"]::before { right: 0; }
   button { margin-right: 8px; }
 </style>
 </head>
