@@ -3,6 +3,7 @@ import { createRef } from "react";
 import * as core from "../blockMap";
 import type { BlockMap as BlockMapInstance } from "../blockMap";
 import { installDom } from "../testing";
+import type { InstalledDom } from "../testing";
 import { BlockMap } from "./BlockMap";
 import type { BlockMapHandle } from "./BlockMap";
 
@@ -24,6 +25,10 @@ const createInstance = (): BlockMapInstance => ({
   setHighlight: vi.fn(),
   getProgress: vi.fn(() => ({ completed: 0, total: 0 })),
   destroy: vi.fn(),
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe("<BlockMap>", () => {
@@ -61,7 +66,7 @@ describe("<BlockMap>", () => {
     spy.mockRestore();
   });
 
-  it("exposes addBlocks and getProgress through the ref", () => {
+  it("exposes addBlocks, setRanges, addRanges, removeRanges and getProgress through the ref", () => {
     const instance = createInstance();
     const spy = vi.spyOn(core, "createBlockMap").mockReturnValue(instance);
     const ref = createRef<BlockMapHandle>();
@@ -69,16 +74,12 @@ describe("<BlockMap>", () => {
     act(() => ref.current?.addBlocks([4]));
     expect(instance.addBlocks).toHaveBeenCalledWith([4]);
     expect(ref.current?.getProgress()).toEqual({ completed: 0, total: 0 });
-    spy.mockRestore();
-  });
-
-  it("exposes setRanges through the ref", () => {
-    const instance = createInstance();
-    const spy = vi.spyOn(core, "createBlockMap").mockReturnValue(instance);
-    const ref = createRef<BlockMapHandle>();
-    render(<BlockMap ref={ref} totalBlocks={10} />);
     act(() => ref.current?.setRanges([[0, 1]]));
     expect(instance.setRanges).toHaveBeenCalledWith([[0, 1]]);
+    act(() => ref.current?.addRanges([[0, 2]]));
+    act(() => ref.current?.removeRanges([[1, 2]]));
+    expect(instance.addRanges).toHaveBeenCalledWith([[0, 2]]);
+    expect(instance.removeRanges).toHaveBeenCalledWith([[1, 2]]);
     spy.mockRestore();
   });
 
@@ -183,41 +184,32 @@ describe("<BlockMap>", () => {
     spy.mockRestore();
   });
 
-  it("passes axis as a create option and exposes getScale", () => {
+  it("passes axis as a create option, exposes getScale, and passes a boolean axis prop through", () => {
     const instance = createInstance();
     const spy = vi.spyOn(core, "createBlockMap").mockReturnValue(instance);
     const ref = createRef<BlockMapHandle>();
-    render(<BlockMap ref={ref} totalBlocks={10} axis={{ tickCount: 3 }} />);
+    const { rerender } = render(<BlockMap ref={ref} totalBlocks={10} axis={{ tickCount: 3 }} />);
     expect(spy.mock.calls[0][1]).toMatchObject({ axis: { tickCount: 3 } });
     expect(ref.current?.getScale().range).toEqual([0, 0]);
     expect(instance.getScale).toHaveBeenCalled();
-    spy.mockRestore();
-  });
-
-  it("passes a boolean axis prop through as a create option", () => {
-    const instance = createInstance();
-    const spy = vi.spyOn(core, "createBlockMap").mockReturnValue(instance);
-    render(<BlockMap totalBlocks={10} axis={true} />);
-    expect(spy.mock.calls[0][1]).toMatchObject({ axis: true });
-    spy.mockRestore();
-  });
-
-  it("forwards addRanges and removeRanges through the handle", () => {
-    const instance = createInstance();
-    const spy = vi.spyOn(core, "createBlockMap").mockReturnValue(instance);
-    const ref = createRef<BlockMapHandle>();
-    render(<BlockMap ref={ref} totalBlocks={10} />);
-    act(() => ref.current?.addRanges([[0, 2]]));
-    act(() => ref.current?.removeRanges([[1, 2]]));
-    expect(instance.addRanges).toHaveBeenCalledWith([[0, 2]]);
-    expect(instance.removeRanges).toHaveBeenCalledWith([[1, 2]]);
+    rerender(<BlockMap ref={ref} totalBlocks={10} axis={true} />);
+    expect(spy.mock.calls[1][1]).toMatchObject({ axis: true });
     spy.mockRestore();
   });
 });
 
 describe("<BlockMap> smoke", () => {
+  let dom: InstalledDom;
+
+  beforeEach(() => {
+    dom = installDom();
+  });
+
+  afterEach(() => {
+    dom.restore();
+  });
+
   it("mounts the real block map and exposes progress", () => {
-    const dom = installDom();
     const ref = createRef<BlockMapHandle>();
     const { container, unmount } = render(
       <BlockMap ref={ref} totalBlocks={100} ranges={[[0, 50]]} axis style={{ height: 12 }} />,
@@ -228,6 +220,5 @@ describe("<BlockMap> smoke", () => {
     expect(ref.current?.getProgress()).toEqual({ completed: 50, total: 100 });
     unmount();
     expect(container.querySelector("canvas")).toBeNull();
-    dom.restore();
   });
 });

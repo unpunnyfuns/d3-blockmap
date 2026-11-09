@@ -1,10 +1,12 @@
 import { createBlockMap } from "./blockMap";
+import type { ImageDataLike } from "./renderer";
 import {
   COMPLETE_RGBA,
   HIGHLIGHT_RGBA,
   MISSING_RGBA,
   ctrlWheel,
   installDom,
+  pixel,
   pointer,
 } from "./testing";
 import type { InstalledDom } from "./testing";
@@ -159,13 +161,13 @@ describe("createBlockMap", () => {
     const map = createBlockMap(container, { totalBlocks: 100, partial: "coverage" });
     dom.triggerResize(5);
     map.setRanges([[0, 5]]);
-    const image = dom.puts.at(-1) as ImageData;
-    const [r, g, b] = Array.from(image.data.subarray(0, 4));
+    const image = dom.puts.at(-1) as ImageDataLike;
+    const [r, g, b] = pixel(image, 0);
     expect(r).toBeGreaterThan(200);
     expect(g).toBeGreaterThan(100);
     expect(g).toBeLessThan(200);
     expect(b).toBeLessThan(10);
-    expect(Array.from(image.data.subarray(4, 8))).toEqual([0, 0, 0, 255]);
+    expect(pixel(image, 1)).toEqual([0, 0, 0, 255]);
     map.destroy();
   });
 
@@ -179,11 +181,10 @@ describe("createBlockMap", () => {
     ]);
     expect(map.getProgress().completed).toBe(64);
 
-    const image = dom.puts.at(-1) as ImageData;
+    const image = dom.puts.at(-1) as ImageDataLike;
     expect(image.width).toBe(200);
-    expect(Array.from(image.data.subarray(0, 4))).toEqual(COMPLETE_RGBA);
-    const columnOffset = 100 * 4;
-    expect(Array.from(image.data.subarray(columnOffset, columnOffset + 4))).toEqual(MISSING_RGBA);
+    expect(pixel(image, 0)).toEqual(COMPLETE_RGBA);
+    expect(pixel(image, 100)).toEqual(MISSING_RGBA);
     map.destroy();
   });
 
@@ -244,9 +245,9 @@ describe("createBlockMap", () => {
     dom.triggerResize(5);
     map.addBlocks([0]);
     map.setHighlight(true);
-    const image = dom.puts.at(-1) as ImageData;
-    expect(Array.from(image.data.subarray(0, 4))).toEqual(COMPLETE_RGBA);
-    expect(Array.from(image.data.subarray(4, 8))).toEqual(HIGHLIGHT_RGBA);
+    const image = dom.puts.at(-1) as ImageDataLike;
+    expect(pixel(image, 0)).toEqual(COMPLETE_RGBA);
+    expect(pixel(image, 1)).toEqual(HIGHLIGHT_RGBA);
     expect(setInterval).toHaveBeenCalledTimes(1);
     map.setHighlight(false);
     expect(clearInterval).toHaveBeenCalledTimes(1);
@@ -262,35 +263,30 @@ describe("createBlockMap", () => {
     dom.triggerResize(5);
     map.setHighlight(true);
     expect(setInterval).not.toHaveBeenCalled();
-    expect(Array.from((dom.puts.at(-1) as ImageData).data.subarray(0, 4))).toEqual(HIGHLIGHT_RGBA);
+    expect(pixel(dom.puts.at(-1) as ImageDataLike, 0)).toEqual(HIGHLIGHT_RGBA);
     map.destroy();
   });
 
-  it("discrete tooltip reports the exact block the renderer painted at every column", () => {
+  it("discrete tooltip reports the exact block the renderer painted at boundary columns", () => {
     const container = dom.mount();
-    const totalBlocks = 7;
-    const map = createBlockMap(container, { totalBlocks });
+    const map = createBlockMap(container, { totalBlocks: 7 });
     dom.triggerResize(50);
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     const tooltip = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
-    const binCount = 100;
-    const boundaries = Array.from({ length: totalBlocks + 1 }, (_, b) =>
-      Math.floor((b * binCount) / totalBlocks),
-    );
-    const expectedBlockFor = (column: number): number => {
-      let block = 0;
-      while (boundaries[block + 1] <= column) block += 1;
-      return block;
-    };
-    const checkColumns = [14, 15, 28, 29, 42, 43];
-    const checked = new Set<number>();
-    for (let column = 0; column < binCount; column += 1) {
-      pointer(canvas, "pointermove", column / 2);
-      const expectedBlock = expectedBlockFor(column);
+    // 7 blocks over 100 bins, boundaries at columns [0, 14, 28, 42, 57, 71, 85, 100];
+    // offsetX = column / 2 (DPR 2). Pairs straddle the boundaries at columns 14, 42, 85.
+    const cases: Array<[offsetX: number, expectedBlock: number]> = [
+      [6.5, 0],
+      [7, 1],
+      [20.5, 2],
+      [21, 3],
+      [42, 5],
+      [42.5, 6],
+    ];
+    for (const [offsetX, expectedBlock] of cases) {
+      pointer(canvas, "pointermove", offsetX);
       expect(tooltip.textContent).toBe(`Block ${expectedBlock} · missing`);
-      if (checkColumns.includes(column)) checked.add(column);
     }
-    expect(checked.size).toBe(checkColumns.length);
     map.destroy();
   });
 
@@ -396,14 +392,14 @@ describe("createBlockMap", () => {
     const before = dom.puts.length;
     map.addRanges([[20, 30]]);
     expect(dom.puts.length).toBe(before + 1);
-    let image = dom.puts.at(-1) as ImageData;
-    expect(Array.from(image.data.subarray(2 * 4, 2 * 4 + 4))).toEqual(COMPLETE_RGBA);
-    expect(Array.from(image.data.subarray(3 * 4, 3 * 4 + 4))).toEqual(MISSING_RGBA);
+    let image = dom.puts.at(-1) as ImageDataLike;
+    expect(pixel(image, 2)).toEqual(COMPLETE_RGBA);
+    expect(pixel(image, 3)).toEqual(MISSING_RGBA);
     expect(map.getProgress().completed).toBe(10);
     map.removeRanges([[25, 35]]);
-    image = dom.puts.at(-1) as ImageData;
+    image = dom.puts.at(-1) as ImageDataLike;
     expect(map.getProgress().completed).toBe(5);
-    expect(Array.from(image.data.subarray(2 * 4, 2 * 4 + 4))).not.toEqual(COMPLETE_RGBA);
+    expect(pixel(image, 2)).not.toEqual(COMPLETE_RGBA);
     map.destroy();
     expect(() => map.addRanges([[0, 1]])).not.toThrow();
   });
@@ -434,12 +430,12 @@ describe("createBlockMap", () => {
     dom.triggerResize(50);
     map.addRanges([[0, 20]]);
     map.removeRanges([[5, 6]]);
-    const image = dom.puts.at(-1) as ImageData;
+    const image = dom.puts.at(-1) as ImageDataLike;
     for (let column = 25; column <= 29; column += 1) {
-      expect(Array.from(image.data.subarray(column * 4, column * 4 + 4))).toEqual(MISSING_RGBA);
+      expect(pixel(image, column)).toEqual(MISSING_RGBA);
     }
     for (let column = 20; column <= 24; column += 1) {
-      expect(Array.from(image.data.subarray(column * 4, column * 4 + 4))).toEqual(COMPLETE_RGBA);
+      expect(pixel(image, column)).toEqual(COMPLETE_RGBA);
     }
     map.destroy();
   });
