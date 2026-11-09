@@ -60,6 +60,7 @@ export const Download = ({ totalBlocks }: { totalBlocks: number }) => {
 | `interactive` | `boolean` | `true` | Ctrl/⌘+wheel zooms, drag pans, double-click resets. |
 | `onViewChange` | `(view) => void` | | Called when the view changes. |
 | `axis` | `boolean \| { format?, tickCount? }` | `false` | Tick labels under the bar. |
+| `label` | `(progress) => string` | | Overrides the canvas `aria-label`. See Behaviour. |
 
 ## Methods
 
@@ -77,6 +78,11 @@ export const Download = ({ totalBlocks }: { totalBlocks: number }) => {
 | `destroy()` | Remove everything. |
 
 Ranges use exclusive ends: `[0, 10]` means blocks 0 through 9. Unsorted, overlapping, and out-of-range input is normalised.
+
+## Behaviour
+
+- The canvas is focusable (`tabindex="0"`) when `interactive` isn't `false`, and announces progress through `role="img"` plus an `aria-label`: `label` overrides the default `Download progress: 4,343,270 of 10,000,000 blocks (43%)` text.
+- With the canvas focused: `+`/`-` (or `=`/`_`) zoom in or out around the centre of the current view, arrow keys pan by 10% of the view length, Shift+arrow by 50%, and `Home` or `0` resets to the full range.
 
 ## React
 

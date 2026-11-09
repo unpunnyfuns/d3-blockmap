@@ -10,7 +10,12 @@ import { createAxis, createScale } from "./axis";
 import type { Axis, AxisOptions, BlockScale } from "./axis";
 import { createColorScale, highlightColor, readTheme, watchTheme } from "./colors";
 import type { PartialStyle, Theme } from "./colors";
-import { CANVAS_ROWS, REDUCED_MOTION_QUERY } from "./constants";
+import {
+  ARIA_LABEL_DEFAULT_PERCENT_DIGITS,
+  CANVAS_ROWS,
+  PERCENT,
+  REDUCED_MOTION_QUERY,
+} from "./constants";
 import { attachInteraction } from "./interaction";
 import { createRenderer } from "./renderer";
 import type { Renderer } from "./renderer";
@@ -30,6 +35,7 @@ export type BlockMapOptions = {
   interactive?: boolean;
   axis?: boolean | AxisOptions;
   onViewChange?: (view: BlockView) => void;
+  label?: (progress: Progress) => string;
 };
 
 export type BlockMap = {
@@ -50,6 +56,19 @@ export type BlockMap = {
 const FULL = "100%";
 const CONTEXT_ID = "2d";
 const NO_FRAME = 0;
+const LOCALE = "en-US";
+const ARIA_LABEL_ATTRIBUTE = "aria-label";
+
+const numberFormat = new Intl.NumberFormat(LOCALE);
+
+// What a screen reader announces when nothing else is specified: grouped
+// counts so large totals read in thousands rather than a wall of digits.
+const defaultLabel = (progress: Progress): string => {
+  const percent = ((progress.completed / progress.total) * PERCENT).toFixed(
+    ARIA_LABEL_DEFAULT_PERCENT_DIGITS,
+  );
+  return `Download progress: ${numberFormat.format(progress.completed)} of ${numberFormat.format(progress.total)} blocks (${percent}%)`;
+};
 
 // devicePixelRatio fires no change event, so the current ratio is watched as
 // a media query that stops matching when it moves.
@@ -80,6 +99,10 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     touchAction: "none",
   });
   canvas.height = CANVAS_ROWS;
+  canvas.setAttribute("role", "img");
+  // Only a canvas the keyboard can reach needs to be in the tab order; a
+  // non-interactive map has nothing for arrow keys or zoom keys to do.
+  if (options.interactive !== false) canvas.tabIndex = 0;
   container.append(canvas);
 
   // Remove the canvas before throwing, so a failed construction leaves no
@@ -123,6 +146,27 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     theme = readTheme(container);
     renderer.setColors(createColorScale(theme, options.partial));
     if (highlightOn) renderer.setHighlightColor(highlightColor(theme));
+  };
+
+  let labelPending = false;
+  let labelFrame = NO_FRAME;
+
+  /**
+   * Coalesces to one aria-label write per animation frame: a burst of
+   * addBlocks calls in a single tick only needs to announce the final count.
+   * labelPending is set before requestAnimationFrame is called, not after,
+   * because the test harness's rAF can run its callback synchronously; if
+   * the flag were the frame handle itself, that reentrant run would clear it
+   * before the still-pending assignment overwrote it right back.
+   */
+  const scheduleLabel = (): void => {
+    if (labelPending) return;
+    labelPending = true;
+    labelFrame = requestAnimationFrame(() => {
+      labelPending = false;
+      labelFrame = NO_FRAME;
+      canvas.setAttribute(ARIA_LABEL_ATTRIBUTE, (options.label ?? defaultLabel)(state.progress()));
+    });
   };
 
   let pendingView: BlockView | undefined;
@@ -266,6 +310,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   // bitset, so the opposite order would discard the individual blocks.
   if (options.initialRanges) state.replaceRanges(options.initialRanges);
   if (options.initialBlocks) renderer.markDirty(state.add(options.initialBlocks));
+  scheduleLabel();
 
   // Every mutating method checks `destroyed`, so a late async update from a
   // caller that has already torn the map down is a no-op rather than a write
@@ -275,25 +320,30 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       if (destroyed) return;
       state.replace(indices);
       renderer.markAllDirty();
+      scheduleLabel();
     },
     setRanges: (ranges) => {
       if (destroyed) return;
       state.replaceRanges(ranges);
       renderer.markAllDirty();
+      scheduleLabel();
     },
 
     // The incremental paths repaint only the bins the state reports changed.
     addBlocks: (indices) => {
       if (destroyed) return;
       renderer.markDirty(state.add(indices));
+      scheduleLabel();
     },
     addRanges: (ranges) => {
       if (destroyed) return;
       renderer.markDirty(state.addRanges(ranges));
+      scheduleLabel();
     },
     removeRanges: (ranges) => {
       if (destroyed) return;
       renderer.markDirty(state.removeRanges(ranges));
+      scheduleLabel();
     },
 
     setView: (view) => {
@@ -326,6 +376,10 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       if (viewFrame !== NO_FRAME) cancelAnimationFrame(viewFrame);
       viewFrame = NO_FRAME;
       pendingView = undefined;
+
+      if (labelFrame !== NO_FRAME) cancelAnimationFrame(labelFrame);
+      labelFrame = NO_FRAME;
+      labelPending = false;
 
       resizeObserver.disconnect();
       unwatchTheme();

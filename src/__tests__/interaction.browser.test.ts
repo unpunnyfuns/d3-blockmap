@@ -101,4 +101,79 @@ describe("attachInteraction", () => {
     expect(calls).toEqual([]);
     expect(deps.resetView).toHaveBeenCalledTimes(1);
   });
+
+  const keydown = (key: string, shiftKey = false): KeyboardEvent => {
+    const event = new KeyboardEvent("keydown", { key, shiftKey, bubbles: true, cancelable: true });
+    canvas.dispatchEvent(event);
+    return event;
+  };
+
+  it("+ zooms in around the view centre and prevents default", () => {
+    const { deps, calls } = createDeps({ start: 0, end: 1000 });
+    attachInteraction(canvas, deps);
+    const event = keydown("+");
+    expect(event.defaultPrevented).toBe(true);
+    expect(calls).toEqual([{ start: 100, end: 900 }]);
+  });
+
+  it("= also zooms in and _ zooms out around the view centre", () => {
+    const { deps, calls } = createDeps({ start: 0, end: 1000 });
+    attachInteraction(canvas, deps);
+    keydown("=");
+    expect(calls).toEqual([{ start: 100, end: 900 }]);
+
+    const { deps: outDeps, calls: outCalls } = createDeps({ start: 100, end: 900 });
+    attachInteraction(canvas, outDeps);
+    keydown("_");
+    expect(outCalls).toEqual([{ start: 0, end: 1000 }]);
+  });
+
+  it("ArrowRight pans by 10% of the view length", () => {
+    const { deps, calls } = createDeps({ start: 200, end: 400 });
+    attachInteraction(canvas, deps);
+    const event = keydown("ArrowRight");
+    expect(event.defaultPrevented).toBe(true);
+    expect(calls).toEqual([{ start: 220, end: 420 }]);
+  });
+
+  it("Shift+ArrowRight pans by 50% of the view length", () => {
+    const { deps, calls } = createDeps({ start: 200, end: 400 });
+    attachInteraction(canvas, deps);
+    keydown("ArrowRight", true);
+    expect(calls).toEqual([{ start: 300, end: 500 }]);
+  });
+
+  it("ArrowLeft pans backward", () => {
+    const { deps, calls } = createDeps({ start: 200, end: 400 });
+    attachInteraction(canvas, deps);
+    keydown("ArrowLeft");
+    expect(calls).toEqual([{ start: 180, end: 380 }]);
+  });
+
+  it("Home and 0 reset the view", () => {
+    const { deps } = createDeps({ start: 200, end: 400 });
+    attachInteraction(canvas, deps);
+    keydown("Home");
+    expect(deps.resetView).toHaveBeenCalledTimes(1);
+    keydown("0");
+    expect(deps.resetView).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves an unrelated key alone", () => {
+    const { deps, calls } = createDeps();
+    attachInteraction(canvas, deps);
+    const event = keydown("a");
+    expect(event.defaultPrevented).toBe(false);
+    expect(calls).toEqual([]);
+    expect(deps.resetView).not.toHaveBeenCalled();
+  });
+
+  it("dispose removes the keydown listener", () => {
+    const { deps, calls } = createDeps();
+    const dispose = attachInteraction(canvas, deps);
+    dispose();
+    const event = keydown("+");
+    expect(event.defaultPrevented).toBe(false);
+    expect(calls).toEqual([]);
+  });
 });

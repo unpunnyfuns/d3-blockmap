@@ -423,6 +423,45 @@ describe("createBlockMap", () => {
     map.destroy();
   });
 
+  it("canvas has role img and is focusable only when interactive", () => {
+    const container = dom.mount();
+    const map = createBlockMap(container, { totalBlocks: 10 });
+    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+    expect(canvas.getAttribute("role")).toBe("img");
+    expect(canvas.getAttribute("tabindex")).toBe("0");
+    map.destroy();
+
+    const fixed = dom.mount();
+    const still = createBlockMap(fixed, { totalBlocks: 10, interactive: false });
+    const canvas2 = fixed.querySelector("canvas") as HTMLCanvasElement;
+    expect(canvas2.getAttribute("role")).toBe("img");
+    expect(canvas2.getAttribute("tabindex")).toBeNull();
+    still.destroy();
+  });
+
+  it("sets a default aria-label at construction and after addBlocks", () => {
+    const container = dom.mount();
+    const map = createBlockMap(container, { totalBlocks: 100 });
+    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+    expect(canvas.getAttribute("aria-label")).toBe("Download progress: 0 of 100 blocks (0%)");
+    map.addBlocks(Array.from({ length: 43 }, (_, i) => i));
+    expect(canvas.getAttribute("aria-label")).toBe("Download progress: 43 of 100 blocks (43%)");
+    map.destroy();
+  });
+
+  it("uses a custom label option", () => {
+    const container = dom.mount();
+    const label = vi.fn(
+      (progress: { completed: number; total: number }) => `${progress.completed}/${progress.total}`,
+    );
+    const map = createBlockMap(container, { totalBlocks: 100, label });
+    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+    expect(canvas.getAttribute("aria-label")).toBe("0/100");
+    map.addBlocks([0]);
+    expect(canvas.getAttribute("aria-label")).toBe("1/100");
+    map.destroy();
+  });
+
   it("discrete mode removeRanges paints the missing colour for only the affected block", () => {
     const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 20 });

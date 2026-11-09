@@ -59,6 +59,14 @@ export const BLINK_INTERVAL_MS = 500;
 export const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 export const MIN_VIEW_LENGTH = 1;
 
+// Keyboard panning moves the view by a fraction of its own length: 10%
+// normally, 50% with Shift held, for a faster traverse of a large view.
+export const KEY_PAN_FRACTION = 0.1;
+export const KEY_PAN_FRACTION_FAST = 0.5;
+
+// The default aria-label reports a whole percentage, no decimal places.
+export const ARIA_LABEL_DEFAULT_PERCENT_DIGITS = 0;
+
 // Axis layout: aim for one tick per 80px, never fewer than two, and treat a
 // tick within half that spacing of an edge as needing an edge-aligned label.
 export const CSS_VAR_AXIS_COLOR = "--blockmap-axis-color";

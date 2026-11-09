@@ -1,11 +1,12 @@
 /**
- * Translates pointer and wheel gestures on the canvas into view changes:
- * ctrl/meta-wheel zooms, drag pans, double click resets. It computes the new
- * view with the pure helpers in view.ts and hands it to deps.setView; it
- * never touches state, pixels or the tooltip directly.
+ * Translates pointer, wheel and keyboard input on the canvas into view
+ * changes: ctrl/meta-wheel zooms, drag pans, double click resets, and the
+ * keys below mirror those gestures for anyone who can't use a pointer. It
+ * computes the new view with the pure helpers in view.ts and hands it to
+ * deps.setView; it never touches state, pixels or the tooltip directly.
  */
 
-import { DRAG_THRESHOLD_PX, ZOOM_STEP } from "./constants";
+import { DRAG_THRESHOLD_PX, KEY_PAN_FRACTION, KEY_PAN_FRACTION_FAST, ZOOM_STEP } from "./constants";
 import { panView, viewLength, zoomView } from "./view";
 import type { BlockView } from "./view";
 
@@ -23,6 +24,13 @@ export type InteractionDeps = {
 const PRIMARY_BUTTON = 0;
 const GRABBING = "grabbing";
 const NO_POINTER = -1;
+const HALF = 2;
+
+// `=` and `_` are the unshifted/shifted neighbours of `+` and `-` on a US
+// keyboard layout, so both read as the same gesture without requiring Shift.
+const ZOOM_IN_KEYS = new Set(["+", "="]);
+const ZOOM_OUT_KEYS = new Set(["-", "_"]);
+const RESET_KEYS = new Set(["0", "Home"]);
 
 /**
  * The view as it was at pointerdown, plus where the pointer went down.
@@ -119,12 +127,42 @@ export const attachInteraction = (
 
   const onDblClick = (): void => deps.resetView();
 
+  /**
+   * Zoom keys anchor on the view's centre rather than a pointer position,
+   * since a keyboard gesture has none. Pan keys move by a fraction of the
+   * current view length rather than a fixed block count, so the step scales
+   * with how far zoomed in the view already is. Only handled keys are
+   * prevented, so everything else - Tab, browser shortcuts - still works.
+   */
+  const onKeyDown = (event: KeyboardEvent): void => {
+    const view = deps.getView();
+    const length = viewLength(view);
+    const centre = view.start + length / HALF;
+    const total = deps.getTotalBlocks();
+
+    if (ZOOM_IN_KEYS.has(event.key)) {
+      deps.setView(zoomView(view, centre, 1 / ZOOM_STEP, total));
+    } else if (ZOOM_OUT_KEYS.has(event.key)) {
+      deps.setView(zoomView(view, centre, ZOOM_STEP, total));
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      const fraction = event.shiftKey ? KEY_PAN_FRACTION_FAST : KEY_PAN_FRACTION;
+      const delta = length * fraction * (event.key === "ArrowLeft" ? -1 : 1);
+      deps.setView(panView(view, delta, total));
+    } else if (RESET_KEYS.has(event.key)) {
+      deps.resetView();
+    } else {
+      return;
+    }
+    event.preventDefault();
+  };
+
   canvas.addEventListener("wheel", onWheel, { passive: false });
   canvas.addEventListener("pointerdown", onPointerDown);
   canvas.addEventListener("pointermove", onPointerMove);
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);
   canvas.addEventListener("dblclick", onDblClick);
+  canvas.addEventListener("keydown", onKeyDown);
 
   // Teardown ends any drag in flight first, so capture and the grabbing
   // cursor are released even if the map is destroyed mid-gesture.
@@ -136,5 +174,6 @@ export const attachInteraction = (
     canvas.removeEventListener("pointerup", endDrag);
     canvas.removeEventListener("pointercancel", endDrag);
     canvas.removeEventListener("dblclick", onDblClick);
+    canvas.removeEventListener("keydown", onKeyDown);
   };
 };
