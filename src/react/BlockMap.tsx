@@ -5,7 +5,7 @@
  * effects instead.
  */
 
-import { useEffect, useImperativeHandle, useRef } from "react";
+import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { CSSProperties, Ref } from "react";
 import type { AxisOptions } from "../axis";
 import type { PartialStyle } from "../colors";
@@ -13,6 +13,7 @@ import { createBlockMap, defaultLabel } from "../blockMap";
 import type { BlockClickEvent, BlockMap as BlockMapInstance, BlockMapOptions } from "../blockMap";
 import type { BlockRange, RangeInput } from "../ranges";
 import type { Progress } from "../state";
+import { createScale, fullView } from "../view";
 import type { BlockView } from "../view";
 
 export type BlockMapProps = {
@@ -35,29 +36,21 @@ export type BlockMapProps = {
   ref?: Ref<BlockMapHandle>;
 };
 
-// The instance methods worth exposing imperatively. setBlocks is omitted
-// because the `blocks` and `ranges` props own wholesale replacement, and
-// destroy because the component owns the instance's lifetime.
-export type BlockMapHandle = Pick<
-  BlockMapInstance,
-  | "addBlocks"
-  | "setRanges"
-  | "addRanges"
-  | "removeRanges"
-  | "setView"
-  | "resetView"
-  | "getView"
-  | "getScale"
-  | "setBrush"
-  | "getBrush"
-  | "setHighlight"
-  | "getProgress"
+// Every instance method except destroy, because the component owns the
+// instance's lifetime. The data setters write through to the instance and
+// stay in effect until the `blocks` or `ranges` prop next changes identity.
+export type BlockMapHandle = Omit<BlockMapInstance, "destroy">;
+
+type Callbacks = Pick<
+  BlockMapProps,
+  "onViewChange" | "onBrush" | "onBrushEnd" | "onBlockClick" | "label"
 >;
 
 // Module-level fallbacks for the empty cases, so neither the push effect nor
 // the handle's getters allocate on every call.
 const EMPTY_BLOCKS: readonly number[] = [];
 const EMPTY_PROGRESS = { completed: 0, total: 0 };
+const UNMEASURED_WIDTH = 0;
 
 export const BlockMap = ({
   totalBlocks,
@@ -79,38 +72,19 @@ export const BlockMap = ({
   ref,
 }: BlockMapProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const instanceRef = useRef<BlockMapInstance>(null);
+  const [instance, setInstance] = useState<BlockMapInstance | null>(null);
 
-  // Held in a ref and refreshed on render so an inline callback does not
-  // appear as a changed dependency and tear the whole map down.
-  const onViewChangeRef = useRef(onViewChange);
-  onViewChangeRef.current = onViewChange;
-
-  // The brush and click callbacks follow the same rule: the wrapper is always
-  // installed, so adding or removing a handler after mount works without a
-  // rebuild, and only `brush` itself is a construction option.
-  const onBrushRef = useRef(onBrush);
-  onBrushRef.current = onBrush;
-  const onBrushEndRef = useRef(onBrushEnd);
-  onBrushEndRef.current = onBrushEnd;
-  const onBlockClickRef = useRef(onBlockClick);
-  onBlockClickRef.current = onBlockClick;
-
-  // Same idea as onViewChangeRef, but label is also kept out of the create
-  // effect's dependencies below: the wrapper is only installed when `label`
-  // was given at construction. Supplying `label` on a later render, after
-  // mounting without one, does not recreate the instance and so never takes
-  // effect. Once the wrapper exists, a changed function identity applies on
-  // the next progress update, and removing the prop falls back to the core's
-  // default text.
-  const labelRef = useRef(label);
-  labelRef.current = label;
+  // Refreshed on every render and read through wrappers installed once, so an
+  // inline callback is never a changed dependency that tears the map down,
+  // and adding or removing one after mount takes effect without a rebuild.
+  const latest = useRef<Callbacks>({});
+  latest.current = { onViewChange, onBrush, onBrushEnd, onBlockClick, label };
 
   /**
    * Only the options that cannot be changed after construction are
-   * dependencies here; everything else is pushed by the effects below. Pass
-   * `axis` as a stable value - a fresh object literal each render would
-   * recreate the map every time.
+   * dependencies here; everything else is pushed by the effects below, which
+   * re-run against each new instance. Pass `axis` as a stable value - a fresh
+   * object literal each render would recreate the map every time.
    */
   useEffect(() => {
     const container = containerRef.current;
@@ -118,37 +92,33 @@ export const BlockMap = ({
 
     const options: BlockMapOptions = {
       totalBlocks,
-      onViewChange: (next) => onViewChangeRef.current?.(next),
-      onBrush: (selection) => onBrushRef.current?.(selection),
-      onBrushEnd: (selection) => onBrushEndRef.current?.(selection),
-      onBlockClick: (event) => onBlockClickRef.current?.(event),
+      onViewChange: (next) => latest.current.onViewChange?.(next),
+      onBrush: (selection) => latest.current.onBrush?.(selection),
+      onBrushEnd: (selection) => latest.current.onBrushEnd?.(selection),
+      onBlockClick: (event) => latest.current.onBlockClick?.(event),
     };
     if (partial) options.partial = partial;
     if (interactive !== undefined) options.interactive = interactive;
     if (view) options.view = view;
     if (axis !== undefined) options.axis = axis;
     if (brush !== undefined) options.brush = brush;
+    // Installed only when given at construction, so a label supplied later
+    // never applies until the map is rebuilt.
     if (label !== undefined) {
-      options.label = (progress) => (labelRef.current ?? defaultLabel)(progress);
+      options.label = (progress) => (latest.current.label ?? defaultLabel)(progress);
     }
 
-    const instance = createBlockMap(container, options);
-    instanceRef.current = instance;
+    const created = createBlockMap(container, options);
+    setInstance(created);
     return () => {
-      instance.destroy();
-      instanceRef.current = null;
+      created.destroy();
+      setInstance(null);
     };
   }, [totalBlocks, partial, interactive, axis, brush]);
 
-  /**
-   * The effects that push props repeat the construction dependencies so they
-   * re-run after a rebuild and re-apply their prop to the new instance.
-   *
-   * `ranges` wins when both props are given: it replaces the bitset, so the
-   * loose blocks have to be added on top of it afterwards.
-   */
+  // `ranges` wins when both props are given: it replaces the bitset, so the
+  // loose blocks have to be added on top of it afterwards.
   useEffect(() => {
-    const instance = instanceRef.current;
     if (!instance) return;
 
     if (ranges !== undefined) {
@@ -157,43 +127,38 @@ export const BlockMap = ({
       return;
     }
     instance.setBlocks(blocks ?? EMPTY_BLOCKS);
-  }, [totalBlocks, partial, interactive, axis, brush, ranges, blocks]);
+  }, [instance, ranges, blocks]);
 
   // Leaving `view` undefined hands control to the map's own interaction.
   useEffect(() => {
-    if (view !== undefined) instanceRef.current?.setView(view);
-  }, [totalBlocks, partial, interactive, axis, brush, view]);
+    if (view !== undefined) instance?.setView(view);
+  }, [instance, view]);
 
   useEffect(() => {
-    instanceRef.current?.setHighlight(highlight ?? false);
-  }, [totalBlocks, partial, interactive, axis, brush, highlight]);
+    instance?.setHighlight(highlight ?? false);
+  }, [instance, highlight]);
 
-  // The getters need defaults for the window before the first effect runs and
-  // after unmount, so callers never have to handle a missing instance.
+  // The getters need defaults for the window before the first instance
+  // exists, so callers never have to handle a missing one. A handle held past
+  // unmount reaches the destroyed instance, whose methods are inert.
   useImperativeHandle(
     ref,
     () => ({
-      addBlocks: (indices) => instanceRef.current?.addBlocks(indices),
-      setRanges: (next) => instanceRef.current?.setRanges(next),
-      addRanges: (next) => instanceRef.current?.addRanges(next),
-      removeRanges: (next) => instanceRef.current?.removeRanges(next),
-      setView: (next) => instanceRef.current?.setView(next),
-      resetView: () => instanceRef.current?.resetView(),
-      getView: () => instanceRef.current?.getView() ?? { start: 0, end: totalBlocks },
-      getScale: () =>
-        instanceRef.current?.getScale() ?? {
-          domain: [0, totalBlocks],
-          range: [0, 0],
-          x: () => 0,
-          block: () => 0,
-        },
-      setBrush: (selection) => instanceRef.current?.setBrush(selection),
-      getBrush: () => instanceRef.current?.getBrush() ?? null,
-      setHighlight: (on) => instanceRef.current?.setHighlight(on),
-      getProgress: () =>
-        instanceRef.current?.getProgress() ?? { ...EMPTY_PROGRESS, total: totalBlocks },
+      setBlocks: (indices) => instance?.setBlocks(indices),
+      addBlocks: (indices) => instance?.addBlocks(indices),
+      setRanges: (next) => instance?.setRanges(next),
+      addRanges: (next) => instance?.addRanges(next),
+      removeRanges: (next) => instance?.removeRanges(next),
+      setView: (next) => instance?.setView(next),
+      resetView: () => instance?.resetView(),
+      getView: () => instance?.getView() ?? fullView(totalBlocks),
+      getScale: () => instance?.getScale() ?? createScale(fullView(totalBlocks), UNMEASURED_WIDTH),
+      setBrush: (selection) => instance?.setBrush(selection),
+      getBrush: () => instance?.getBrush() ?? null,
+      setHighlight: (on) => instance?.setHighlight(on),
+      getProgress: () => instance?.getProgress() ?? { ...EMPTY_PROGRESS, total: totalBlocks },
     }),
-    [totalBlocks],
+    [instance, totalBlocks],
   );
 
   return <div ref={containerRef} className={className} style={style} />;

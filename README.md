@@ -94,11 +94,12 @@ Ranges use exclusive ends: `[0, 10]` means blocks 0 through 9. Unsorted, overlap
 
 ## React
 
-Props mirror the options, including `label`, `brush`, `onBrush`, `onBrushEnd`, `onBlockClick`, plus `blocks`, `ranges`, `highlight`, `className`, `style`. `ref` is a plain prop exposing the methods above, including `setBrush` and `getBrush`, except `setBlocks` and `destroy`, as `BlockMapHandle`.
+Props mirror the options, including `label`, `brush`, `onBrush`, `onBrushEnd`, `onBlockClick`, plus `blocks`, `ranges`, `highlight`, `className`, `style`. `ref` is a plain prop exposing every method above except `destroy`, as `BlockMapHandle`.
 
 - `blocks` and `ranges` apply when their identity changes, so keep the references stable.
 - `partial`, `interactive`, `axis`, and `brush` recreate the instance when they change; memoise an object `axis`.
 - `onViewChange`, `onBrush`, `onBrushEnd`, and `onBlockClick` can be inline: the latest function is called without recreating the instance.
+- `setBlocks` and `setRanges` on the ref hold until the `blocks` or `ranges` prop next changes.
 - For high-frequency updates use the ref (`addBlocks`, `addRanges`) rather than props.
 
 ## Theming

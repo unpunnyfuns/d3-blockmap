@@ -67,11 +67,13 @@ describe("<BlockMap>", () => {
     expect(second.setBlocks).toHaveBeenCalledWith(blocks);
   });
 
-  it("exposes addBlocks, setRanges, addRanges, removeRanges and getProgress through the ref", () => {
+  it("exposes setBlocks, addBlocks, setRanges, addRanges, removeRanges and getProgress through the ref", () => {
     const instance = createInstance();
     vi.mocked(createBlockMap).mockReturnValue(instance);
     const ref = createRef<BlockMapHandle>();
     render(<BlockMap ref={ref} totalBlocks={10} />);
+    act(() => ref.current?.setBlocks([5, 6]));
+    expect(instance.setBlocks).toHaveBeenLastCalledWith([5, 6]);
     act(() => ref.current?.addBlocks([4]));
     expect(instance.addBlocks).toHaveBeenCalledWith([4]);
     expect(ref.current?.getProgress()).toEqual({ completed: 0, total: 0 });

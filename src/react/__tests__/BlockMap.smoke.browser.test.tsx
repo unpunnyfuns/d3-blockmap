@@ -1,5 +1,5 @@
 import { act, render } from "@testing-library/react";
-import { createRef } from "react";
+import { StrictMode, createRef } from "react";
 import { installDom } from "../../testing";
 import type { InstalledDom } from "../../testing";
 import { BlockMap } from "../BlockMap";
@@ -25,6 +25,20 @@ describe("<BlockMap> smoke", () => {
     expect(container.querySelector("canvas")).not.toBeNull();
     expect(container.querySelector("[data-blockmap-axis]")).not.toBeNull();
     expect(ref.current?.getProgress()).toEqual({ completed: 50, total: 100 });
+    unmount();
+    expect(container.querySelector("canvas")).toBeNull();
+  });
+
+  it("leaves one live map with props applied under StrictMode", () => {
+    const ref = createRef<BlockMapHandle>();
+    const { container, unmount } = render(
+      <StrictMode>
+        <BlockMap ref={ref} totalBlocks={100} blocks={[1, 2, 3]} />
+      </StrictMode>,
+    );
+    act(() => dom.triggerResize(40));
+    expect(container.querySelectorAll("canvas")).toHaveLength(1);
+    expect(ref.current?.getProgress()).toEqual({ completed: 3, total: 100 });
     unmount();
     expect(container.querySelector("canvas")).toBeNull();
   });
