@@ -169,6 +169,36 @@ describe("<BlockMap>", () => {
     expect(second.setHighlight).toHaveBeenCalledWith(true);
   });
 
+  it("passes label as a wrapper and forwards the latest function without recreating", () => {
+    const instance = createInstance();
+    vi.mocked(createBlockMap).mockReturnValue(instance);
+    const first = vi.fn(
+      (progress: { completed: number; total: number }) => `${progress.completed}`,
+    );
+    const second = vi.fn((progress: { completed: number; total: number }) => `${progress.total}`);
+    const { rerender } = render(<BlockMap totalBlocks={10} label={first} />);
+
+    const passed = vi.mocked(createBlockMap).mock.calls[0][1].label as (p: {
+      completed: number;
+      total: number;
+    }) => string;
+    expect(passed({ completed: 3, total: 10 })).toBe("3");
+    expect(first).toHaveBeenCalledTimes(1);
+
+    rerender(<BlockMap totalBlocks={10} label={second} />);
+    expect(createBlockMap).toHaveBeenCalledTimes(1);
+    expect(passed({ completed: 3, total: 10 })).toBe("10");
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits label from the created options when the prop is not given", () => {
+    const instance = createInstance();
+    vi.mocked(createBlockMap).mockReturnValue(instance);
+    render(<BlockMap totalBlocks={10} />);
+    expect(vi.mocked(createBlockMap).mock.calls[0][1]).not.toHaveProperty("label");
+  });
+
   it("passes axis as a create option, exposes getScale, and passes a boolean axis prop through", () => {
     const instance = createInstance();
     vi.mocked(createBlockMap).mockReturnValue(instance);

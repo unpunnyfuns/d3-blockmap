@@ -12,6 +12,7 @@ import type { PartialStyle } from "../colors";
 import { createBlockMap } from "../blockMap";
 import type { BlockMap as BlockMapInstance, BlockMapOptions } from "../blockMap";
 import type { RangeInput } from "../ranges";
+import type { Progress } from "../state";
 import type { BlockView } from "../view";
 
 export type BlockMapProps = {
@@ -23,6 +24,7 @@ export type BlockMapProps = {
   interactive?: boolean;
   axis?: boolean | AxisOptions;
   onViewChange?: (view: BlockView) => void;
+  label?: (progress: Progress) => string;
   highlight?: boolean;
   className?: string;
   style?: CSSProperties;
@@ -60,6 +62,7 @@ export const BlockMap = ({
   interactive,
   axis,
   onViewChange,
+  label,
   highlight,
   className,
   style,
@@ -72,6 +75,16 @@ export const BlockMap = ({
   // appear as a changed dependency and tear the whole map down.
   const onViewChangeRef = useRef(onViewChange);
   onViewChangeRef.current = onViewChange;
+
+  // Same idea as onViewChangeRef, but label is also kept out of the create
+  // effect's dependencies below: the core already defaults the label when
+  // the option is absent, so the wrapper is only installed when `label` was
+  // given at construction. Supplying `label` on a later render, after
+  // mounting without one, does not recreate the instance and so never takes
+  // effect; a changed function identity once the wrapper exists does, on the
+  // next progress update.
+  const labelRef = useRef(label);
+  labelRef.current = label;
 
   /**
    * Only the options that cannot be changed after construction are
@@ -91,6 +104,7 @@ export const BlockMap = ({
     if (interactive !== undefined) options.interactive = interactive;
     if (view) options.view = view;
     if (axis !== undefined) options.axis = axis;
+    if (label !== undefined) options.label = (progress) => labelRef.current!(progress);
 
     const instance = createBlockMap(container, options);
     instanceRef.current = instance;

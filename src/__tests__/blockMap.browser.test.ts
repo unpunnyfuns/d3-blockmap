@@ -480,6 +480,22 @@ describe("createBlockMap", () => {
     still.destroy();
   });
 
+  it("describes the role and lists key shortcuts only when interactive", () => {
+    const container = dom.mount();
+    const map = createBlockMap(container, { totalBlocks: 10 });
+    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+    expect(canvas.getAttribute("aria-roledescription")).toBe("zoomable block map");
+    expect(canvas.getAttribute("aria-keyshortcuts")).toBe("Plus Minus ArrowLeft ArrowRight Home");
+    map.destroy();
+
+    const fixed = dom.mount();
+    const still = createBlockMap(fixed, { totalBlocks: 10, interactive: false });
+    const canvas2 = fixed.querySelector("canvas") as HTMLCanvasElement;
+    expect(canvas2.getAttribute("aria-roledescription")).toBe("zoomable block map");
+    expect(canvas2.getAttribute("aria-keyshortcuts")).toBeNull();
+    still.destroy();
+  });
+
   it("sets a default aria-label at construction and after addBlocks", () => {
     const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 100 });
@@ -487,6 +503,17 @@ describe("createBlockMap", () => {
     expect(canvas.getAttribute("aria-label")).toBe("Download progress: 0 of 100 blocks (0%)");
     map.addBlocks(Array.from({ length: 43 }, (_, i) => i));
     expect(canvas.getAttribute("aria-label")).toBe("Download progress: 43 of 100 blocks (43%)");
+    map.destroy();
+  });
+
+  it("floors the default percent rather than rounding it up to 100%", () => {
+    const container = dom.mount();
+    const map = createBlockMap(container, { totalBlocks: 10_000_000 });
+    map.addRanges([[0, 9_999_999]]);
+    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+    expect(canvas.getAttribute("aria-label")).toBe(
+      "Download progress: 9,999,999 of 10,000,000 blocks (99%)",
+    );
     map.destroy();
   });
 
@@ -501,6 +528,33 @@ describe("createBlockMap", () => {
     map.addBlocks([0]);
     expect(canvas.getAttribute("aria-label")).toBe("1/100");
     map.destroy();
+  });
+
+  it("sets the first label synchronously, before any frame runs", () => {
+    dom.restore();
+    dom = installDom({ deferFrames: true });
+    const container = dom.mount();
+    const map = createBlockMap(container, { totalBlocks: 100, initialBlocks: [0, 1] });
+    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+    expect(canvas.getAttribute("aria-label")).toBe("Download progress: 2 of 100 blocks (2%)");
+
+    map.addBlocks([2]);
+    expect(canvas.getAttribute("aria-label")).toBe("Download progress: 2 of 100 blocks (2%)");
+
+    dom.flushFrames();
+    expect(canvas.getAttribute("aria-label")).toBe("Download progress: 3 of 100 blocks (3%)");
+    map.destroy();
+  });
+
+  it("destroy before a pending label frame flushes does not throw", () => {
+    dom.restore();
+    dom = installDom({ deferFrames: true });
+    const container = dom.mount();
+    const map = createBlockMap(container, { totalBlocks: 100 });
+    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+    map.addBlocks([0]);
+    expect(() => map.destroy()).not.toThrow();
+    expect(canvas.getAttribute("aria-label")).toBe("Download progress: 0 of 100 blocks (0%)");
   });
 
   it("discrete mode removeRanges paints the missing colour for only the affected block", () => {

@@ -11,7 +11,9 @@ import type { Axis, AxisOptions, BlockScale } from "./axis";
 import { createColorScale, highlightColor, readTheme, watchTheme } from "./colors";
 import type { PartialStyle, Theme } from "./colors";
 import {
+  ARIA_KEYSHORTCUTS,
   ARIA_LABEL_DEFAULT_PERCENT_DIGITS,
+  ARIA_ROLEDESCRIPTION,
   CANVAS_ROWS,
   PERCENT,
   REDUCED_MOTION_QUERY,
@@ -63,8 +65,10 @@ const numberFormat = new Intl.NumberFormat(LOCALE);
 
 // What a screen reader announces when nothing else is specified: grouped
 // counts so large totals read in thousands rather than a wall of digits.
+// The percentage is floored, not rounded, so it only reads 100% once every
+// block actually is, and reports a last block still missing as 99%.
 const defaultLabel = (progress: Progress): string => {
-  const percent = ((progress.completed / progress.total) * PERCENT).toFixed(
+  const percent = Math.floor((progress.completed / progress.total) * PERCENT).toFixed(
     ARIA_LABEL_DEFAULT_PERCENT_DIGITS,
   );
   return `Download progress: ${numberFormat.format(progress.completed)} of ${numberFormat.format(progress.total)} blocks (${percent}%)`;
@@ -100,9 +104,14 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   });
   canvas.height = CANVAS_ROWS;
   canvas.setAttribute("role", "img");
-  // Only a canvas the keyboard can reach needs to be in the tab order; a
-  // non-interactive map has nothing for arrow keys or zoom keys to do.
-  if (options.interactive !== false) canvas.tabIndex = 0;
+  canvas.setAttribute("aria-roledescription", ARIA_ROLEDESCRIPTION);
+  // Only a canvas the keyboard can reach needs to be in the tab order or
+  // advertise key shortcuts; a non-interactive map has nothing for arrow
+  // keys or zoom keys to do.
+  if (options.interactive !== false) {
+    canvas.tabIndex = 0;
+    canvas.setAttribute("aria-keyshortcuts", ARIA_KEYSHORTCUTS);
+  }
   container.append(canvas);
 
   // Remove the canvas before throwing, so a failed construction leaves no
@@ -162,22 +171,35 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   let labelPending = false;
   let labelFrame = NO_FRAME;
 
+  // Reads the current progress through options.label when given, defaultLabel
+  // otherwise, and writes it straight to the attribute - no coalescing, no
+  // frame. Called directly at construction for a synchronous first label, and
+  // from inside the scheduled frame below for every later update.
+  const writeLabel = (): void => {
+    canvas.setAttribute(ARIA_LABEL_ATTRIBUTE, (options.label ?? defaultLabel)(state.progress()));
+  };
+
   /**
    * Coalesces to one aria-label write per animation frame: a burst of
    * addBlocks calls in a single tick only needs to announce the final count.
    * labelPending is set before requestAnimationFrame is called, not after,
    * because the test harness's rAF can run its callback synchronously; if
    * the flag were the frame handle itself, that reentrant run would clear it
-   * before the still-pending assignment overwrote it right back.
+   * before the still-pending assignment overwrote it right back. The handle
+   * is likewise only stored if labelPending is still true once
+   * requestAnimationFrame returns, so a synchronous callback - which already
+   * cleared it to NO_FRAME - cannot have that clear overwritten by a stale
+   * handle on the way out.
    */
   const scheduleLabel = (): void => {
     if (labelPending) return;
     labelPending = true;
-    labelFrame = requestAnimationFrame(() => {
+    const handle = requestAnimationFrame(() => {
       labelPending = false;
       labelFrame = NO_FRAME;
-      canvas.setAttribute(ARIA_LABEL_ATTRIBUTE, (options.label ?? defaultLabel)(state.progress()));
+      writeLabel();
     });
+    if (labelPending) labelFrame = handle;
   };
 
   // The css width the axis was last built for; distinct from binCount, which
@@ -235,11 +257,16 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
 
   /**
    * One bin per device pixel, so the map never shows more detail than the
-   * screen can resolve. The early return matters for more than speed:
-   * assigning canvas.width clears the backing store, so a no-op resize would
-   * blank the canvas until the next frame.
+   * screen can resolve. A zero css width means the container has not been
+   * measured yet (or has collapsed), so there is nothing to lay out and the
+   * axis is left alone rather than refreshed against a width of zero. The
+   * binCount early return matters for more than speed: assigning
+   * canvas.width clears the backing store, so a no-op resize would blank the
+   * canvas until the next frame.
    */
   const layout = (): void => {
+    if (cssWidth === 0) return;
+
     const binCount = Math.round(cssWidth * dpr);
     if (binCount === state.binCount) {
       // The device-pixel bin count can stay put across a sub-pixel css
@@ -337,7 +364,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   // bitset, so the opposite order would discard the individual blocks.
   if (options.initialRanges) state.replaceRanges(options.initialRanges);
   if (options.initialBlocks) renderer.markDirty(state.add(options.initialBlocks));
-  scheduleLabel();
+  writeLabel();
 
   // Every mutating method checks `destroyed`, so a late async update from a
   // caller that has already torn the map down is a no-op rather than a write

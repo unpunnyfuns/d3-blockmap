@@ -67,6 +67,11 @@ export const KEY_PAN_FRACTION_FAST = 0.5;
 // The default aria-label reports a whole percentage, no decimal places.
 export const ARIA_LABEL_DEFAULT_PERCENT_DIGITS = 0;
 
+// Describes the canvas's role to assistive tech beyond plain "img", and
+// lists the keys a focused, interactive map responds to.
+export const ARIA_ROLEDESCRIPTION = "zoomable block map";
+export const ARIA_KEYSHORTCUTS = "Plus Minus ArrowLeft ArrowRight Home";
+
 // Axis layout: aim for one tick per 80px, never fewer than two, and treat a
 // tick within half that spacing of an edge as needing an edge-aligned label.
 export const CSS_VAR_AXIS_COLOR = "--blockmap-axis-color";
