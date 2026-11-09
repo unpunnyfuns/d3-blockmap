@@ -21,7 +21,7 @@ import {
 import { attachInteraction } from "./interaction";
 import { createRenderer } from "./renderer";
 import type { Renderer } from "./renderer";
-import type { RangeInput } from "./ranges";
+import type { BlockRange, RangeInput } from "./ranges";
 import { createBlockState } from "./state";
 import type { Progress } from "./state";
 import { createTooltip, formatBinTooltip, formatBlockTooltip } from "./tooltip";
@@ -37,7 +37,20 @@ export type BlockMapOptions = {
   interactive?: boolean;
   axis?: boolean | AxisOptions;
   onViewChange?: (view: BlockView) => void;
+  onBlockClick?: (event: BlockClickEvent) => void;
   label?: (progress: Progress) => string;
+};
+
+// Reported from a click on the surface: block/range/completed/total mirror
+// whichever mode located the pointer, discrete block or binned column, and
+// originalEvent carries the native MouseEvent for modifier keys or
+// preventDefault.
+export type BlockClickEvent = {
+  block: number;
+  range: BlockRange;
+  completed: number;
+  total: number;
+  originalEvent: MouseEvent;
 };
 
 export type BlockMap = {
@@ -142,6 +155,9 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   let theme: Theme = readTheme(container);
   let highlightOn = false;
   let dragging = false;
+  // Set when a pan ends, so the click the browser fires right after pointerup
+  // is swallowed instead of reaching onBlockClick as a false hit.
+  let suppressClick = false;
 
   // Created once and read live, rather than re-queried per call, so the
   // change listener below can be attached to this exact MediaQueryList.
@@ -311,37 +327,89 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   const surfaceX = (event: { clientX: number }): number =>
     event.clientX - canvas.getBoundingClientRect().left;
 
+  type Hit = {
+    column: number;
+    block: number;
+    range: BlockRange;
+    completed: number;
+    total: number;
+  };
+
   /**
-   * Hit test for the tooltip, mirroring how the renderer chose to paint:
-   * fewer blocks than columns means each block spans several columns and the
-   * readout names a single block, otherwise a column is a bin and the readout
-   * is a coverage count. The column is clamped because the pointer can sit
-   * past either canvas edge while still inside the container, and suppressed
-   * while dragging, where the pointer means pan.
+   * Hit test shared by the tooltip and the click listener, mirroring how the
+   * renderer chose to paint: fewer blocks than columns means each block spans
+   * several columns and the readout names a single block, otherwise a column
+   * is a bin and the readout is a coverage count. The column is clamped
+   * because the pointer can sit past either canvas edge while still inside
+   * the container. Returns undefined before the first layout, when there
+   * are no bins to hit.
    */
+  const locate = (x: number): Hit | undefined => {
+    const { binCount, view } = state;
+    if (binCount === 0) return undefined;
+
+    const column = Math.min(binCount - 1, Math.max(0, Math.floor(x * dpr)));
+    const length = viewLength(view);
+
+    if (length < binCount) {
+      const block = discreteBlock(column, length, binCount, view.start);
+      return {
+        column,
+        block,
+        range: [block, block + 1],
+        completed: state.has(block) ? 1 : 0,
+        total: 1,
+      };
+    }
+
+    const { start, end } = state.rangeOf(column);
+    return {
+      column,
+      block: start,
+      range: [start, end],
+      completed: state.countOf(column),
+      total: end - start,
+    };
+  };
+
+  // Suppressed while dragging, where the pointer means pan rather than hover.
   const onPointerMove = (event: PointerEvent): void => {
     if (dragging) return;
 
-    const { binCount, view } = state;
-    if (binCount === 0) return;
-
     const x = surfaceX(event);
-    const column = Math.min(binCount - 1, Math.max(0, Math.floor(x * dpr)));
-    const length = viewLength(view);
-    let text: string;
-    if (length < binCount) {
-      const block = discreteBlock(column, length, binCount, view.start);
-      text = formatBlockTooltip(block, state.has(block));
-    } else {
-      text = formatBinTooltip(state.rangeOf(column), state.countOf(column));
-    }
+    const hit = locate(x);
+    if (!hit) return;
+
+    const text =
+      viewLength(state.view) < state.binCount
+        ? formatBlockTooltip(hit.block, hit.completed === 1)
+        : formatBinTooltip({ start: hit.range[0], end: hit.range[1] }, hit.completed);
     tooltip.show(x, text);
   };
 
   const onPointerLeave = (): void => tooltip.hide();
 
+  // A click right after an active pan is a drag artefact, not an intent to
+  // pick a block, so suppressClick swallows exactly one. Registered
+  // regardless of `interactive`, like the tooltip listeners above, since a
+  // non-interactive map can still report what was clicked.
+  const onClick = (event: MouseEvent): void => {
+    if (suppressClick) {
+      suppressClick = false;
+      return;
+    }
+    if (!options.onBlockClick) return;
+
+    const hit = locate(surfaceX(event));
+    if (!hit) return;
+
+    const { column: _column, ...rest } = hit;
+    options.onBlockClick({ ...rest, originalEvent: event });
+  };
+
   container.addEventListener("pointermove", onPointerMove);
   container.addEventListener("pointerleave", onPointerLeave);
+  container.addEventListener("click", onClick);
 
   // Interaction reads the live view and total through getters rather than
   // captured values, since both change under it as zoom and resize happen.
@@ -362,6 +430,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
           },
           onDragEnd: () => {
             dragging = false;
+            suppressClick = true;
           },
         });
 
@@ -450,6 +519,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       motionMedia.removeEventListener("change", onMotionChange);
       container.removeEventListener("pointermove", onPointerMove);
       container.removeEventListener("pointerleave", onPointerLeave);
+      container.removeEventListener("click", onClick);
       detachInteraction?.();
 
       renderer.destroy();

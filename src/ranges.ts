@@ -9,6 +9,11 @@ import { RANGE_PAIR } from "./constants";
 export type BlockRangeTuple = readonly [start: number, end: number];
 export type RangeInput = ArrayLike<BlockRangeTuple> | ArrayLike<number>;
 
+// Half-open [start, end) pair handed back from hit tests - the tooltip and
+// click readouts - and from the brush. Distinct from BlockRangeTuple, which
+// describes caller-supplied range input rather than something the map reports.
+export type BlockRange = readonly [number, number];
+
 type Pair = [number, number];
 
 /**

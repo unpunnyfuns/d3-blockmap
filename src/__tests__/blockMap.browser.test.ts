@@ -621,4 +621,83 @@ describe("createBlockMap", () => {
     }
     map.destroy();
   });
+
+  describe("onBlockClick", () => {
+    it("reports a bin's range and completed count in bin mode", () => {
+      const container = dom.mount();
+      const onBlockClick = vi.fn();
+      const map = createBlockMap(container, { totalBlocks: 100, onBlockClick });
+      dom.triggerResize(5);
+      map.addRanges([[20, 25]]);
+
+      fire(container, "click", at(container, 1.2));
+
+      expect(onBlockClick).toHaveBeenCalledTimes(1);
+      const event = onBlockClick.mock.calls[0][0];
+      expect(event.block).toBe(20);
+      expect(event.range).toEqual([20, 30]);
+      expect(event.completed).toBe(5);
+      expect(event.total).toBe(10);
+      expect(event.originalEvent).toBeInstanceOf(MouseEvent);
+      map.destroy();
+    });
+
+    it("reports the exact block with total 1 in discrete mode", () => {
+      const container = dom.mount(800);
+      const onBlockClick = vi.fn();
+      const map = createBlockMap(container, { totalBlocks: 10, onBlockClick });
+      dom.triggerResize(800);
+      map.addBlocks([5]);
+
+      fire(container, "click", at(container, 400));
+
+      expect(onBlockClick).toHaveBeenCalledTimes(1);
+      const event = onBlockClick.mock.calls[0][0];
+      expect(event.block).toBe(5);
+      expect(event.range).toEqual([5, 6]);
+      expect(event.completed).toBe(1);
+      expect(event.total).toBe(1);
+      map.destroy();
+    });
+
+    it("does not fire after a real drag", () => {
+      const container = dom.mount();
+      const onBlockClick = vi.fn();
+      const map = createBlockMap(container, { totalBlocks: 100, onBlockClick });
+      dom.triggerResize(50);
+
+      pointer(container, "pointerdown", 50);
+      pointer(container, "pointermove", 60);
+      pointer(container, "pointerup", 60);
+      fire(container, "click", at(container, 60));
+
+      expect(onBlockClick).not.toHaveBeenCalled();
+      map.destroy();
+    });
+
+    it("fires when interactive is false", () => {
+      const container = dom.mount();
+      const onBlockClick = vi.fn();
+      const map = createBlockMap(container, {
+        totalBlocks: 100,
+        interactive: false,
+        onBlockClick,
+      });
+      dom.triggerResize(5);
+
+      fire(container, "click", at(container, 1.2));
+
+      expect(onBlockClick).toHaveBeenCalledTimes(1);
+      map.destroy();
+    });
+
+    it("does not throw when onBlockClick is absent", () => {
+      const container = dom.mount();
+      const map = createBlockMap(container, { totalBlocks: 100 });
+      dom.triggerResize(5);
+
+      expect(() => fire(container, "click", at(container, 1.2))).not.toThrow();
+      map.destroy();
+    });
+  });
 });
