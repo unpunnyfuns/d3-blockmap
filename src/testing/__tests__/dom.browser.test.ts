@@ -55,8 +55,8 @@ describe("installDom", () => {
     dom.restore();
   });
 
-  it("defers frames when asked and flushes in order", () => {
-    const dom = installDom({ deferFrames: true });
+  it("defers frames until flushed and runs them in order", () => {
+    const dom = installDom();
     const order: number[] = [];
     requestAnimationFrame(() => order.push(1));
     requestAnimationFrame(() => order.push(2));
@@ -67,7 +67,7 @@ describe("installDom", () => {
   });
 
   it("drains a frame that schedules another frame in one flushFrames call", () => {
-    const dom = installDom({ deferFrames: true });
+    const dom = installDom();
     const order: number[] = [];
     requestAnimationFrame(() => {
       order.push(1);
@@ -79,7 +79,7 @@ describe("installDom", () => {
   });
 
   it("cancels exactly the frame identified by its handle", () => {
-    const dom = installDom({ deferFrames: true });
+    const dom = installDom();
     const order: number[] = [];
     const handleA = requestAnimationFrame(() => order.push(1));
     requestAnimationFrame(() => order.push(2));

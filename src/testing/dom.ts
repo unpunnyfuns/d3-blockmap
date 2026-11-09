@@ -5,7 +5,6 @@ import type { InstalledPointerCapture } from "./pointerCapture";
 
 export type DomOptions = {
   dpr?: number;
-  deferFrames?: boolean;
   media?: (query: string) => boolean;
 };
 export type MediaListener = { query: string; listener: () => void };
@@ -103,11 +102,7 @@ export const installDom = (options: DomOptions = {}): InstalledDom => {
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
     const handle = nextFrameId;
     nextFrameId += 1;
-    if (options.deferFrames) {
-      frames.set(handle, callback);
-      return handle;
-    }
-    callback(0);
+    frames.set(handle, callback);
     return handle;
   });
   vi.stubGlobal("cancelAnimationFrame", (handle: number) => {

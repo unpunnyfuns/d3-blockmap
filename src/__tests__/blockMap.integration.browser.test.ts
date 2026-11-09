@@ -14,7 +14,7 @@ import type { InstalledDom } from "../testing";
 
 let dom: InstalledDom;
 beforeEach(() => {
-  dom = installDom({ deferFrames: true });
+  dom = installDom();
 });
 afterEach(() => {
   dom.restore();

@@ -33,6 +33,7 @@ describe("createBlockMap", () => {
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     expect(canvas).not.toBeNull();
     dom.triggerResize(50);
+    dom.flushFrames();
     expect(canvas.width).toBe(100);
     expect(canvas.height).toBe(1);
     expect(dom.puts.at(-1)?.width).toBe(100);
@@ -43,9 +44,11 @@ describe("createBlockMap", () => {
     const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 100 });
     dom.triggerResize(50);
+    dom.flushFrames();
     expect(dom.puts).toHaveLength(1);
     expect(dom.puts[0]?.width).toBe(100);
     dom.triggerResize(50);
+    dom.flushFrames();
     expect(dom.puts).toHaveLength(1);
     map.destroy();
   });
@@ -56,6 +59,7 @@ describe("createBlockMap", () => {
     dom.triggerResize(50);
     map.addBlocks([0, 1, 2]);
     dom.triggerResize(20);
+    dom.flushFrames();
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     expect(canvas.width).toBe(40);
     expect(dom.puts.at(-1)?.width).toBe(40);
@@ -145,11 +149,13 @@ describe("createBlockMap", () => {
     const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 10, initialBlocks: [9] });
     dom.triggerResize(5);
+    dom.flushFrames();
     const before = dom.puts.length;
     map.setRanges([
       [0, 2],
       [4, 7],
     ]);
+    dom.flushFrames();
     expect(map.getProgress()).toEqual({ completed: 5, total: 10 });
     expect(dom.puts.length).toBe(before + 1);
     map.destroy();
@@ -173,6 +179,7 @@ describe("createBlockMap", () => {
     const map = createBlockMap(container, { totalBlocks: 100, partial: "coverage" });
     dom.triggerResize(5);
     map.setRanges([[0, 5]]);
+    dom.flushFrames();
     const image = dom.puts.at(-1) as ImageDataLike;
     const [r, g, b] = pixel(image, 0);
     expect(r).toBeGreaterThan(200);
@@ -191,6 +198,7 @@ describe("createBlockMap", () => {
       [0, 32],
       [96, 128],
     ]);
+    dom.flushFrames();
     expect(map.getProgress().completed).toBe(64);
 
     const image = dom.puts.at(-1) as ImageDataLike;
@@ -205,14 +213,18 @@ describe("createBlockMap", () => {
     const onViewChange = vi.fn();
     const map = createBlockMap(container, { totalBlocks: 1000, onViewChange });
     dom.triggerResize(50);
+    dom.flushFrames();
     const before = dom.puts.length;
     map.setView({ start: 100, end: 200 });
+    dom.flushFrames();
     expect(map.getView()).toEqual({ start: 100, end: 200 });
     expect(onViewChange).toHaveBeenCalledWith({ start: 100, end: 200 });
     expect(dom.puts.length).toBe(before + 1);
     map.setView({ start: 100, end: 200 });
+    dom.flushFrames();
     expect(onViewChange).toHaveBeenCalledTimes(1);
     map.resetView();
+    dom.flushFrames();
     expect(map.getView()).toEqual({ start: 0, end: 1000 });
     expect(onViewChange).toHaveBeenCalledTimes(2);
     map.destroy();
@@ -226,6 +238,7 @@ describe("createBlockMap", () => {
       view: { start: 10, end: 20 },
       onViewChange,
     });
+    dom.flushFrames();
     expect(map.getView()).toEqual({ start: 10, end: 20 });
     expect(onViewChange).not.toHaveBeenCalled();
     map.destroy();
@@ -255,6 +268,7 @@ describe("createBlockMap", () => {
     dom.triggerResize(5);
     map.addBlocks([0]);
     map.setHighlight(true);
+    dom.flushFrames();
     const image = dom.puts.at(-1) as ImageDataLike;
     expect(pixel(image, 0)).toEqual(COMPLETE_RGBA);
     expect(pixel(image, 1)).toEqual(HIGHLIGHT_RGBA);
@@ -272,6 +286,7 @@ describe("createBlockMap", () => {
     const map = createBlockMap(container, { totalBlocks: 10 });
     dom.triggerResize(5);
     map.setHighlight(true);
+    dom.flushFrames();
     expect(setInterval).not.toHaveBeenCalled();
     expect(pixel(dom.puts.at(-1) as ImageDataLike, 0)).toEqual(HIGHLIGHT_RGBA);
     map.destroy();
@@ -294,6 +309,7 @@ describe("createBlockMap", () => {
       .filter((entry) => entry.query.includes("reduced-motion"))
       .at(-1);
     motionListener?.listener();
+    dom.flushFrames();
 
     expect(clearInterval).toHaveBeenCalledTimes(1);
     expect(pixel(dom.puts.at(-1) as ImageDataLike, 0)).toEqual(HIGHLIGHT_RGBA);
@@ -377,8 +393,6 @@ describe("createBlockMap", () => {
   });
 
   it("coalesces rapid setView calls into one commit per animation frame", () => {
-    dom.restore();
-    dom = installDom({ deferFrames: true });
     const container = dom.mount();
     const onViewChange = vi.fn();
     const map = createBlockMap(container, { totalBlocks: 1000, onViewChange });
@@ -431,6 +445,7 @@ describe("createBlockMap", () => {
       );
     expect(blocks()).toEqual(["0", "200", "400", "600", "800", "1000"]);
     map.setView({ start: 500, end: 600 });
+    dom.flushFrames();
     expect(blocks()).toEqual(["500", "520", "540", "560", "580", "600"]);
     map.destroy();
     expect(container.querySelector("[data-blockmap-axis]")).toBeNull();
@@ -463,14 +478,13 @@ describe("createBlockMap", () => {
     expect(map.getScale().range).toEqual([0, 400]);
     expect(map.getScale().x(500)).toBe(200);
     map.setView({ start: 500, end: 600 });
+    dom.flushFrames();
     expect(map.getScale().domain).toEqual([500, 600]);
     expect(map.getScale().block(200)).toBe(550);
     map.destroy();
   });
 
   it("getScale lags getView by one frame during a coalesced view change", () => {
-    dom.restore();
-    dom = installDom({ deferFrames: true });
     const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 1000 });
     dom.triggerResize(400);
@@ -492,14 +506,17 @@ describe("createBlockMap", () => {
     const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 100 });
     dom.triggerResize(5);
+    dom.flushFrames();
     const before = dom.puts.length;
     map.addRanges([[20, 30]]);
+    dom.flushFrames();
     expect(dom.puts.length).toBe(before + 1);
     let image = dom.puts.at(-1) as ImageDataLike;
     expect(pixel(image, 2)).toEqual(COMPLETE_RGBA);
     expect(pixel(image, 3)).toEqual(MISSING_RGBA);
     expect(map.getProgress().completed).toBe(10);
     map.removeRanges([[25, 35]]);
+    dom.flushFrames();
     image = dom.puts.at(-1) as ImageDataLike;
     expect(map.getProgress().completed).toBe(5);
     expect(pixel(image, 2)).not.toEqual(COMPLETE_RGBA);
@@ -508,8 +525,6 @@ describe("createBlockMap", () => {
   });
 
   it("addRanges before a pending view flush does not throw and resolves after flush", () => {
-    dom.restore();
-    dom = installDom({ deferFrames: true });
     const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 1000 });
     dom.triggerResize(50);
@@ -594,8 +609,6 @@ describe("createBlockMap", () => {
   });
 
   it("writes the label synchronously, before any frame runs", () => {
-    dom.restore();
-    dom = installDom({ deferFrames: true });
     const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 100, initialBlocks: [0, 1] });
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
@@ -612,6 +625,7 @@ describe("createBlockMap", () => {
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
     map.destroy();
     map.addBlocks([0]);
+    dom.flushFrames();
     expect(canvas.getAttribute("aria-label")).toBe("Download progress: 0 of 100 blocks (0%)");
   });
 
@@ -621,6 +635,7 @@ describe("createBlockMap", () => {
     dom.triggerResize(50);
     map.addRanges([[0, 20]]);
     map.removeRanges([[5, 6]]);
+    dom.flushFrames();
     const image = dom.puts.at(-1) as ImageDataLike;
     for (let column = 25; column <= 29; column += 1) {
       expect(pixel(image, column)).toEqual(MISSING_RGBA);
@@ -826,7 +841,7 @@ describe("createBlockMap", () => {
 
     it("re-projects the selection once a view change commits", () => {
       dom.restore();
-      dom = installDom({ deferFrames: true });
+      dom = installDom();
       const { container, map } = mountBrushed();
       dom.flushFrames();
       map.setBrush([2, 5]);
