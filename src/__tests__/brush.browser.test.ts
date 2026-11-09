@@ -15,7 +15,7 @@ type Harness = {
   cleanup(): void;
 };
 
-const mount = (): Harness => {
+const mount = (totalBlocks = TOTAL): Harness => {
   const container = document.createElement("div");
   Object.assign(container.style, {
     position: "absolute",
@@ -34,7 +34,7 @@ const mount = (): Harness => {
     getView: () => view,
     getWidth: () => WIDTH,
     getHeight: () => HEIGHT,
-    getTotalBlocks: () => TOTAL,
+    getTotalBlocks: () => totalBlocks,
     onBrush: (selection: BlockRange | null) => onBrush(selection),
     onBrushEnd: (selection: BlockRange | null) => onBrushEnd(selection),
   });
@@ -60,18 +60,68 @@ const svgOf = (container: HTMLElement): SVGSVGElement =>
 const selectionRect = (container: HTMLElement): SVGRectElement =>
   svgOf(container).querySelector(".selection") as SVGRectElement;
 
-// d3-brush listens for mousedown on its group (the overlay rect is the
-// bubbling target it reads a datum from) and for move/up on event.view.
-const drag = (container: HTMLElement, fromX: number, toX: number): void => {
-  const svg = svgOf(container);
-  const rect = svg.getBoundingClientRect();
-  const overlay = svg.querySelector(".overlay") as SVGRectElement;
-  const clientY = rect.top + HEIGHT / 2;
-  const at = (x: number) => ({ clientX: rect.left + x, clientY, bubbles: true, view: window });
+// The overlay covers the container exactly, so container geometry gives the
+// same client coordinates and still works once the svg has been removed.
+const mouseInit = (container: HTMLElement, x: number): MouseEventInit => {
+  const rect = container.getBoundingClientRect();
+  return { clientX: rect.left + x, clientY: rect.top + HEIGHT / 2, bubbles: true, view: window };
+};
 
-  overlay.dispatchEvent(new MouseEvent("mousedown", at(fromX)));
-  window.dispatchEvent(new MouseEvent("mousemove", at(toX)));
-  window.dispatchEvent(new MouseEvent("mouseup", at(toX)));
+// d3-brush listens for mousedown on its group - the overlay rect is the
+// bubbling target it reads a datum from - and for move/up on event.view.
+const press = (container: HTMLElement, x: number, extra: MouseEventInit = {}): void => {
+  const overlay = svgOf(container).querySelector(".overlay") as SVGRectElement;
+  overlay.dispatchEvent(new MouseEvent("mousedown", { ...mouseInit(container, x), ...extra }));
+};
+
+const moveTo = (container: HTMLElement, x: number): void => {
+  window.dispatchEvent(new MouseEvent("mousemove", mouseInit(container, x)));
+};
+
+const release = (container: HTMLElement, x: number): void => {
+  window.dispatchEvent(new MouseEvent("mouseup", mouseInit(container, x)));
+};
+
+const drag = (container: HTMLElement, fromX: number, toX: number): void => {
+  press(container, fromX);
+  moveTo(container, toX);
+  release(container, toX);
+};
+
+// d3-selection records every listener it adds on the node itself, which is
+// how a gesture's window listeners can be observed from outside d3.
+type WithD3Listeners = { __on?: { type: string; name: string }[] };
+
+// click.drag is left out: d3-drag adds it on release and clears it on its own
+// timer, so an earlier test's gesture can still be holding one.
+const GESTURE_LISTENERS = [
+  "mousemove.brush",
+  "mouseup.brush",
+  "keydown.brush",
+  "keyup.brush",
+  "dragstart.drag",
+  "selectstart.drag",
+];
+
+const gestureListeners = (): string[] =>
+  ((window as unknown as WithD3Listeners).__on ?? [])
+    .map((entry) => `${entry.type}.${entry.name}`)
+    .filter((name) => GESTURE_LISTENERS.includes(name));
+
+// Errors thrown inside a listener do not propagate to dispatchEvent, so they
+// are collected rather than asserted on directly.
+const collectErrors = (): { errors: string[]; stop(): void } => {
+  const errors: string[] = [];
+  const onError = (event: ErrorEvent): void => {
+    errors.push(event.message);
+  };
+  window.addEventListener("error", onError);
+  return {
+    errors,
+    stop: () => {
+      window.removeEventListener("error", onError);
+    },
+  };
 };
 
 describe("createBrushOverlay", () => {
@@ -198,6 +248,14 @@ describe("createBrushOverlay", () => {
     harness.cleanup();
   });
 
+  it("reports no selection from a drag when the map has no blocks", () => {
+    const harness = mount(0);
+    drag(harness.container, 160, 400);
+    expect(harness.onBrushEnd).toHaveBeenCalledWith(null);
+    expect(harness.overlay.getSelection()).toBeNull();
+    harness.cleanup();
+  });
+
   it("clears the selection on a click without movement", () => {
     const harness = mount();
     harness.overlay.setSelection([2, 5]);
@@ -207,26 +265,18 @@ describe("createBrushOverlay", () => {
     harness.cleanup();
   });
 
-  it("ignores a drag with a modifier held", () => {
+  const declined: [string, MouseEventInit][] = [
+    ["ctrl held", { ctrlKey: true }],
+    ["meta held", { metaKey: true }],
+    ["shift held", { shiftKey: true }],
+    ["a secondary button", { button: 2 }],
+  ];
+
+  it.each(declined)("ignores a drag with %s", (_label, extra) => {
     const harness = mount();
-    const svg = svgOf(harness.container);
-    const rect = svg.getBoundingClientRect();
-    const overlay = svg.querySelector(".overlay") as SVGRectElement;
-    overlay.dispatchEvent(
-      new MouseEvent("mousedown", {
-        clientX: rect.left + 160,
-        clientY: rect.top + HEIGHT / 2,
-        bubbles: true,
-        view: window,
-        shiftKey: true,
-      }),
-    );
-    window.dispatchEvent(
-      new MouseEvent("mousemove", { clientX: rect.left + 400, bubbles: true, view: window }),
-    );
-    window.dispatchEvent(
-      new MouseEvent("mouseup", { clientX: rect.left + 400, bubbles: true, view: window }),
-    );
+    press(harness.container, 160, extra);
+    moveTo(harness.container, 400);
+    release(harness.container, 400);
     expect(harness.onBrush).not.toHaveBeenCalled();
     expect(harness.onBrushEnd).not.toHaveBeenCalled();
     harness.cleanup();
@@ -240,6 +290,26 @@ describe("createBrushOverlay", () => {
     expect(harness.onBrush).not.toHaveBeenCalled();
     expect(harness.onBrushEnd).not.toHaveBeenCalled();
     harness.cleanup();
+  });
+
+  it("tears down d3's window listeners when destroyed mid-gesture", () => {
+    const harness = mount();
+    const watcher = collectErrors();
+    press(harness.container, 160);
+    moveTo(harness.container, 300);
+    expect(gestureListeners()).toContain("mousemove.brush");
+
+    harness.overlay.destroy();
+    expect(gestureListeners()).toEqual([]);
+
+    moveTo(harness.container, 400);
+    release(harness.container, 400);
+    watcher.stop();
+
+    expect(watcher.errors).toEqual([]);
+    expect(harness.onBrushEnd).not.toHaveBeenCalled();
+    expect(harness.container.querySelector("svg[data-blockmap-brush]")).toBeNull();
+    harness.container.remove();
   });
 
   it("removes the overlay and stops listening on destroy", () => {

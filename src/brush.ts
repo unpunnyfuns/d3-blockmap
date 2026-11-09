@@ -36,6 +36,10 @@ export type BrushOverlay = {
 const BRUSH_ATTRIBUTE = "data-blockmap-brush";
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
 const SELECTION_CLASS = ".selection";
+// Everything d3 attaches outside our own subtree during a gesture: the brush's
+// window listeners plus d3-drag's page-wide suppression of text selection.
+const GESTURE_LISTENERS =
+  "mousemove.brush mouseup.brush keydown.brush keyup.brush dragstart.drag selectstart.drag";
 
 // Only the properties the filter inspects: d3-brush calls it for both mouse
 // and touch starts, and TouchEvent has no `button`.
@@ -148,8 +152,9 @@ export const createBrushOverlay = (
   // sourceEvent, and this flag covers a future version that supplies one.
   let silent = false;
 
-  // d3-brush writes its own presentational attributes when the behaviour is
-  // applied, so the theme colour has to be re-applied after every call.
+  // The .selection rect does not exist until the behaviour has been applied,
+  // and d3-brush gives it default colours as it creates it, so repainting
+  // after every call is what makes setColor order-independent.
   const paint = (): void => {
     g.select(SELECTION_CLASS)
       .attr("fill", color)
@@ -167,8 +172,11 @@ export const createBrushOverlay = (
     paint();
 
     silent = true;
-    g.call(brush.move, selection ? toPixels(selection, deps.getView(), width) : null);
-    silent = false;
+    try {
+      g.call(brush.move, selection ? toPixels(selection, deps.getView(), width) : null);
+    } finally {
+      silent = false;
+    }
   };
 
   const blocksFrom = (pixels: BrushSelection | null): BlockRange | null => {
@@ -186,7 +194,7 @@ export const createBrushOverlay = (
   // re-project so the rectangle sits on the block boundaries it reports.
   brush.on("end", (event: D3BrushEvent<unknown>) => {
     if (!event.sourceEvent || silent) return;
-    selection = blocksFrom(event.selection);
+    selection = normalize(blocksFrom(event.selection), deps.getTotalBlocks());
     update();
     deps.onBrushEnd(selection);
   });
@@ -208,8 +216,15 @@ export const createBrushOverlay = (
       paint();
     },
 
+    // d3-brush only drops its window listeners and re-enables dragging from
+    // inside its own gesture end, so destroying mid-drag has to do it by
+    // hand or they outlive the map. Every targeted browser has
+    // onselectstart, so d3-drag suppresses selection with a listener rather
+    // than an inline style and removing the listeners is the whole cleanup.
     destroy: () => {
       brush.on("brush", null).on("end", null);
+      g.on(".brush", null);
+      select(window).on(GESTURE_LISTENERS, null);
       svg.remove();
     },
   };
