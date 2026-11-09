@@ -224,38 +224,11 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     overlay?.setColor(theme.brush);
   };
 
-  let labelPending = false;
-  let labelFrame = NO_FRAME;
-
   // Reads the current progress through options.label when given, defaultLabel
-  // otherwise, and writes it straight to the attribute - no coalescing, no
-  // frame. Called directly at construction for a synchronous first label, and
-  // from inside the scheduled frame below for every later update.
+  // otherwise, and writes it straight to the attribute. It is O(1), so every
+  // mutator calls it directly rather than waiting for a frame.
   const writeLabel = (): void => {
     canvas.setAttribute(ARIA_LABEL_ATTRIBUTE, (options.label ?? defaultLabel)(state.progress()));
-  };
-
-  /**
-   * Coalesces to one aria-label write per animation frame: a burst of
-   * addBlocks calls in a single tick only needs to announce the final count.
-   * labelPending is set before requestAnimationFrame is called, not after,
-   * because the test harness's rAF can run its callback synchronously; if
-   * the flag were the frame handle itself, that reentrant run would clear it
-   * before the still-pending assignment overwrote it right back. The handle
-   * is likewise only stored if labelPending is still true once
-   * requestAnimationFrame returns, so a synchronous callback - which already
-   * cleared it to NO_FRAME - cannot have that clear overwritten by a stale
-   * handle on the way out.
-   */
-  const scheduleLabel = (): void => {
-    if (labelPending) return;
-    labelPending = true;
-    const handle = requestAnimationFrame(() => {
-      labelPending = false;
-      labelFrame = NO_FRAME;
-      writeLabel();
-    });
-    if (labelPending) labelFrame = handle;
   };
 
   // The css size the chrome was last built for; distinct from binCount, which
@@ -512,30 +485,30 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       if (destroyed) return;
       state.replace(indices);
       renderer.markAllDirty();
-      scheduleLabel();
+      writeLabel();
     },
     setRanges: (ranges) => {
       if (destroyed) return;
       state.replaceRanges(ranges);
       renderer.markAllDirty();
-      scheduleLabel();
+      writeLabel();
     },
 
     // The incremental paths repaint only the bins the state reports changed.
     addBlocks: (indices) => {
       if (destroyed) return;
       renderer.markDirty(state.add(indices));
-      scheduleLabel();
+      writeLabel();
     },
     addRanges: (ranges) => {
       if (destroyed) return;
       renderer.markDirty(state.addRanges(ranges));
-      scheduleLabel();
+      writeLabel();
     },
     removeRanges: (ranges) => {
       if (destroyed) return;
       renderer.markDirty(state.removeRanges(ranges));
-      scheduleLabel();
+      writeLabel();
     },
 
     setView: (view) => {
@@ -578,10 +551,6 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       if (viewFrame !== NO_FRAME) cancelAnimationFrame(viewFrame);
       viewFrame = NO_FRAME;
       pendingView = undefined;
-
-      if (labelFrame !== NO_FRAME) cancelAnimationFrame(labelFrame);
-      labelFrame = NO_FRAME;
-      labelPending = false;
 
       resizeObserver.disconnect();
       unwatchTheme();

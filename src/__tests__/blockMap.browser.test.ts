@@ -593,7 +593,7 @@ describe("createBlockMap", () => {
     map.destroy();
   });
 
-  it("sets the first label synchronously, before any frame runs", () => {
+  it("writes the label synchronously, before any frame runs", () => {
     dom.restore();
     dom = installDom({ deferFrames: true });
     const container = dom.mount();
@@ -602,21 +602,16 @@ describe("createBlockMap", () => {
     expect(canvas.getAttribute("aria-label")).toBe("Download progress: 2 of 100 blocks (2%)");
 
     map.addBlocks([2]);
-    expect(canvas.getAttribute("aria-label")).toBe("Download progress: 2 of 100 blocks (2%)");
-
-    dom.flushFrames();
     expect(canvas.getAttribute("aria-label")).toBe("Download progress: 3 of 100 blocks (3%)");
     map.destroy();
   });
 
-  it("destroy before a pending label frame flushes does not throw", () => {
-    dom.restore();
-    dom = installDom({ deferFrames: true });
+  it("leaves the label untouched by an update after destroy", () => {
     const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 100 });
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+    map.destroy();
     map.addBlocks([0]);
-    expect(() => map.destroy()).not.toThrow();
     expect(canvas.getAttribute("aria-label")).toBe("Download progress: 0 of 100 blocks (0%)");
   });
 
