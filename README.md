@@ -20,6 +20,7 @@ npm i d3-blockmap
 ## Usage
 
 ![Demo](demo/screenshot-ranges.png)
+![Axis](demo/screenshot-axis.png)
 
 ```html
 <div id="blocks" style="height: 12px"></div>
@@ -47,11 +48,12 @@ import type { BlockMapHandle } from 'd3-blockmap/react';
 const ref = useRef<BlockMapHandle>(null);
 <BlockMap ref={ref} totalBlocks={total} blocks={initial} style={{ height: 12 }} />;
 ref.current?.addBlocks(newIndices);
+ref.current?.getScale(); // { domain, range, x(block), block(x) }
 ```
 
 A new `blocks` array identity triggers `setBlocks`; keep the reference stable between renders unless the full set changed. `ranges` (`RangeInput`) behaves the same way via `setRanges`. When both `ranges` and `blocks` are given, ranges are applied first and blocks are added on top; any identity change of either prop re-applies the `ranges` snapshot and then adds `blocks` on top again, so keep both references stable between renders. `partial` (`"gradient" | "coverage"`) recreates the underlying instance when its value changes.
 
-`view` (`BlockView`) applies via `setView` when its identity changes. `interactive` (`boolean`, default `true`) recreates the underlying instance when its value changes, same as `partial`. `onViewChange` is called after the view changes by API or interaction; its identity does not trigger instance recreation, so inline closures are fine. `highlight` (`boolean`) toggles blinking on incomplete bins via `setHighlight`.
+`view` (`BlockView`) applies via `setView` when its identity changes. `interactive` (`boolean`, default `true`) recreates the underlying instance when its value changes, same as `partial`. `onViewChange` is called after the view changes by API or interaction; its identity does not trigger instance recreation, so inline closures are fine. `highlight` (`boolean`) toggles blinking on incomplete bins via `setHighlight`. `axis` is a creation option: like `partial` and `interactive`, it recreates the underlying instance when its value changes, so an object value (`{ format?, tickCount? }`) must be memoized (`useMemo`) to avoid recreating the instance on every render.
 
 `BlockMapHandle` also exposes an imperative `setRanges(ranges)`, bypassing React state, for high-frequency snapshots where re-rendering on every tick would be wasteful. Do not combine it with the `ranges` prop; the prop's own effect will re-apply and fight the imperative calls. The handle additionally exposes `setView(view)`, `resetView()`, `getView()`, and `setHighlight(on)` for the same imperative use case.
 
@@ -68,6 +70,7 @@ A new `blocks` array identity triggers `setBlocks`; keep the reference stable be
 | `view` | `BlockView` | Optional. Initial `{ start, end }` window in block indices, `end` exclusive. |
 | `interactive` | `boolean` | Default `true`. Ctrl+wheel or pinch zooms around the cursor, drag pans, double-click resets. |
 | `onViewChange` | `(view: BlockView) => void` | Called after the view changes by API or interaction. |
+| `axis` | `boolean \| { format?, tickCount? }` | Default off. `true` renders compact tick labels under the bar, one per ~80 CSS px. |
 
 Returns:
 
@@ -81,6 +84,7 @@ Returns:
 | `resetView()` | Back to the full range. |
 | `getView()` | Current `{ start, end }`. |
 | `setHighlight(on)` | Blink every incomplete bin between its colour and `--blockmap-highlight` at 1 Hz (toggles every 500 ms). Steady under `prefers-reduced-motion`. |
+| `getScale()` | `{ domain, range, x(block), block(x) }` for the current view, in CSS px. |
 | `destroy()` | Remove canvas, tooltip, observers. Idempotent. |
 
 ### Theming
@@ -95,6 +99,7 @@ Colours are read from CSS custom properties on the container at start and on the
 | `--blockmap-partial` | `#e0a500` |
 | `--blockmap-complete` | `#2ecc71` |
 | `--blockmap-highlight` | `#ff4d4f` |
+| `--blockmap-axis-color` | `currentColor`. Tick label colour. |
 
 Fully missing and fully complete bins use the exact endpoint colours. By default (`partial: "coverage"`), partial bins fade `--blockmap-missing` → `--blockmap-partial` → `--blockmap-complete` by bin fill fraction. `partial: "gradient"` is opt-in and interpolates partial bins between `--blockmap-partial-low` and `--blockmap-partial-high` instead; those two variables apply only to `"gradient"`. `--blockmap-highlight` is the blink colour for incomplete bins while highlight is on (see `setHighlight` below).
 
@@ -125,6 +130,7 @@ The tooltip element carries the attribute `data-blockmap-tooltip` and ships unst
 - Bins are computed over the current view, so zooming far enough in switches to discrete per-block segments.
 - View changes from the API or interaction are coalesced to one rebuild per animation frame.
 - There is no keyboard affordance for zoom or pan yet.
+- The axis renders below the container at `top: 100%`; leave space under the bar. Ticks use nice values (1, 2, 5 × 10ⁿ) within the current view.
 
 ## Development
 

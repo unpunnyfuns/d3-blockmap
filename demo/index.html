@@ -11,6 +11,7 @@
     --blockmap-partial: #f0b429;
     --blockmap-complete: #3ddc84;
     --blockmap-highlight: #ff4d4f;
+    --blockmap-axis-color: #8b93a7;
     color-scheme: dark;
   }
   html[data-theme="light"] {
@@ -20,15 +21,18 @@
     --blockmap-partial: #ff8c00;
     --blockmap-complete: #1a9e4b;
     --blockmap-highlight: #d4380d;
+    --blockmap-axis-color: #5b6472;
     color-scheme: light;
   }
   body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 32px; background: Canvas; color: CanvasText; }
   h1 { font-size: 18px; margin: 0 0 24px; }
-  section { margin-bottom: 32px; }
+  section { margin-bottom: 44px; }
   .label { display: flex; justify-content: space-between; margin-bottom: 6px; color: GrayText; }
   .map { height: 24px; }
   .map canvas { border-radius: 3px; }
   [data-blockmap-tooltip] { background: #000c; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-top: -6px; }
+  [data-blockmap-axis] { font-size: 11px; padding-top: 4px; }
+  [data-blockmap-tick][style*="translateX(-50%)"]::before { content: ""; position: absolute; left: 0; top: -4px; height: 4px; border-left: 1px solid currentColor; }
   button { margin-right: 8px; }
 </style>
 </head>
@@ -57,6 +61,7 @@
 <script type="importmap">
 { "imports": {
   "d3-blockmap": "/dist/index.js",
+  "d3-array": "/node_modules/d3-array/dist/d3-array.mjs",
   "d3-color": "/node_modules/d3-color/dist/d3-color.mjs",
   "d3-interpolate": "/node_modules/d3-interpolate/dist/d3-interpolate.mjs"
 } }
@@ -74,6 +79,7 @@ const small = createBlockMap(document.querySelector("#small"), { totalBlocks: SM
 const rangeMap = createBlockMap(document.querySelector("#ranges"), {
   totalBlocks: BIG,
   partial: "coverage",
+  axis: true,
   onViewChange: (view) => {
     document.querySelector("#view").textContent = `View ${fmt.format(view.start)}–${fmt.format(view.end - 1)}`;
   },
