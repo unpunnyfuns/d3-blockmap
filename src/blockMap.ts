@@ -207,8 +207,9 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   };
 
   // Reads the current progress through options.label when given, defaultLabel
-  // otherwise, and writes it straight to the attribute. It is O(1), so every
-  // mutator calls it directly rather than waiting for a frame.
+  // otherwise, and writes it straight to the attribute. Every mutator calls it
+  // directly: one count and one string per call is cheap next to the mutation
+  // itself, and the label never lags the state.
   const writeLabel = (): void => {
     canvas.setAttribute(ARIA_LABEL_ATTRIBUTE, (options.label ?? defaultLabel)(state.progress()));
   };
@@ -380,11 +381,14 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
 
   // A click that lands as far from its press as a drag has to travel is the
   // end of a pan or a brush, not an intent to pick a block. Distance alone
-  // decides, so no gesture can leave state behind for the next click.
+  // decides, and each press is read by at most one click, so no gesture can
+  // leave state behind for the next one.
   // Registered regardless of `interactive`, like the tooltip listeners above,
   // since a non-interactive map can still report what was clicked.
   const onClick = (event: MouseEvent): void => {
-    if (Math.abs(event.clientX - downX) >= DRAG_THRESHOLD_PX) return;
+    const travelled = Math.abs(event.clientX - downX);
+    downX = Number.NaN;
+    if (travelled >= DRAG_THRESHOLD_PX) return;
     if (!options.onBlockClick) return;
 
     const hit = locate(canvasX(canvas, event));

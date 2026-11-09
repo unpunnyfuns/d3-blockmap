@@ -286,6 +286,19 @@ describe("createBrushOverlay", () => {
     harness.cleanup();
   });
 
+  it("snaps a nudged selection back onto its blocks without reporting", () => {
+    const harness = mount();
+    harness.overlay.setSelection([2, 5]);
+    const selectionRect = svgOf(harness.container).querySelector(".selection") as SVGRectElement;
+    selectionRect.dispatchEvent(new MouseEvent("mousedown", mouseInit(harness.container, 300)));
+    moveTo(harness.container, 330);
+    release(harness.container, 330);
+    expect(harness.onBrushEnd).not.toHaveBeenCalled();
+    expect(selectionRect.getAttribute("x")).toBe("160");
+    expect(selectionRect.getAttribute("width")).toBe("240");
+    harness.cleanup();
+  });
+
   it("reports nothing for a drag that ends on the selection it started with", () => {
     const harness = mount();
     drag(harness.container, 160, 400);

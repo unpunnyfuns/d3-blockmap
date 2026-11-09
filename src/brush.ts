@@ -220,18 +220,19 @@ export const createBrushOverlay = (
    * that leaves the selection as it found it - a stray click on the map,
    * either half of a double click, a drag back to where it started - reports
    * nothing; a press that cleared a selection still does, because the
-   * selection genuinely changed.
+   * selection genuinely changed. The rectangle is re-projected either way,
+   * so a nudge that rounds back to the same blocks snaps back onto them.
    */
   brush.on("end", (event: D3BrushEvent<unknown>) => {
     if (!event.sourceEvent || silent) return;
     active = false;
 
     const next = normalize(blocksFrom(event.selection), deps.getTotalBlocks());
-    if (sameRange(selection, next)) return;
+    const changed = !sameRange(selection, next);
 
     selection = next;
     update();
-    deps.onBrushEnd(selection);
+    if (changed) deps.onBrushEnd(selection);
   });
 
   update();

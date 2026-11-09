@@ -939,7 +939,7 @@ describe("createBlockMap", () => {
       map.destroy();
     });
 
-    it("counts a brush drag under the drag threshold as a click", async () => {
+    it("reports a click after a sub-threshold brush drag once d3's own click guard has cleared", async () => {
       const onBlockClick = vi.fn();
       const { container, map } = mountBrushed({ onBlockClick });
 

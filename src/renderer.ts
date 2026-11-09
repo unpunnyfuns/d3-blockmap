@@ -3,7 +3,7 @@
  * collected, then flushed once per animation frame. It reads the model
  * through RenderSource and is handed a ColorScale, so it knows nothing about
  * themes, pointers or the DOM beyond a 2d context. The scheduler and timer
- * are injected so tests can drive frames and blinks synchronously.
+ * are injected so tests decide when frames and blinks run.
  */
 
 import { discreteColumn } from "./bins";
@@ -30,6 +30,9 @@ export type RenderSource = {
   has(index: number): boolean;
 };
 
+// request must call back later, never during the call itself, as
+// requestAnimationFrame does: the frame handle it returns is the only record
+// that a frame is pending.
 export type Scheduler = {
   request(callback: () => void): number;
   cancel(handle: number): void;
