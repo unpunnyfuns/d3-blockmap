@@ -20,6 +20,8 @@ import {
   DRAG_THRESHOLD_PX,
   PERCENT,
   REDUCED_MOTION_QUERY,
+  TOUCH_ACTION_INTERACTIVE,
+  TOUCH_ACTION_UNSET,
 } from "./constants";
 import { canvasX } from "./dom";
 import { attachInteraction } from "./interaction";
@@ -116,14 +118,16 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   if (initialView) state.setView(initialView);
 
   // One pixel row stretched to fill the container: width is set in layout
-  // once the container has been measured. touchAction none so a drag pans
-  // the view instead of scrolling the page.
+  // once the container has been measured. An interactive map keeps vertical
+  // swipes for page scrolling and claims horizontal drags and pinches; a
+  // non-interactive one sets no touch-action, so it intercepts no touch.
+  const touchAction = options.interactive === false ? TOUCH_ACTION_UNSET : TOUCH_ACTION_INTERACTIVE;
   const canvas = document.createElement("canvas");
   Object.assign(canvas.style, {
     display: "block",
     width: FULL,
     height: FULL,
-    touchAction: "none",
+    touchAction,
   });
   canvas.height = CANVAS_ROWS;
   canvas.setAttribute("role", "img");
@@ -171,6 +175,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
         getWidth: () => cssWidth,
         getHeight: () => cssHeight,
         getTotalBlocks: () => state.totalBlocks,
+        touchAction,
         onBrush: (selection) => options.onBrush?.(selection),
         onBrushEnd: (selection) => options.onBrushEnd?.(selection),
       })

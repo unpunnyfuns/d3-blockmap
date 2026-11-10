@@ -584,6 +584,20 @@ describe("createBlockMap", () => {
     still.destroy();
   });
 
+  it("sets touch-action pan-y only when interactive", () => {
+    const container = dom.mount();
+    const map = createBlockMap(container, { totalBlocks: 10 });
+    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+    expect(canvas.style.touchAction).toBe("pan-y");
+    map.destroy();
+
+    const fixed = dom.mount();
+    const still = createBlockMap(fixed, { totalBlocks: 10, interactive: false });
+    const canvas2 = fixed.querySelector("canvas") as HTMLCanvasElement;
+    expect(canvas2.style.touchAction).toBe("");
+    still.destroy();
+  });
+
   it("describes the role and lists key shortcuts only when interactive", () => {
     const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 10 });
@@ -1087,6 +1101,41 @@ describe("createBlockMap", () => {
       dom.triggerResize(800, container, 48);
 
       expect(partOf(container, ".overlay").getAttribute("height")).toBe("48");
+      map.destroy();
+    });
+
+    it("gives the brush overlay the canvas touch-action", () => {
+      const container = dom.mount(100);
+      const map = createBlockMap(container, { totalBlocks: 1000, brush });
+      const svg = container.querySelector("svg[data-blockmap-brush]") as SVGSVGElement;
+      expect(svg.style.touchAction).toBe("pan-y");
+      map.destroy();
+
+      const still = dom.mount(100);
+      const stillMap = createBlockMap(still, { totalBlocks: 1000, brush, interactive: false });
+      const stillSvg = still.querySelector("svg[data-blockmap-brush]") as SVGSVGElement;
+      expect(stillSvg.style.touchAction).toBe("");
+      stillMap.destroy();
+    });
+
+    it("pinches with two touch pointers, which the brush leaves alone", () => {
+      const container = dom.mount(100);
+      const map = createBlockMap(container, { totalBlocks: 1000, brush });
+      dom.triggerResize(100, container);
+      dom.flushFrames();
+      const touch = (type: string, offsetX: number, pointerId: number): void => {
+        fire(container, type, { ...at(container, offsetX), pointerId, pointerType: "touch" });
+      };
+
+      touch("pointerdown", 40, 1);
+      touch("pointerdown", 60, 2);
+      touch("pointermove", 30, 1);
+      touch("pointermove", 70, 2);
+      dom.flushFrames();
+
+      expect(map.getView()).toEqual({ start: 250, end: 750 });
+      touch("pointerup", 70, 2);
+      touch("pointerup", 30, 1);
       map.destroy();
     });
 

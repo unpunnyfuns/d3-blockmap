@@ -304,4 +304,159 @@ describe("attachInteraction", () => {
     expect(event.defaultPrevented).toBe(false);
     expect(calls).toEqual([]);
   });
+  describe("pinch", () => {
+    const touch = (type: string, offsetX: number, pointerId: number): Event =>
+      fire(surface, type, {
+        button: PRIMARY_BUTTON,
+        pointerId,
+        pointerType: "touch",
+        ...at(canvas, offsetX),
+      });
+
+    const startPinch = (x1: number, x2: number): void => {
+      touch("pointerdown", x1, 1);
+      touch("pointerdown", x2, 2);
+    };
+
+    // The fake deps map css pixels to blocks as px / binCount * viewLength,
+    // so this is the block the deps would place under the given offset.
+    const blockAt = (view: { start: number; end: number }, offsetX: number): number =>
+      view.start + (offsetX / 100) * (view.end - view.start);
+
+    it("spreading zooms in and keeps the anchor block under the midpoint", () => {
+      const { deps, calls } = createDeps({ start: 0, end: 1000 });
+      attachInteraction(surface, canvas, deps);
+      startPinch(40, 60);
+      expect(deps.onDragStart).toHaveBeenCalledTimes(1);
+      expect(surface.hasPointerCapture(1)).toBe(true);
+      expect(surface.hasPointerCapture(2)).toBe(true);
+
+      touch("pointermove", 20, 1);
+      touch("pointermove", 100, 2);
+
+      const view = calls.at(-1);
+      expect(view).toEqual({ start: 350, end: 600 });
+      const column = ((view?.end ?? 0) - (view?.start ?? 0)) / 100;
+      expect(Math.abs(blockAt(view ?? { start: 0, end: 0 }, 60) - 500)).toBeLessThanOrEqual(column);
+    });
+
+    it("pinching in zooms out and clamps at the full view", () => {
+      const { deps, calls } = createDeps({ start: 250, end: 750 });
+      attachInteraction(surface, canvas, deps);
+      startPinch(30, 70);
+      touch("pointermove", 45, 1);
+      touch("pointermove", 55, 2);
+      expect(calls.at(-1)).toEqual({ start: 0, end: 1000 });
+    });
+
+    it("moving both fingers together pans", () => {
+      const { deps, calls } = createDeps({ start: 400, end: 600 });
+      attachInteraction(surface, canvas, deps);
+      startPinch(40, 60);
+      touch("pointermove", 50, 1);
+      touch("pointermove", 70, 2);
+      expect(calls.at(-1)).toEqual({ start: 380, end: 580 });
+    });
+
+    it("a second finger ends a single-finger pan before the pinch starts", () => {
+      const { deps, calls } = createDeps({ start: 400, end: 600 });
+      attachInteraction(surface, canvas, deps);
+      const order: string[] = [];
+      vi.mocked(deps.onDragStart).mockImplementation(() => order.push("start"));
+      vi.mocked(deps.onDragEnd).mockImplementation(() => order.push("end"));
+
+      touch("pointerdown", 40, 1);
+      touch("pointermove", 50, 1);
+      expect(calls.at(-1)).toEqual({ start: 380, end: 580 });
+      expect(surface.style.cursor).toBe("grabbing");
+
+      touch("pointerdown", 70, 2);
+      expect(order).toEqual(["start", "end", "start"]);
+      expect(surface.style.cursor).toBe("");
+      expect(surface.hasPointerCapture(1)).toBe(true);
+      expect(surface.hasPointerCapture(2)).toBe(true);
+
+      touch("pointermove", 40, 1);
+      const zoomed = calls.at(-1) ?? { start: 0, end: 0 };
+      expect(zoomed.end - zoomed.start).toBeLessThan(200);
+    });
+
+    it("lifting one finger ends the pinch and the other finger does nothing", () => {
+      const { deps, calls } = createDeps({ start: 0, end: 1000 });
+      attachInteraction(surface, canvas, deps);
+      startPinch(40, 60);
+      touch("pointermove", 30, 1);
+      touch("pointerup", 30, 1);
+      expect(deps.onDragEnd).toHaveBeenCalledTimes(1);
+      expect(surface.hasPointerCapture(1)).toBe(false);
+      expect(surface.hasPointerCapture(2)).toBe(false);
+
+      const before = calls.length;
+      touch("pointermove", 90, 2);
+      touch("pointermove", 10, 2);
+      expect(calls.length).toBe(before);
+      touch("pointerup", 10, 2);
+      expect(deps.onDragEnd).toHaveBeenCalledTimes(1);
+      expect(deps.onDragStart).toHaveBeenCalledTimes(1);
+    });
+
+    it("pointercancel ends the pinch", () => {
+      const { deps, calls } = createDeps({ start: 0, end: 1000 });
+      attachInteraction(surface, canvas, deps);
+      startPinch(40, 60);
+      touch("pointercancel", 60, 2);
+      expect(deps.onDragEnd).toHaveBeenCalledTimes(1);
+      expect(surface.hasPointerCapture(1)).toBe(false);
+      touch("pointermove", 10, 1);
+      expect(calls).toEqual([]);
+    });
+
+    it("ignores a third touch pointer", () => {
+      const { deps, calls } = createDeps({ start: 400, end: 600 });
+      attachInteraction(surface, canvas, deps);
+      startPinch(40, 60);
+      touch("pointerdown", 80, 3);
+      touch("pointermove", 90, 3);
+      expect(calls).toEqual([]);
+      touch("pointerup", 90, 3);
+      expect(deps.onDragEnd).not.toHaveBeenCalled();
+      touch("pointermove", 50, 1);
+      touch("pointermove", 70, 2);
+      expect(calls.at(-1)).toEqual({ start: 380, end: 580 });
+    });
+
+    it("ignores ctrl+wheel and keys while a pinch is active", () => {
+      const { deps, calls } = createDeps({ start: 0, end: 1000 });
+      attachInteraction(surface, canvas, deps);
+      startPinch(40, 60);
+      expect(ctrlWheel(surface, -100, 50).defaultPrevented).toBe(false);
+      const key = new KeyboardEvent("keydown", { key: "+", bubbles: true, cancelable: true });
+      canvas.dispatchEvent(key);
+      expect(key.defaultPrevented).toBe(false);
+      expect(calls).toEqual([]);
+    });
+
+    it("destroy mid-pinch releases capture and ends the gesture", () => {
+      const { deps, calls } = createDeps({ start: 0, end: 1000 });
+      const dispose = attachInteraction(surface, canvas, deps);
+      startPinch(40, 60);
+      dispose();
+      expect(surface.hasPointerCapture(1)).toBe(false);
+      expect(surface.hasPointerCapture(2)).toBe(false);
+      expect(deps.onDragEnd).toHaveBeenCalledTimes(1);
+      touch("pointermove", 10, 1);
+      expect(calls).toEqual([]);
+    });
+
+    it("a touch pointer during a mouse drag does not start a pinch", () => {
+      const { deps, calls } = createDeps({ start: 100, end: 200 });
+      attachInteraction(surface, canvas, deps);
+      pointer(surface, "pointerdown", 50, 1, PRIMARY_BUTTON);
+      pointer(surface, "pointermove", 60);
+      expect(calls.at(-1)).toEqual({ start: 90, end: 190 });
+      touch("pointerdown", 80, 2);
+      expect(deps.onDragStart).toHaveBeenCalledTimes(1);
+      expect(deps.onDragEnd).not.toHaveBeenCalled();
+    });
+  });
 });

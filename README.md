@@ -57,7 +57,7 @@ export const Download = ({ totalBlocks }: { totalBlocks: number }) => {
 | `initialRanges` | `RangeInput` | | `[start, end)` tuples (or a flat `Uint32Array` of pairs) already complete. |
 | `partial` | `"coverage" \| "gradient"` | `"coverage"` | How partly filled columns are coloured. See Theming. |
 | `view` | `{ start, end }` | full range | Initial zoom window, `end` exclusive. |
-| `interactive` | `boolean` | `true` | Ctrl/⌘+wheel zooms, drag pans, double-click resets; keyboard controls when focused, see Behaviour. |
+| `interactive` | `boolean` | `true` | Ctrl/⌘+wheel or a touch pinch zooms, drag pans, double-click resets; keyboard controls when focused, see Behaviour. |
 | `onViewChange` | `(view) => void` | | Called when the view changes. |
 | `axis` | `boolean \| { format?, tickCount? }` | `false` | Tick labels under the bar. |
 | `brush` | `BrushFactory` | | Pass the `brush` export of `@unpunnyfuns/d3-blockmap/brush`: a mouse or pen drag then selects a block range, and panning needs Shift. See Behaviour. |
@@ -91,6 +91,7 @@ Ranges use exclusive ends: `[0, 10]` means blocks 0 through 9. Unsorted, overlap
 
 - The canvas is focusable (`tabindex="0"`) when `interactive` isn't `false`, and announces progress through `role="img"` plus an `aria-label`: `label` overrides the default `4,343,270 of 10,000,000 blocks complete (43%)` text.
 - With the canvas focused: `+`/`-` (or `=`/`_`) zoom in or out around the centre of the current view, arrow keys pan by 10% of the view length, Shift+arrow by 50%, and `Home` or `0` resets to the full range.
+- On touch, a pinch zooms around the fingers' midpoint and a one-finger horizontal drag pans; vertical swipes scroll the page (`touch-action: pan-y`). A non-interactive map sets no `touch-action` and intercepts no touch.
 - With a `brush`, a mouse or pen drag selects a block range and Shift+drag pans; click an empty spot to clear. The brush is a mouse and pen gesture only, so a touch drag keeps panning and needs no modifier.
 
 ```ts

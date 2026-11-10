@@ -1,7 +1,8 @@
 /**
  * Translates pointer, wheel and keyboard input into view changes:
  * ctrl/meta-wheel zooms, drag pans, double click resets, and the keys below
- * mirror those gestures for anyone who can't use a pointer. Pointer, wheel
+ * mirror those gestures for anyone who can't use a pointer. Two touch
+ * pointers pinch: the spread zooms and the midpoint pans. Pointer, wheel
  * and dblclick listeners sit on the surface - the container - rather than
  * the canvas, so an overlay stacked above the canvas (the brush) cannot
  * swallow them; keydown stays on the canvas because that is the focusable
@@ -12,7 +13,13 @@
  * tooltip directly.
  */
 
-import { DRAG_THRESHOLD_PX, KEY_PAN_FRACTION, KEY_PAN_FRACTION_FAST, ZOOM_STEP } from "./constants";
+import {
+  DRAG_THRESHOLD_PX,
+  KEY_PAN_FRACTION,
+  KEY_PAN_FRACTION_FAST,
+  PINCH_MIN_DISTANCE_PX,
+  ZOOM_STEP,
+} from "./constants";
 import { canvasX } from "./dom";
 import { panView, viewLength, zoomView } from "./view";
 import type { BlockView } from "./view";
@@ -50,12 +57,32 @@ const RESET_KEYS = new Set(["0", "Home"]);
  */
 type DragState = { downX: number; view: BlockView; pointerId: number; active: boolean };
 
+/**
+ * The view as it was when the second touch pointer went down, the two
+ * pointers that own the pinch, their distance and midpoint at that moment,
+ * and the block that sat under the midpoint.
+ */
+type PinchState = {
+  view: BlockView;
+  pointerIds: readonly [number, number];
+  distance: number;
+  midpoint: number;
+  anchor: number;
+};
+
+const PINCH_POINTERS = 2;
+
 export const attachInteraction = (
   surface: HTMLElement,
   canvas: HTMLCanvasElement,
   deps: InteractionDeps,
 ): (() => void) => {
   let drag: DragState | undefined;
+  let pinch: PinchState | undefined;
+
+  // Touch pointers currently down on the surface, by pointerId, with their
+  // latest canvas-relative x.
+  const touches = new Map<number, number>();
 
   // CSS pixels to blocks: scale to device pixels (one per column), take that
   // as a fraction of the columns across, and spend it over the view length.
@@ -70,7 +97,7 @@ export const attachInteraction = (
    */
   const onWheel = (event: WheelEvent): void => {
     if (!(event.ctrlKey || event.metaKey)) return;
-    if (drag?.active) return;
+    if (drag?.active || pinch) return;
     if (deps.getBinCount() === 0) return;
     event.preventDefault();
 
@@ -93,6 +120,15 @@ export const attachInteraction = (
 
     if (document.activeElement !== canvas && typeof canvas.focus === "function") {
       canvas.focus({ preventScroll: true });
+    }
+
+    if (event.pointerType === TOUCH_POINTER) {
+      if (pinch) return;
+      touches.set(event.pointerId, canvasX(canvas, event));
+      if (touches.size === PINCH_POINTERS) {
+        startPinch();
+        return;
+      }
     }
 
     // The brush only claims mouse and pen drags, so a touch drag is the only
@@ -118,6 +154,11 @@ export const attachInteraction = (
    * remaining events to an element that never hears them.
    */
   const onPointerMove = (event: PointerEvent): void => {
+    if (touches.has(event.pointerId)) touches.set(event.pointerId, canvasX(canvas, event));
+    if (pinch) {
+      if (pinch.pointerIds.includes(event.pointerId)) movePinch(pinch);
+      return;
+    }
     if (!drag) return;
 
     const dx = canvasX(canvas, event) - drag.downX;
@@ -154,6 +195,80 @@ export const attachInteraction = (
     drag = undefined;
   };
 
+  const releaseCapture = (pointerId: number): void => {
+    const hasCapture = surface.hasPointerCapture?.(pointerId) ?? true;
+    if (typeof surface.releasePointerCapture === "function" && hasCapture) {
+      surface.releasePointerCapture(pointerId);
+    }
+  };
+
+  /**
+   * A pinch needs both pointers to be touch, so a mouse or pen drag in
+   * flight keeps the gesture. A touch drag in flight ends through endDrag
+   * first, so its capture, cursor and onDragEnd unwind before the pinch
+   * claims both pointers. onDragStart hides the tooltip for the pinch the
+   * same way it does for a drag.
+   */
+  const startPinch = (): void => {
+    if (drag && !touches.has(drag.pointerId)) return;
+    endDrag();
+
+    const [[firstId, firstX], [secondId, secondX]] = Array.from(touches);
+    const view = deps.getView();
+    const midpoint = (firstX + secondX) / HALF;
+    pinch = {
+      view,
+      pointerIds: [firstId, secondId],
+      distance: Math.max(Math.abs(firstX - secondX), PINCH_MIN_DISTANCE_PX),
+      midpoint,
+      anchor: deps.getBinCount() === 0 ? view.start : view.start + columnsToBlocks(midpoint, view),
+    };
+
+    if (typeof surface.setPointerCapture === "function") {
+      surface.setPointerCapture(firstId);
+      surface.setPointerCapture(secondId);
+    }
+    deps.onDragStart();
+  };
+
+  /**
+   * Computed from the baseline on every move, never incrementally, like the
+   * drag: the distance ratio zooms around the anchor, then a pan keeps the
+   * anchor under the current midpoint. The minimum distance keeps fingers
+   * that meet from dividing by zero.
+   */
+  const movePinch = (state: PinchState): void => {
+    if (deps.getBinCount() === 0) return;
+
+    const [firstX = 0, secondX = 0] = state.pointerIds.map((id) => touches.get(id));
+    const distance = Math.max(Math.abs(firstX - secondX), PINCH_MIN_DISTANCE_PX);
+    const midpoint = (firstX + secondX) / HALF;
+    const total = deps.getTotalBlocks();
+    const zoomed = zoomView(state.view, state.anchor, state.distance / distance, total);
+    deps.setView(panView(zoomed, -columnsToBlocks(midpoint - state.midpoint, zoomed), total));
+  };
+
+  const endPinch = (): void => {
+    if (!pinch) return;
+    pinch.pointerIds.forEach(releaseCapture);
+    pinch = undefined;
+    deps.onDragEnd();
+  };
+
+  /**
+   * Either pinch pointer lifting ends the pinch; the finger left down hands
+   * over to nothing, so it cannot jolt the view into a pan. A pointer that
+   * is not part of the pinch - a third finger - changes nothing.
+   */
+  const onPointerEnd = (event: PointerEvent): void => {
+    touches.delete(event.pointerId);
+    if (pinch) {
+      if (pinch.pointerIds.includes(event.pointerId)) endPinch();
+      return;
+    }
+    endDrag();
+  };
+
   const onDblClick = (): void => deps.resetView();
 
   /**
@@ -170,7 +285,7 @@ export const attachInteraction = (
    */
   const onKeyDown = (event: KeyboardEvent): void => {
     if (event.ctrlKey || event.metaKey || event.altKey) return;
-    if (drag?.active) return;
+    if (drag?.active || pinch) return;
 
     const view = deps.getView();
     const length = viewLength(view);
@@ -196,20 +311,22 @@ export const attachInteraction = (
   surface.addEventListener("wheel", onWheel, { passive: false });
   surface.addEventListener("pointerdown", onPointerDown);
   surface.addEventListener("pointermove", onPointerMove);
-  surface.addEventListener("pointerup", endDrag);
-  surface.addEventListener("pointercancel", endDrag);
+  surface.addEventListener("pointerup", onPointerEnd);
+  surface.addEventListener("pointercancel", onPointerEnd);
   surface.addEventListener("dblclick", onDblClick);
   canvas.addEventListener("keydown", onKeyDown);
 
-  // Teardown ends any drag in flight first, so capture and the grabbing
-  // cursor are released even if the map is destroyed mid-gesture.
+  // Teardown ends any drag or pinch in flight first, so capture and the
+  // grabbing cursor are released even if the map is destroyed mid-gesture.
   return () => {
     endDrag();
+    endPinch();
+    touches.clear();
     surface.removeEventListener("wheel", onWheel);
     surface.removeEventListener("pointerdown", onPointerDown);
     surface.removeEventListener("pointermove", onPointerMove);
-    surface.removeEventListener("pointerup", endDrag);
-    surface.removeEventListener("pointercancel", endDrag);
+    surface.removeEventListener("pointerup", onPointerEnd);
+    surface.removeEventListener("pointercancel", onPointerEnd);
     surface.removeEventListener("dblclick", onDblClick);
     canvas.removeEventListener("keydown", onKeyDown);
   };

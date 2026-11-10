@@ -16,7 +16,7 @@ type Harness = {
   cleanup(): void;
 };
 
-const mount = (totalBlocks = TOTAL): Harness => {
+const mount = (totalBlocks = TOTAL, touchAction = "pan-y"): Harness => {
   const container = document.createElement("div");
   Object.assign(container.style, {
     position: "absolute",
@@ -36,6 +36,7 @@ const mount = (totalBlocks = TOTAL): Harness => {
     getWidth: () => WIDTH,
     getHeight: () => HEIGHT,
     getTotalBlocks: () => totalBlocks,
+    touchAction,
     onBrush: (selection: BlockRange | null) => onBrush(selection),
     onBrushEnd: (selection: BlockRange | null) => onBrushEnd(selection),
   });
@@ -131,8 +132,19 @@ describe("createBrushOverlay", () => {
     const svg = svgOf(harness.container);
     expect(svg).not.toBeNull();
     expect(svg.style.position).toBe("absolute");
-    expect(svg.style.touchAction).toBe("none");
     expect(svg.querySelector(".overlay")).not.toBeNull();
+    harness.cleanup();
+  });
+
+  it("sets the touch-action it is given on the svg", () => {
+    const harness = mount(TOTAL, "pan-y");
+    expect(svgOf(harness.container).style.touchAction).toBe("pan-y");
+    harness.cleanup();
+  });
+
+  it("sets no touch-action when given an empty string", () => {
+    const harness = mount(TOTAL, "");
+    expect(svgOf(harness.container).style.touchAction).toBe("");
     harness.cleanup();
   });
 
@@ -144,6 +156,7 @@ describe("createBrushOverlay", () => {
       getWidth: () => WIDTH,
       getHeight: () => HEIGHT,
       getTotalBlocks: () => TOTAL,
+      touchAction: "pan-y",
       onBrush: () => {},
       onBrushEnd: () => {},
     });

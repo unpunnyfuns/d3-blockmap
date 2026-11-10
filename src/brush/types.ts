@@ -6,6 +6,9 @@ export type BrushOverlayDeps = {
   getWidth(): number;
   getHeight(): number;
   getTotalBlocks(): number;
+  // The canvas's touch-action, mirrored on the overlay so touch reaches the
+  // map the same way wherever it lands; an empty string sets nothing.
+  touchAction: string;
   onBrush(selection: BlockRange | null): void;
   onBrushEnd(selection: BlockRange | null): void;
 };

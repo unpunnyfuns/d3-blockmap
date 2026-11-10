@@ -113,7 +113,7 @@ export const createBrushOverlay: BrushFactory = (container, deps) => {
     inset: "0",
     width: "100%",
     height: "100%",
-    touchAction: "none",
+    touchAction: deps.touchAction,
     overflow: "visible",
     display: "block",
   });

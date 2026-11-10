@@ -65,6 +65,16 @@ export const BLINK_INTERVAL_MS = 500;
 export const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 export const MIN_VIEW_LENGTH = 1;
 
+// A pinch's finger distance never counts as less than this, so fingers that
+// meet or cross cannot divide the zoom factor by zero.
+export const PINCH_MIN_DISTANCE_PX = 8;
+
+// An interactive map lets the browser keep vertical swipes, so the page
+// still scrolls, and takes horizontal drags and pinches for itself; an empty
+// value sets no touch-action at all, for a map that intercepts nothing.
+export const TOUCH_ACTION_INTERACTIVE = "pan-y";
+export const TOUCH_ACTION_UNSET = "";
+
 // Keyboard panning moves the view by a fraction of its own length: 10%
 // normally, 50% with Shift held, for a faster traverse of a large view.
 export const KEY_PAN_FRACTION = 0.1;
