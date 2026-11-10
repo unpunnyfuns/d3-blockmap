@@ -1,6 +1,6 @@
 {
   "name": "@unpunnyfuns/d3-blockmap",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Canvas block map for millions of download blocks, D3 scales and colours",
   "license": "MIT",
   "files": [
