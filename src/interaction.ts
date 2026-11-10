@@ -23,6 +23,7 @@ import {
   DRAG_THRESHOLD_PX,
   KEY_PAN_FRACTION,
   KEY_PAN_FRACTION_FAST,
+  NO_BUTTONS,
   PINCH_MIN_DISTANCE_PX,
   ZOOM_STEP,
 } from "./constants";
@@ -48,7 +49,6 @@ const PRIMARY_BUTTON = 0;
 const TOUCH_POINTER = "touch";
 const GRABBING = "grabbing";
 const NO_POINTER = -1;
-const NO_BUTTONS = 0;
 const HALF = 2;
 
 // `=` and `_` are the unshifted/shifted neighbours of `+` and `-` on a US

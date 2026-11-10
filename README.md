@@ -65,7 +65,7 @@ export const Download = ({ totalBlocks }: { totalBlocks: number }) => {
 | `onBrushEnd` | `(selection) => void` | | Called when the gesture ends, with the snapped `[start, end)`, or `null` when it cleared the selection. A gesture that leaves the selection as it was fires nothing. |
 | `onBlockClick` | `(event) => void` | | Called on click with `{ block, range, completed, total, originalEvent }`. Works even when `interactive` is `false`. |
 | `label` | `(progress) => string` | `N of T blocks complete (P%)` | Overrides the canvas `aria-label`. See Behaviour. |
-| `tooltip` | `false \| (hit) => string` | built-in text | Hover text from `{ block, range, completed, total }`; `false` creates no tooltip element. |
+| `tooltip` | `false \| (hit) => string` | built-in text | Hover text from `{ block, range, completed, total }`; over a brush selection the hit is the whole selection. `false` creates no tooltip element. |
 
 ## Methods
 
@@ -92,7 +92,7 @@ Ranges use exclusive ends: `[0, 10]` means blocks 0 through 9. Unsorted, overlap
 - The canvas is focusable (`tabindex="0"`) when `interactive` isn't `false`, and announces progress through `role="img"` plus an `aria-label`: `label` overrides the default `4,343,270 of 10,000,000 blocks complete (43%)` text.
 - With the canvas focused: `+`/`-` (or `=`/`_`) zoom in or out around the centre of the current view, arrow keys pan by 10% of the view length, Shift+arrow by 50%, and `Home` or `0` resets to the full range.
 - On touch, a pinch zooms around the fingers' midpoint and a one-finger horizontal drag pans; vertical swipes scroll the page (`touch-action: pan-y`). A non-interactive map sets no `touch-action` and intercepts no touch.
-- With a `brush`, a mouse or pen drag selects a block range and Shift+drag pans; click an empty spot to clear. The brush is a mouse and pen gesture only, so a touch drag keeps panning and needs no modifier.
+- With a `brush`, a mouse or pen drag selects a block range and Shift+drag pans; click an empty spot to clear. While a selection is dragged, and whenever the pointer is over one, the tooltip shows the selection's range and how much of it is complete. The brush is a mouse and pen gesture only, so a touch drag keeps panning and needs no modifier.
 
 ```ts
 import { createBlockMap } from '@unpunnyfuns/d3-blockmap';
@@ -138,6 +138,7 @@ The tooltip is a `div[data-blockmap-tooltip]`, ticks are `span[data-blockmap-tic
 - The axis sits just below the container at `top: 100%`; don't clip it with `overflow: hidden`.
 - The built-in tooltip, label and axis text are English with en-US number grouping; `tooltip`, `label` and the axis `format` option replace them.
 - d3 packages are external imports, not bundled; they dedupe with your own D3. `d3-brush` and `d3-selection` load only through the `/brush` subpath.
+- The selection tooltip counts the selected blocks from the bitset on each pointer move, so its cost grows with the length of the selection.
 - Editing a selection that is partly outside the view re-derives both edges from the visible span, so the off-screen edge snaps to the view bound.
 
 ## Development

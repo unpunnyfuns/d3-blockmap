@@ -305,4 +305,15 @@ describe("createBlockState", () => {
     state.resize(10);
     expect(state.countOf(1)).toBe(10);
   });
+
+  it("countRange counts completed blocks in any range, whatever the view", () => {
+    const state = createBlockState(100);
+    state.resize(10);
+    state.addRanges([[10, 20]]);
+    state.add([55]);
+    state.setView({ start: 0, end: 10 });
+    expect(state.countRange(0, 100)).toBe(11);
+    expect(state.countRange(15, 56)).toBe(6);
+    expect(state.countRange(20, 55)).toBe(0);
+  });
 });

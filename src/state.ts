@@ -34,6 +34,7 @@ export type BlockState = {
   has(index: number): boolean;
   fraction(bin: number): number;
   countOf(bin: number): number;
+  countRange(start: number, end: number): number;
   rangeOf(bin: number): BlockRange;
   progress(): Progress;
 };
@@ -219,6 +220,10 @@ export const createBlockState = (totalBlocks: number): BlockState => {
     },
 
     countOf: (bin) => bins.counts[bin],
+
+    // Straight from the bitset, so it answers for blocks outside the view
+    // too; the cost grows with the length of the range.
+    countRange: (start, end) => bitset.countRange(start, end),
     rangeOf: (bin) => bins.rangeOf(bin),
     progress: () => ({ completed: bitset.count, total: totalBlocks }),
   };

@@ -18,6 +18,7 @@ import {
   ARIA_ROLEDESCRIPTION,
   CANVAS_ROWS,
   DRAG_THRESHOLD_PX,
+  NO_BUTTONS,
   PERCENT,
   REDUCED_MOTION_QUERY,
   TOUCH_ACTION_INTERACTIVE,
@@ -164,6 +165,9 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   // Where the last press went down. NaN until the first one, so a click with
   // no press before it - a synthetic one - is never taken for a drag's end.
   let downX = Number.NaN;
+  // Where the pointer last was over the container, in canvas pixels: a brush
+  // drag reports its selection without a position of its own.
+  let pointerX = Number.NaN;
 
   // Appended straight after the canvas so it covers the bar, and before the
   // tooltip and the axis so those keep painting over it. The committed view
@@ -176,7 +180,10 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
         getHeight: () => cssHeight,
         getTotalBlocks: () => state.totalBlocks,
         touchAction,
-        onBrush: (selection) => options.onBrush?.(selection),
+        onBrush: (selection) => {
+          showSelection(selection);
+          options.onBrush?.(selection);
+        },
         onBrushEnd: (selection) => options.onBrushEnd?.(selection),
       })
     : undefined;
@@ -362,21 +369,55 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     };
   };
 
-  // Suppressed while dragging, where the pointer means pan rather than hover.
-  // A pointer inside the container but off the canvas - padding, or a brush
-  // handle poking past the edge - hides the readout rather than leaving a
-  // stale one behind.
-  const onPointerMove = (event: PointerEvent): void => {
-    if (dragging) return;
+  // A brush selection reported in the same shape as a column, so one tooltip
+  // formatter serves both.
+  const selectionHit = ([start, end]: BlockRange): BlockHit => ({
+    block: start,
+    range: [start, end],
+    completed: state.countRange(start, end),
+    total: end - start,
+  });
 
+  /**
+   * The readout while a selection is being dragged: the live range, at the
+   * last pointer position the container saw. d3-brush follows the mouse on
+   * the window, so the brush keeps reporting after the pointer has left the
+   * map; the readout then stays at the edge it left through.
+   */
+  const showSelection = (selection: BlockRange | null): void => {
+    if (!tooltip || Number.isNaN(pointerX)) return;
+    if (!selection) {
+      tooltip.hide();
+      return;
+    }
+    const x = Math.min(Math.max(pointerX, 0), cssWidth);
+    tooltip.show(x, formatTooltip(selectionHit(selection)));
+  };
+
+  /**
+   * Suppressed while dragging, where the pointer means pan rather than hover,
+   * and while a button is held over a brush, where the gesture reports the
+   * live selection itself. A pointer inside the container but off the canvas
+   * - padding, or a brush handle poking past the edge - hides the readout
+   * rather than leaving a stale one behind. Over a brush selection the
+   * readout describes the whole selection instead of the column under the
+   * pointer.
+   */
+  const onPointerMove = (event: PointerEvent): void => {
     const x = canvasX(canvas, event);
+    pointerX = x;
+    if (!tooltip || dragging) return;
+    if (overlay && event.buttons !== NO_BUTTONS) return;
+
     const hit = locate(x);
     if (!hit) {
-      tooltip?.hide();
+      tooltip.hide();
       return;
     }
 
-    tooltip?.show(x, formatTooltip(hit));
+    const selection = overlay?.getSelection();
+    const selected = selection && hit.range[0] < selection[1] && hit.range[1] > selection[0];
+    tooltip.show(x, formatTooltip(selected ? selectionHit(selection) : hit));
   };
 
   const onPointerLeave = (): void => tooltip?.hide();

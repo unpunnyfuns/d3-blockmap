@@ -69,6 +69,9 @@ export const MIN_VIEW_LENGTH = 1;
 // meet or cross cannot divide the zoom factor by zero.
 export const PINCH_MIN_DISTANCE_PX = 8;
 
+// `PointerEvent.buttons` when nothing is pressed.
+export const NO_BUTTONS = 0;
+
 // An interactive map lets the browser keep vertical swipes, so the page
 // still scrolls, and takes horizontal drags and pinches for itself; an empty
 // value sets no touch-action at all, for a map that intercepts nothing.

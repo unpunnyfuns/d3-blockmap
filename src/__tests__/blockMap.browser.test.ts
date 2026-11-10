@@ -1003,6 +1003,84 @@ describe("createBlockMap", () => {
       map.destroy();
     });
 
+    it("shows the selection's range and completion while the pointer is over it", () => {
+      const { container, map } = mountBrushed({ totalBlocks: 1000 });
+      map.addRanges([[200, 300]]);
+      map.setBrush([200, 500]);
+      const tooltip = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
+
+      fire(container, "pointermove", at(container, 240));
+      expect(tooltip.style.display).toBe("block");
+      expect(tooltip.textContent).toBe("Blocks 200–499 · 100 / 300 (33.3%)");
+
+      fire(container, "pointermove", at(container, 600));
+      expect(tooltip.textContent).toBe("Block 750 · missing");
+      map.destroy();
+    });
+
+    it("hands a custom tooltip the selection as its hit", () => {
+      const tooltip = vi.fn((_hit: BlockHit) => "custom");
+      const { container, map } = mountBrushed({ totalBlocks: 1000, tooltip });
+      map.addRanges([[200, 300]]);
+      map.setBrush([200, 500]);
+
+      fire(container, "pointermove", at(container, 240));
+
+      expect(tooltip).toHaveBeenLastCalledWith({
+        block: 200,
+        range: [200, 500],
+        completed: 100,
+        total: 300,
+      });
+      map.destroy();
+    });
+
+    it("shows the live selection while it is being dragged", () => {
+      const { container, map } = mountBrushed({ totalBlocks: 1000 });
+      map.addRanges([[200, 300]]);
+      const tooltip = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
+
+      fire(container, "pointermove", at(container, 160));
+      fire(container, "pointerdown", { ...at(container, 160), pointerId: 1, button: 0 });
+      fire(partOf(container, ".overlay"), "mousedown", mouseAt(container, 160));
+      fire(window, "mousemove", mouseAt(container, 400));
+
+      expect(tooltip.style.display).toBe("block");
+      expect(tooltip.textContent).toBe("Blocks 200–499 · 100 / 300 (33.3%)");
+
+      pointer(container, "pointermove", 400);
+      expect(tooltip.textContent).toBe("Blocks 200–499 · 100 / 300 (33.3%)");
+
+      fire(window, "mouseup", mouseAt(container, 400));
+      map.destroy();
+    });
+
+    it("hides the tooltip when a press clears the selection", () => {
+      const { container, map } = mountBrushed({ totalBlocks: 1000 });
+      map.setBrush([200, 500]);
+      const tooltip = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
+      fire(container, "pointermove", at(container, 240));
+      expect(tooltip.style.display).toBe("block");
+
+      fire(container, "pointermove", at(container, 700));
+      brushClick(container, 700);
+      fire(container, "pointermove", at(container, 240));
+
+      expect(map.getBrush()).toBeNull();
+      expect(tooltip.textContent).toBe("Block 300 · missing");
+      map.destroy();
+    });
+
+    it("brushes without a tooltip element when the tooltip is off", () => {
+      const { container, map } = mountBrushed({ totalBlocks: 1000, tooltip: false });
+      fire(container, "pointermove", at(container, 160));
+      brushDrag(container, 160, 400);
+      fire(container, "pointermove", at(container, 240));
+      expect(map.getBrush()).toEqual([200, 500]);
+      expect(container.querySelector("[data-blockmap-tooltip]")).toBeNull();
+      map.destroy();
+    });
+
     it("leaves panning to shift+drag while the brush owns a plain drag", () => {
       const container = dom.mount(100);
       const map = createBlockMap(container, { totalBlocks: 1000, brush });
