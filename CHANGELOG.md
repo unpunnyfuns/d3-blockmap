@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.0](https://github.com/unpunnyfuns/d3-blockmap/compare/v0.2.0...v0.3.0) (2026-11-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* `brush: true` is replaced by passing the `brush` export of `@unpunnyfuns/d3-blockmap/brush`.
+* the default canvas aria-label changes from "Download progress: N of T blocks (P%)" to "N of T blocks complete (P%)".
+
+### Features
+
+* add removeBlocks ([da99597](https://github.com/unpunnyfuns/d3-blockmap/commit/da995975070c88e6ce104fe9d1664af8d16bbd81))
+* move the brush to the /brush subpath ([b1c9380](https://github.com/unpunnyfuns/d3-blockmap/commit/b1c9380477ed28f8994b601f41ea95be0289576b))
+* show a brush selection's range and completion in the tooltip ([85d5a64](https://github.com/unpunnyfuns/d3-blockmap/commit/85d5a645bcee4a4861b51378a6a4759e054b68b7))
+* tooltip option, neutral default label ([ed9f5ed](https://github.com/unpunnyfuns/d3-blockmap/commit/ed9f5ed15f3e0d6fc11826aff9ccd5de05196951))
+* touch pinch zoom; stop blocking page scroll ([12fa9f1](https://github.com/unpunnyfuns/d3-blockmap/commit/12fa9f1aa9bada4478d833a1e7078b5d3e45df78))
+
+
+### Bug Fixes
+
+* one gesture owns the surface at a time ([51cbb52](https://github.com/unpunnyfuns/d3-blockmap/commit/51cbb52506219492cfe9bdc8ba53d9f5561aaafb))
+* only an active drag or a pinch owns the surface ([4d8a402](https://github.com/unpunnyfuns/d3-blockmap/commit/4d8a4029bad0cf09efd7700dc3ac49183a2efa4b))
+
 ## [0.2.0](https://github.com/unpunnyfuns/d3-blockmap/compare/v0.1.0...v0.2.0) (2026-11-09)
 
 
