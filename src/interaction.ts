@@ -9,10 +9,10 @@
  * past the threshold - holds no capture, no cursor and has not called
  * onDragStart, so it owns nothing: it is only a baseline, and any new press
  * replaces it. A finger still down after its pinch ends does nothing until
- * it lifts or loses capture. Pointer, wheel and dblclick listeners sit on the surface - the container - rather than
- * the canvas, so an overlay stacked above the canvas (the brush) cannot
- * swallow them; keydown stays on the canvas because that is the focusable
- * element. Positions therefore come from clientX minus the canvas rect
+ * it lifts or loses capture. Pointer, wheel and dblclick listeners sit on
+ * the surface - the container - rather than the canvas, so an overlay
+ * stacked above the canvas (the brush) cannot swallow them; keydown stays on
+ * the canvas because that is the focusable element. Positions therefore come from clientX minus the canvas rect
  * instead of offsetX, which would be relative to whichever child the event
  * happened to hit. It computes the new view with the pure helpers in view.ts
  * and hands it to deps.setView; it never touches state, pixels or the
@@ -213,9 +213,8 @@ export const attachInteraction = (
     deps.setView(panView(drag.view, -columnsToBlocks(dx, drag.view), deps.getTotalBlocks()));
   };
 
-  // Only a drag that became active took capture and changed the cursor, so
-  // only that one has anything to undo. The optional-call guards cover
-  // environments and test doubles without the pointer capture API.
+  // The optional-call guards cover environments and test doubles without
+  // the pointer capture API.
   const releaseCapture = (pointerId: number): void => {
     const hasCapture = surface.hasPointerCapture?.(pointerId) ?? true;
     if (typeof surface.releasePointerCapture === "function" && hasCapture) {
@@ -223,8 +222,10 @@ export const attachInteraction = (
     }
   };
 
-  // The state is cleared before anything is undone, so a lostpointercapture
-  // dispatched by the release finds nothing left to end.
+  // Only a drag that became active took capture and changed the cursor, so
+  // only that one has anything to undo. The state is cleared before anything
+  // is undone, so a lostpointercapture dispatched by the release finds
+  // nothing left to end.
   const endDrag = (): void => {
     const ended = drag;
     drag = undefined;
@@ -236,10 +237,11 @@ export const attachInteraction = (
   };
 
   /**
-   * Only reached with two touch pointers down and no mouse or pen drag, which
-   * onPointerDown turns away beforehand. A touch drag in flight ends through
-   * endDrag first, so its capture, cursor and onDragEnd unwind before the pinch
-   * claims both pointers. onDragStart hides the tooltip for the pinch the
+   * Only reached with two touch pointers down and no active mouse or pen
+   * drag, which onPointerDown turns away beforehand. Whatever drag is
+   * recorded - a touch drag in flight, or an inactive baseline - ends through
+   * endDrag first, so any capture, cursor and onDragEnd unwind before the
+   * pinch claims both pointers. onDragStart hides the tooltip for the pinch the
    * same way it does for a drag.
    */
   const startPinch = (): void => {
@@ -297,9 +299,9 @@ export const attachInteraction = (
 
   /**
    * Forgets one pointer: up, cancel, or a lost capture on the surface itself.
-   * A spent finger releases the capture it kept. Either pinch pointer going ends the pinch; the finger left down is spent
-   * and hands over to nothing, so it cannot jolt the view into a pan or pair
-   * with a new finger. A pointer that owns no gesture - a third finger, a
+   * A spent finger releases the capture it kept. Either pinch pointer going
+   * ends the pinch; the finger left down is spent and hands over to nothing,
+   * so it cannot jolt the view into a pan or pair with a new finger. A pointer that owns no gesture - a third finger, a
    * press that was turned away - changes nothing. Ending is idempotent, so
    * the lostpointercapture that follows a normal up finds nothing to do.
    */

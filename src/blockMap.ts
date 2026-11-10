@@ -329,9 +329,10 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
    * size. Which text to show is left to the tooltip formatter. An x outside
    * the canvas hit nothing: the listeners are on the container, so container
    * padding or a brush handle sticking out past an edge would otherwise
-   * report the nearest column as a phantom hit. Within the canvas the column is still clamped,
-   * since x scaled by dpr can round onto the column past the last one.
-   * Returns undefined before the first layout too, when there are no bins.
+   * report the nearest column as a phantom hit. Within the canvas the column
+   * is still clamped, since x scaled by dpr can round onto the column past
+   * the last one. Returns undefined before the first layout too, when there
+   * are no bins.
    */
   const locate = (x: number): BlockHit | undefined => {
     const { binCount } = state;
