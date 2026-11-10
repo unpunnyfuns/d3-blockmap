@@ -5,6 +5,7 @@
   "packages": {
     ".": {
       "package-name": "@unpunnyfuns/d3-blockmap",
+      "bump-minor-pre-major": true,
       "changelog-path": "CHANGELOG.md"
     }
   }
