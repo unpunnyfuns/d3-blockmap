@@ -2,68 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>d3-blockmap demo</title>
-<style>
-  :root {
-    --blockmap-missing: #1f2430;
-    --blockmap-partial-low: #5a3d12;
-    --blockmap-partial-high: #f0b429;
-    --blockmap-partial: #f0b429;
-    --blockmap-complete: #3ddc84;
-    --blockmap-highlight: #ff4d4f;
-    --blockmap-brush: #9ecbff;
-    --blockmap-axis-color: #8b93a7;
-    color-scheme: dark;
-  }
-  html[data-theme="light"] {
-    --blockmap-missing: #e3e6ec;
-    --blockmap-partial-low: #ffd9a8;
-    --blockmap-partial-high: #ff8c00;
-    --blockmap-partial: #ff8c00;
-    --blockmap-complete: #1a9e4b;
-    --blockmap-highlight: #d4380d;
-    --blockmap-brush: #0b63ce;
-    --blockmap-axis-color: #5b6472;
-    color-scheme: light;
-  }
-  body { font: 14px/1.5 system-ui, sans-serif; margin: 0; padding: 32px; background: Canvas; color: CanvasText; }
-  h1 { font-size: 18px; margin: 0 0 24px; }
-  section { margin-bottom: 44px; }
-  .label { display: flex; justify-content: space-between; margin-bottom: 6px; color: GrayText; }
-  .map { height: 24px; }
-  .map canvas { border-radius: 3px; }
-  [data-blockmap-tooltip] { background: #000c; color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-top: -6px; }
-  [data-blockmap-axis] { font-size: 11px; }
-  [data-blockmap-tick] { padding-top: 7px; }
-  [data-blockmap-tick]::before { content: ""; position: absolute; top: 0; height: 5px; border-left: 1px solid currentColor; }
-  [data-blockmap-tick][style*="translateX(-50%)"]::before { left: 50%; }
-  [data-blockmap-tick][style*="translateX(0)"]::before { left: 0; }
-  [data-blockmap-tick][style*="translateX(-100%)"]::before { right: 0; }
-  button { margin-right: 8px; }
-</style>
-</head>
-<body>
-<h1>d3-blockmap</h1>
-<section>
-  <div class="label"><span>10,000,000 blocks, streaming, gradient style</span><span id="big-progress"></span></div>
-  <div id="big" class="map"></div>
-</section>
-<section>
-  <div class="label"><span>40 blocks, discrete mode</span><span id="small-progress"></span></div>
-  <div id="small" class="map"></div>
-</section>
-<section>
-  <div class="label"><span>10,000,000 blocks, incremental ranges, coverage style</span><span id="ranges-progress"></span></div>
-  <div id="ranges" class="map"></div>
-</section>
-<p>
-  <button id="toggle">Pause</button>
-  <button id="theme">Toggle theme</button>
-  <button id="reset">Reset</button>
-  <button id="highlight">Highlight incomplete</button>
-  <button id="reset-view">Reset view</button>
-</p>
-<p class="label">Ctrl+wheel (or pinch) zooms around the cursor, drag pans, double-click resets. On the third map drag selects a block range, Shift+drag pans, and a click reports the block under the pointer. <span id="view"></span> <span id="selection"></span></p>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light dark" />
+<script>
+try {
+  document.querySelector('meta[name="color-scheme"]').content = localStorage.getItem("color-scheme") ?? "light dark";
+} catch {}
+</script>
+<title>d3-blockmap configurator</title>
+<link rel="icon" href="data:," />
+<link rel="stylesheet" href="styles.css" />
 <!-- d3-array.mjs pre-bundles its internmap dependency, so no separate import map entry is needed for it. -->
 <script type="importmap">
 { "imports": {
@@ -81,151 +29,166 @@
   "d3-transition": "/node_modules/d3-transition/dist/d3-transition.mjs"
 } }
 </script>
-<script type="module">
-import { createBlockMap } from "@unpunnyfuns/d3-blockmap";
-import { brush } from "@unpunnyfuns/d3-blockmap/brush";
+<script type="module" src="main.js"></script>
+</head>
+<body>
+<header>
+  <h1>d3-blockmap</h1>
+  <p>Configure a block map and copy the code for it.</p>
+</header>
 
-const BIG = 10_000_000;
-const SMALL = 40;
-const BATCH = 2_500;
-const FRONTS = 6;
+<section class="stage" aria-label="Preview">
+  <div class="stage-head">
+    <span id="progress" role="status"></span>
+    <span class="actions">
+      <button type="button" id="toggle">Pause</button>
+      <button type="button" id="restart">Restart</button>
+      <button type="button" id="reset-view">Reset view</button>
+      <button type="button" id="clear-brush" hidden>Clear selection</button>
+    </span>
+  </div>
+  <div id="map" class="map"></div>
+  <p class="hint" id="hint"></p>
+  <dl class="events" id="events">
+    <div data-event="onViewChange" hidden><dt>onViewChange</dt><dd></dd></div>
+    <div data-event="onBrush" hidden><dt>onBrush</dt><dd></dd></div>
+    <div data-event="onBrushEnd" hidden><dt>onBrushEnd</dt><dd></dd></div>
+    <div data-event="onBlockClick" hidden><dt>onBlockClick</dt><dd></dd></div>
+  </dl>
+</section>
 
-const big = createBlockMap(document.querySelector("#big"), { totalBlocks: BIG, partial: "gradient" });
-const small = createBlockMap(document.querySelector("#small"), { totalBlocks: SMALL, initialBlocks: [0, 1, 2, 7, 8, 20, 21, 22, 23, 39] });
-const rangeMap = createBlockMap(document.querySelector("#ranges"), {
-  totalBlocks: BIG,
-  partial: "coverage",
-  axis: true,
-  brush,
-  onViewChange: (view) => {
-    document.querySelector("#view").textContent = `View ${fmt.format(view.start)}–${fmt.format(view.end - 1)}`;
-  },
-  onBrushEnd: (selection) => {
-    document.querySelector("#selection").textContent = selection
-      ? `Selected ${fmt.format(selection[0])}–${fmt.format(selection[1] - 1)} (${fmt.format(selection[1] - selection[0])} blocks)`
-      : "No selection";
-  },
-  onBlockClick: ({ range, completed, total }) => {
-    const span = `${fmt.format(range[0])}–${fmt.format(range[1] - 1)}`;
-    document.querySelector("#selection").textContent = `Clicked ${span} · ${fmt.format(completed)} / ${fmt.format(total)} complete`;
-  },
-});
-const RUN_SEED = 24;
-const RUN_MAX = 400;
-const RUN_START_LENGTH = 20_000;
-const RUN_GROWTH = 120;
-const NEW_RUN_EVERY = 20;
-const SNAPSHOT_EVERY = 5;
-const runs = [];
-const rangeDeltas = [];
-const addRun = () => {
-  const start = Math.floor(Math.random() * BIG);
-  const length = Math.floor(Math.random() * RUN_START_LENGTH);
-  runs.push([start, length]);
-  rangeDeltas.push([start, start + length]);
-};
-const seedRuns = () => {
-  runs.length = 0;
-  for (let i = 0; i < RUN_SEED; i += 1) addRun();
-};
-seedRuns();
-let rangeTick = 0;
-const stepRanges = () => {
-  rangeTick += 1;
-  for (const run of runs) {
-    const prevStart = run[0];
-    const prevEnd = run[0] + run[1];
-    const left = Math.min(run[0], Math.floor(Math.random() * RUN_GROWTH));
-    run[0] -= left;
-    run[1] += left + Math.floor(Math.random() * RUN_GROWTH);
-    const newStart = run[0];
-    const newEnd = run[0] + run[1];
-    if (newStart < prevStart) rangeDeltas.push([newStart, prevStart]);
-    if (newEnd > prevEnd) rangeDeltas.push([prevEnd, newEnd]);
-  }
-  if (rangeTick % NEW_RUN_EVERY === 0 && runs.length < RUN_MAX) addRun();
-  if (rangeTick % SNAPSHOT_EVERY === 0) {
-    rangeMap.addRanges(rangeDeltas);
-    rangeDeltas.length = 0;
-  }
-};
+<main>
+  <form id="config" aria-label="Configuration">
+    <fieldset>
+      <legend>Presets</legend>
+      <div class="row">
+        <button type="button" data-preset="streaming">Streaming, 10M</button>
+        <button type="button" data-preset="discrete">Discrete, 40</button>
+        <button type="button" data-preset="ranges">Ranges with brush</button>
+      </div>
+    </fieldset>
 
-const fmt = new Intl.NumberFormat("en-US");
-const showProgress = (map, el) => {
-  const { completed, total } = map.getProgress();
-  el.textContent = `${fmt.format(completed)} / ${fmt.format(total)} (${((completed / total) * 100).toFixed(2)}%)`;
-};
+    <fieldset>
+      <legend>Data</legend>
+      <label>totalBlocks
+        <input type="number" name="totalBlocks" min="1" max="4294967295" step="1" value="10000000" list="totals" />
+      </label>
+      <datalist id="totals">
+        <option value="40"></option>
+        <option value="1000"></option>
+        <option value="1000000"></option>
+        <option value="10000000"></option>
+        <option value="1000000000"></option>
+      </datalist>
+      <label>Fill order
+        <select name="source">
+          <option value="sequential">Start to end</option>
+          <option value="random">Random</option>
+          <option value="ranges">Random growing ranges</option>
+        </select>
+      </label>
+      <label>Duration, seconds
+        <input type="number" name="duration" min="0" max="3600" step="1" value="60" />
+      </label>
+      <label>Target fill <output name="targetFillValue"></output>
+        <input type="range" name="targetFill" min="0" max="100" step="1" value="100" />
+      </label>
+    </fieldset>
 
-const maps = [big, small, rangeMap];
-const LABEL_INTERVAL_MS = 500;
-let lastLabelUpdate = 0;
-const updateLabels = () => {
-  showProgress(big, document.querySelector("#big-progress"));
-  showProgress(small, document.querySelector("#small-progress"));
-  showProgress(rangeMap, document.querySelector("#ranges-progress"));
-};
+    <fieldset>
+      <legend>Display</legend>
+      <label>partial
+        <select name="partial">
+          <option value="coverage">coverage</option>
+          <option value="gradient">gradient</option>
+        </select>
+      </label>
+      <label>Height <output name="heightValue"></output>
+        <input type="range" name="height" min="4" max="64" step="1" value="24" />
+      </label>
+      <label class="check"><input type="checkbox" name="interactive" checked /> interactive</label>
+      <label class="check"><input type="checkbox" name="highlight" /> highlight incomplete</label>
+    </fieldset>
 
-const fronts = Array.from({ length: FRONTS }, () => Math.floor(Math.random() * BIG));
-let running = true;
-let smallTick = 0;
+    <fieldset>
+      <legend>Axis, brush, tooltip</legend>
+      <label class="check"><input type="checkbox" name="axis" /> axis</label>
+      <label>tickCount
+        <input type="number" name="tickCount" min="2" max="20" step="1" placeholder="auto" />
+      </label>
+      <label class="check"><input type="checkbox" name="brush" /> brush</label>
+      <label>tooltip
+        <select name="tooltip">
+          <option value="default">Built-in text</option>
+          <option value="custom">Custom function</option>
+          <option value="off">false</option>
+        </select>
+      </label>
+    </fieldset>
 
-const step = () => {
-  if (running) {
-    const batch = new Uint32Array(BATCH);
-    for (let i = 0; i < BATCH; i += 1) {
-      const f = i % FRONTS;
-      const sequential = i % 3 !== 0;
-      batch[i] = sequential ? (fronts[f] = (fronts[f] + 1) % BIG) : Math.floor(Math.random() * BIG);
-    }
-    big.addBlocks(batch);
-    smallTick += 1;
-    if (smallTick % 30 === 0) small.addBlocks([Math.floor(Math.random() * SMALL)]);
-    stepRanges();
-    const now = performance.now();
-    if (now - lastLabelUpdate >= LABEL_INTERVAL_MS) {
-      updateLabels();
-      lastLabelUpdate = now;
-    }
-    if (maps.every((map) => { const p = map.getProgress(); return p.completed === p.total; })) {
-      running = false;
-      document.querySelector("#toggle").textContent = "Done";
-      updateLabels();
-    }
-  }
-  requestAnimationFrame(step);
-};
-step();
+    <fieldset>
+      <legend>Callbacks</legend>
+      <label class="check"><input type="checkbox" name="onViewChange" /> onViewChange</label>
+      <label class="check"><input type="checkbox" name="onBrush" /> onBrush</label>
+      <label class="check"><input type="checkbox" name="onBrushEnd" /> onBrushEnd</label>
+      <label class="check"><input type="checkbox" name="onBlockClick" /> onBlockClick</label>
+    </fieldset>
 
-document.querySelector("#toggle").onclick = (e) => { running = !running; e.target.textContent = running ? "Pause" : "Resume"; };
-document.querySelector("#theme").onclick = () => {
-  const html = document.documentElement;
-  html.dataset.theme = html.dataset.theme === "light" ? "" : "light";
-};
-let highlighted = false;
-document.querySelector("#highlight").onclick = (e) => {
-  highlighted = !highlighted;
-  maps.forEach((map) => map.setHighlight(highlighted));
-  e.target.textContent = highlighted ? "Stop highlight" : "Highlight incomplete";
-};
-document.querySelector("#reset-view").onclick = () => maps.forEach((map) => map.resetView());
-document.querySelector("#reset").onclick = () => {
-  big.setBlocks([]);
-  small.setBlocks([]);
-  rangeMap.setRanges([]);
-  rangeDeltas.length = 0;
-  rangeTick = 0;
-  seedRuns();
-  rangeMap.addRanges(rangeDeltas);
-  rangeDeltas.length = 0;
-  rangeMap.setBrush(null);
-  document.querySelector("#selection").textContent = "";
-  maps.forEach((map) => map.resetView());
-  highlighted = false;
-  maps.forEach((map) => map.setHighlight(false));
-  document.querySelector("#highlight").textContent = "Highlight incomplete";
-  running = true;
-  document.querySelector("#toggle").textContent = "Pause";
-};
-</script>
+    <fieldset>
+      <legend>Theme</legend>
+      <label>Colour scheme
+        <select id="scheme">
+          <option value="light dark">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+      <div class="colors">
+        <label><input type="color" name="--blockmap-missing" data-color /> missing</label>
+        <label><input type="color" name="--blockmap-complete" data-color /> complete</label>
+        <label><input type="color" name="--blockmap-partial" data-color /> partial</label>
+        <label><input type="color" name="--blockmap-partial-low" data-color /> partial-low</label>
+        <label><input type="color" name="--blockmap-partial-high" data-color /> partial-high</label>
+        <label><input type="color" name="--blockmap-highlight" data-color /> highlight</label>
+        <label><input type="color" name="--blockmap-brush" data-color /> brush</label>
+        <label><input type="color" name="--blockmap-axis-color" data-color /> axis-color</label>
+      </div>
+      <button type="button" id="reset-colors">Reset colours</button>
+    </fieldset>
+  </form>
+
+  <div class="code">
+    <section aria-labelledby="js-title">
+      <div class="code-head">
+        <h2 id="js-title">JavaScript</h2>
+        <span class="copy">
+          <button type="button" command="--copy" commandfor="snippet-js">Copy JavaScript</button>
+          <span class="tip" role="status"></span>
+        </span>
+      </div>
+      <pre><code id="snippet-js"></code></pre>
+    </section>
+    <section aria-labelledby="react-title">
+      <div class="code-head">
+        <h2 id="react-title">React</h2>
+        <span class="copy">
+          <button type="button" command="--copy" commandfor="snippet-react">Copy React</button>
+          <span class="tip" role="status"></span>
+        </span>
+      </div>
+      <pre><code id="snippet-react"></code></pre>
+    </section>
+    <section aria-labelledby="css-title">
+      <div class="code-head">
+        <h2 id="css-title">CSS</h2>
+        <span class="copy">
+          <button type="button" command="--copy" commandfor="snippet-css">Copy CSS</button>
+          <span class="tip" role="status"></span>
+        </span>
+      </div>
+      <pre><code id="snippet-css"></code></pre>
+    </section>
+  </div>
+</main>
 </body>
 </html>
