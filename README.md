@@ -108,8 +108,8 @@ createBlockMap(container, { totalBlocks, brush, onBrushEnd: (selection) => {} })
 Props mirror the options, including `label`, `tooltip`, `brush` (the same `brush` factory from `/brush`), `onBrush`, `onBrushEnd`, `onBlockClick`, plus `blocks`, `ranges`, `highlight`, `className`, `style`. `ref` is a plain prop exposing every method above except `destroy`, as `BlockMapHandle`.
 
 - `blocks` and `ranges` apply when their identity changes, so keep the references stable.
-- `partial`, `interactive`, `axis`, and `brush` recreate the instance when they change; memoise an object `axis`.
-- `onViewChange`, `onBrush`, `onBrushEnd`, `onBlockClick`, and `label` can be inline, added, or removed: the latest function is called without recreating the instance. A changed `label` applies on the next progress update.
+- `partial`, `interactive`, `axis`, `brush`, and `tooltip` switching to or from `false` recreate the instance when they change; memoise an object `axis`.
+- `onViewChange`, `onBrush`, `onBrushEnd`, `onBlockClick`, `label`, and a `tooltip` function can be inline, added, or removed: the latest function is called without recreating the instance. A changed `label` applies on the next progress update.
 - `setBlocks` and `setRanges` on the ref hold until the `blocks` or `ranges` prop next changes.
 - For high-frequency updates use the ref (`addBlocks`, `addRanges`) rather than props.
 
