@@ -26,6 +26,7 @@ export type BlockState = {
   setView(view: BlockView): boolean;
   getView(): BlockView;
   add(indices: ArrayLike<number>): Uint32Array;
+  remove(indices: ArrayLike<number>): Uint32Array;
   replace(indices: ArrayLike<number>): void;
   replaceRanges(input: RangeInput): void;
   addRanges(input: RangeInput): Uint32Array;
@@ -85,6 +86,32 @@ export const createBlockState = (totalBlocks: number): BlockState => {
 
       const bin = bins.binOf(index);
       bins.counts[bin] += 1;
+      dirty.add(bin);
+    }
+
+    return dirty.size === 0 ? EMPTY_DIRTY : Uint32Array.from(dirty).sort();
+  };
+
+  /**
+   * Incremental remove of individual indices, the mirror of add. The bitset
+   * has no single-bit clear, so a one-block clearRange is used and the
+   * running count is written back; a bit that was not set is skipped, so it
+   * costs no bin update and reports nothing dirty.
+   */
+  const remove = (indices: ArrayLike<number>): Uint32Array => {
+    const hasBins = bins.binCount > 0;
+    const dirty = new Set<number>();
+
+    for (let i = 0; i < indices.length; i += 1) {
+      const index = indices[i];
+      if (!isValidIndex(index, totalBlocks) || !bitset.has(index)) continue;
+
+      bitset.clearRange(index, index + 1);
+      bitset.setCount(bitset.count - 1);
+      if (!hasBins || !inView(index)) continue;
+
+      const bin = bins.binOf(index);
+      bins.counts[bin] -= 1;
       dirty.add(bin);
     }
 
@@ -154,6 +181,7 @@ export const createBlockState = (totalBlocks: number): BlockState => {
     getView: () => ({ ...view }),
 
     add,
+    remove,
 
     replace: (indices) => {
       bitset.clear();

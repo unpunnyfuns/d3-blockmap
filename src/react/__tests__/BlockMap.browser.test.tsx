@@ -15,6 +15,7 @@ const createInstance = (): BlockMapInstance => ({
   setBlocks: vi.fn(),
   setRanges: vi.fn(),
   addBlocks: vi.fn(),
+  removeBlocks: vi.fn(),
   addRanges: vi.fn(),
   removeRanges: vi.fn(),
   setView: vi.fn(),
@@ -67,7 +68,7 @@ describe("<BlockMap>", () => {
     expect(second.setBlocks).toHaveBeenCalledWith(blocks);
   });
 
-  it("exposes setBlocks, addBlocks, setRanges, addRanges, removeRanges and getProgress through the ref", () => {
+  it("exposes setBlocks, addBlocks, removeBlocks, setRanges, addRanges, removeRanges and getProgress through the ref", () => {
     const instance = createInstance();
     vi.mocked(createBlockMap).mockReturnValue(instance);
     const ref = createRef<BlockMapHandle>();
@@ -77,6 +78,8 @@ describe("<BlockMap>", () => {
     act(() => ref.current?.addBlocks([4]));
     expect(instance.addBlocks).toHaveBeenCalledWith([4]);
     expect(ref.current?.getProgress()).toEqual({ completed: 0, total: 0 });
+    act(() => ref.current?.removeBlocks([4]));
+    expect(instance.removeBlocks).toHaveBeenCalledWith([4]);
     act(() => ref.current?.setRanges([[0, 1]]));
     expect(instance.setRanges).toHaveBeenCalledWith([[0, 1]]);
     act(() => ref.current?.addRanges([[0, 2]]));

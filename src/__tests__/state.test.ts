@@ -25,6 +25,48 @@ describe("createBlockState", () => {
     expect(state.fraction(0)).toBe(0.5);
   });
 
+  it("remove clears set blocks, drops progress and reports dirty bins", () => {
+    const state = createBlockState(10);
+    state.resize(3);
+    state.add([0, 1, 4, 9]);
+    const dirty = state.remove([0, 9]);
+    expect(Array.from(dirty)).toEqual([0, 2]);
+    expect([0, 1, 2].map(state.countOf)).toEqual([1, 1, 0]);
+    expect(state.has(0)).toBe(false);
+    expect(state.has(1)).toBe(true);
+    expect(state.progress().completed).toBe(2);
+  });
+
+  it("remove ignores unset, duplicate, out of range and non-integer indices", () => {
+    const state = createBlockState(10);
+    state.resize(3);
+    state.add([2]);
+    expect(state.remove([5, -1, 10, 2.5, Number.NaN]).length).toBe(0);
+    expect(state.progress().completed).toBe(1);
+    const dirty = state.remove([2, 2]);
+    expect(Array.from(dirty)).toEqual([0]);
+    expect(state.progress().completed).toBe(0);
+    expect(state.countOf(0)).toBe(0);
+  });
+
+  it("remove without bins clears bits and progress", () => {
+    const state = createBlockState(10);
+    state.add([1, 2]);
+    expect(state.remove([1]).length).toBe(0);
+    expect(state.progress().completed).toBe(1);
+  });
+
+  it("remove outside the view clears bits but not bins", () => {
+    const state = createBlockState(100);
+    state.resize(5);
+    state.add([10, 45]);
+    state.setView({ start: 40, end: 60 });
+    const dirty = state.remove([10]);
+    expect(dirty.length).toBe(0);
+    expect(state.progress().completed).toBe(1);
+    expect(state.has(10)).toBe(false);
+  });
+
   it("skips duplicates, out of range, and non-integers", () => {
     const state = createBlockState(10);
     state.resize(3);

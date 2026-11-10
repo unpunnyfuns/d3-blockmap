@@ -65,6 +65,7 @@ export type BlockMap = {
   setBlocks(indices: ArrayLike<number>): void;
   setRanges(ranges: RangeInput): void;
   addBlocks(indices: ArrayLike<number>): void;
+  removeBlocks(indices: ArrayLike<number>): void;
   addRanges(ranges: RangeInput): void;
   removeRanges(ranges: RangeInput): void;
   setView(view: BlockView): void;
@@ -458,6 +459,10 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     // The incremental paths repaint only the bins the state reports changed.
     addBlocks: live((indices) => {
       renderer.markDirty(state.add(indices));
+      writeLabel();
+    }),
+    removeBlocks: live((indices) => {
+      renderer.markDirty(state.remove(indices));
       writeLabel();
     }),
     addRanges: live((ranges) => {

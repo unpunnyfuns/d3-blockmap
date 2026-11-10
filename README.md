@@ -72,6 +72,7 @@ export const Download = ({ totalBlocks }: { totalBlocks: number }) => {
 |---|---|
 | `setBlocks(indices)` | Replace everything with these indices. |
 | `addBlocks(indices)` | Mark indices complete. Cheapest way to add single blocks. |
+| `removeBlocks(indices)` | Mark indices missing again. Unset indices are ignored. |
 | `setRanges(ranges)` | Replace everything with a snapshot of ranges. |
 | `addRanges(ranges)` | Mark ranges complete. Overlap is fine and counted once. |
 | `removeRanges(ranges)` | Mark ranges missing again. |

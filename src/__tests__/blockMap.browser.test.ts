@@ -609,6 +609,18 @@ describe("createBlockMap", () => {
     map.destroy();
   });
 
+  it("removeBlocks updates progress and the aria-label", () => {
+    const container = dom.mount();
+    const map = createBlockMap(container, { totalBlocks: 100 });
+    const canvas = container.querySelector("canvas") as HTMLCanvasElement;
+    map.addBlocks(Array.from({ length: 43 }, (_, i) => i));
+    map.removeBlocks([0, 1, 2]);
+    expect(map.getProgress().completed).toBe(40);
+    expect(canvas.getAttribute("aria-label")).toBe("Download progress: 40 of 100 blocks (40%)");
+    map.destroy();
+    expect(() => map.removeBlocks([5])).not.toThrow();
+  });
+
   it("floors the default percent rather than rounding it up to 100%", () => {
     const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 10_000_000 });

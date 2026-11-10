@@ -147,6 +147,7 @@ export const BlockMap = ({
     () => ({
       setBlocks: (indices) => instance?.setBlocks(indices),
       addBlocks: (indices) => instance?.addBlocks(indices),
+      removeBlocks: (indices) => instance?.removeBlocks(indices),
       setRanges: (next) => instance?.setRanges(next),
       addRanges: (next) => instance?.addRanges(next),
       removeRanges: (next) => instance?.removeRanges(next),
