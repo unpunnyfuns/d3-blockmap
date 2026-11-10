@@ -32,7 +32,7 @@
     "format": "oxfmt src",
     "format:check": "oxfmt --check src",
     "typecheck": "tsc --noEmit",
-    "demo": "python3 -m http.server 4173",
+    "demo": "sirv . --dev --port 4173",
     "verify": "npm run lint && npm run format:check && npm run typecheck && npm test && npm run build",
     "prepare": "husky"
   },
@@ -61,6 +61,7 @@
     "playwright": "^1.65.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "sirv-cli": "^3.0.1",
     "tsup": "^9.0.0",
     "typescript": "^5.9.3",
     "vitest": "^5.1.0"
