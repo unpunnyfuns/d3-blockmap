@@ -448,15 +448,75 @@ describe("attachInteraction", () => {
       expect(calls).toEqual([]);
     });
 
-    it("a touch pointer during a mouse drag does not start a pinch", () => {
+    it("two touch pointers during a mouse drag neither pinch nor take over the drag", () => {
       const { deps, calls } = createDeps({ start: 100, end: 200 });
       attachInteraction(surface, canvas, deps);
       pointer(surface, "pointerdown", 50, 1, PRIMARY_BUTTON);
       pointer(surface, "pointermove", 60);
       expect(calls.at(-1)).toEqual({ start: 90, end: 190 });
+
       touch("pointerdown", 80, 2);
+      touch("pointerdown", 90, 3);
+      touch("pointermove", 20, 2);
+      touch("pointermove", 150, 3);
+      expect(calls.at(-1)).toEqual({ start: 90, end: 190 });
       expect(deps.onDragStart).toHaveBeenCalledTimes(1);
+      touch("pointerup", 150, 3);
+      touch("pointerup", 20, 2);
       expect(deps.onDragEnd).not.toHaveBeenCalled();
+      expect(surface.style.cursor).toBe("grabbing");
+
+      pointer(surface, "pointermove", 70);
+      expect(calls.at(-1)).toEqual({ start: 80, end: 180 });
+      pointer(surface, "pointerup", 70);
+      expect(deps.onDragEnd).toHaveBeenCalledTimes(1);
+      expect(surface.style.cursor).toBe("");
+      expect(surface.hasPointerCapture(1)).toBe(false);
+    });
+
+    it("ignores a mouse press during a pinch, so hover afterwards does not pan", () => {
+      const { deps, calls } = createDeps({ start: 400, end: 600 });
+      attachInteraction(surface, canvas, deps);
+      startPinch(40, 60);
+      fire(surface, "pointerdown", {
+        button: PRIMARY_BUTTON,
+        pointerId: 9,
+        pointerType: "mouse",
+        ...at(canvas, 50),
+      });
+      fire(surface, "pointerup", { pointerId: 9, pointerType: "mouse", ...at(canvas, 50) });
+      touch("pointerup", 40, 1);
+      expect(deps.onDragEnd).toHaveBeenCalledTimes(1);
+
+      const before = calls.length;
+      fire(surface, "pointermove", { pointerId: 9, pointerType: "mouse", ...at(canvas, 90) });
+      touch("pointerup", 60, 2);
+      fire(surface, "pointermove", { pointerId: 9, pointerType: "mouse", ...at(canvas, 10) });
+      expect(calls.length).toBe(before);
+      expect(deps.onDragStart).toHaveBeenCalledTimes(1);
+      expect(surface.style.cursor).toBe("");
+    });
+
+    it("a finger left down after a pinch does not pair with a new finger", () => {
+      const { deps, calls } = createDeps({ start: 400, end: 600 });
+      attachInteraction(surface, canvas, deps);
+      startPinch(40, 60);
+      touch("pointerup", 40, 1);
+      expect(deps.onDragStart).toHaveBeenCalledTimes(1);
+
+      touch("pointerdown", 20, 3);
+      touch("pointermove", 90, 3);
+      touch("pointermove", 10, 2);
+      expect(calls).toEqual([]);
+      expect(deps.onDragStart).toHaveBeenCalledTimes(1);
+
+      touch("pointerup", 90, 3);
+      touch("pointerup", 10, 2);
+      startPinch(40, 60);
+      expect(deps.onDragStart).toHaveBeenCalledTimes(2);
+      touch("pointermove", 50, 1);
+      touch("pointermove", 70, 2);
+      expect(calls.at(-1)).toEqual({ start: 380, end: 580 });
     });
   });
 });

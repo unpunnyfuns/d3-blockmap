@@ -2,7 +2,10 @@
  * Translates pointer, wheel and keyboard input into view changes:
  * ctrl/meta-wheel zooms, drag pans, double click resets, and the keys below
  * mirror those gestures for anyone who can't use a pointer. Two touch
- * pointers pinch: the spread zooms and the midpoint pans. Pointer, wheel
+ * pointers pinch: the spread zooms and the midpoint pans. One gesture owns
+ * the surface at a time: while a drag or a pinch is under way, presses from
+ * other pointers are ignored, and a finger still down after its pinch ends
+ * does nothing until it lifts. Pointer, wheel
  * and dblclick listeners sit on the surface - the container - rather than
  * the canvas, so an overlay stacked above the canvas (the brush) cannot
  * swallow them; keydown stays on the canvas because that is the focusable
@@ -84,6 +87,10 @@ export const attachInteraction = (
   // latest canvas-relative x.
   const touches = new Map<number, number>();
 
+  // Fingers still down from a pinch that has ended. They belong to no
+  // gesture, and while any remains no new touch gesture can start.
+  const spent = new Set<number>();
+
   // CSS pixels to blocks: scale to device pixels (one per column), take that
   // as a fraction of the columns across, and spend it over the view length.
   const columnsToBlocks = (px: number, view: BlockView): number =>
@@ -122,8 +129,14 @@ export const attachInteraction = (
       canvas.focus({ preventScroll: true });
     }
 
+    // A pinch owns the surface until it ends, whatever the new pointer is.
+    if (pinch) return;
+
     if (event.pointerType === TOUCH_POINTER) {
-      if (pinch) return;
+      // A mouse or pen drag, even one still under the threshold, keeps the
+      // surface, and so does the leftover finger of an ended pinch.
+      if (drag && !touches.has(drag.pointerId)) return;
+      if (spent.size > 0) return;
       touches.set(event.pointerId, canvasX(canvas, event));
       if (touches.size === PINCH_POINTERS) {
         startPinch();
@@ -154,12 +167,15 @@ export const attachInteraction = (
    * remaining events to an element that never hears them.
    */
   const onPointerMove = (event: PointerEvent): void => {
+    if (spent.has(event.pointerId)) return;
     if (touches.has(event.pointerId)) touches.set(event.pointerId, canvasX(canvas, event));
     if (pinch) {
       if (pinch.pointerIds.includes(event.pointerId)) movePinch(pinch);
       return;
     }
     if (!drag) return;
+    // A drag follows only the pointer that started it.
+    if (drag.pointerId !== NO_POINTER && event.pointerId !== drag.pointerId) return;
 
     const dx = canvasX(canvas, event) - drag.downX;
     if (!drag.active) {
@@ -203,14 +219,13 @@ export const attachInteraction = (
   };
 
   /**
-   * A pinch needs both pointers to be touch, so a mouse or pen drag in
-   * flight keeps the gesture. A touch drag in flight ends through endDrag
-   * first, so its capture, cursor and onDragEnd unwind before the pinch
+   * Only reached with two touch pointers down and no mouse or pen drag, which
+   * onPointerDown turns away beforehand. A touch drag in flight ends through
+   * endDrag first, so its capture, cursor and onDragEnd unwind before the pinch
    * claims both pointers. onDragStart hides the tooltip for the pinch the
    * same way it does for a drag.
    */
   const startPinch = (): void => {
-    if (drag && !touches.has(drag.pointerId)) return;
     endDrag();
 
     const [[firstId, firstX], [secondId, secondX]] = Array.from(touches);
@@ -235,12 +250,15 @@ export const attachInteraction = (
    * Computed from the baseline on every move, never incrementally, like the
    * drag: the distance ratio zooms around the anchor, then a pan keeps the
    * anchor under the current midpoint. The minimum distance keeps fingers
-   * that meet from dividing by zero.
+   * that meet from dividing by zero. A pinch pointer missing from the
+   * tracked set has no position to use, so the move is skipped rather than
+   * guessed.
    */
   const movePinch = (state: PinchState): void => {
     if (deps.getBinCount() === 0) return;
 
-    const [firstX = 0, secondX = 0] = state.pointerIds.map((id) => touches.get(id));
+    const [firstX, secondX] = state.pointerIds.map((id) => touches.get(id));
+    if (firstX === undefined || secondX === undefined) return;
     const distance = Math.max(Math.abs(firstX - secondX), PINCH_MIN_DISTANCE_PX);
     const midpoint = (firstX + secondX) / HALF;
     const total = deps.getTotalBlocks();
@@ -256,16 +274,22 @@ export const attachInteraction = (
   };
 
   /**
-   * Either pinch pointer lifting ends the pinch; the finger left down hands
-   * over to nothing, so it cannot jolt the view into a pan. A pointer that
-   * is not part of the pinch - a third finger - changes nothing.
+   * Either pinch pointer lifting ends the pinch; the finger left down is
+   * spent and hands over to nothing, so it cannot jolt the view into a pan or
+   * pair with a new finger. A pointer that owns no gesture - a third finger,
+   * a press that was turned away - changes nothing.
    */
   const onPointerEnd = (event: PointerEvent): void => {
     touches.delete(event.pointerId);
+    spent.delete(event.pointerId);
     if (pinch) {
-      if (pinch.pointerIds.includes(event.pointerId)) endPinch();
+      if (!pinch.pointerIds.includes(event.pointerId)) return;
+      endPinch();
+      touches.forEach((_x, id) => spent.add(id));
+      touches.clear();
       return;
     }
+    if (drag && drag.pointerId !== NO_POINTER && drag.pointerId !== event.pointerId) return;
     endDrag();
   };
 
@@ -322,6 +346,7 @@ export const attachInteraction = (
     endDrag();
     endPinch();
     touches.clear();
+    spent.clear();
     surface.removeEventListener("wheel", onWheel);
     surface.removeEventListener("pointerdown", onPointerDown);
     surface.removeEventListener("pointermove", onPointerMove);
