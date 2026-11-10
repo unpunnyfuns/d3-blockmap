@@ -8,7 +8,11 @@ import type { BlockMapHandle } from "../BlockMap";
 
 vi.mock("../../blockMap", async (importOriginal) => {
   const actual = await importOriginal<typeof BlockMapModule>();
-  return { createBlockMap: vi.fn(), defaultLabel: actual.defaultLabel };
+  return {
+    createBlockMap: vi.fn(),
+    defaultLabel: actual.defaultLabel,
+    defaultTooltip: actual.defaultTooltip,
+  };
 });
 
 const createInstance = (): BlockMapInstance => ({
@@ -215,7 +219,7 @@ describe("<BlockMap>", () => {
 
     rerender(<BlockMap totalBlocks={10} />);
     expect(createBlockMap).toHaveBeenCalledTimes(1);
-    expect(passed({ completed: 3, total: 10 })).toBe("Download progress: 3 of 10 blocks (30%)");
+    expect(passed({ completed: 3, total: 10 })).toBe("3 of 10 blocks complete (30%)");
   });
 
   it("uses the default text when no label is given", () => {
@@ -226,7 +230,7 @@ describe("<BlockMap>", () => {
       completed: number;
       total: number;
     }) => string;
-    expect(passed({ completed: 3, total: 10 })).toBe("Download progress: 3 of 10 blocks (30%)");
+    expect(passed({ completed: 3, total: 10 })).toBe("3 of 10 blocks complete (30%)");
   });
 
   it("applies a label supplied after mount without recreating", () => {
@@ -350,5 +354,30 @@ describe("<BlockMap>", () => {
     expect(instance.getScale).toHaveBeenCalled();
     rerender(<BlockMap ref={ref} totalBlocks={10} axis={true} />);
     expect(vi.mocked(createBlockMap).mock.calls[1][1]).toMatchObject({ axis: true });
+  });
+
+  it("reads an inline tooltip formatter live without recreating, and falls back to the default", () => {
+    const instance = createInstance();
+    vi.mocked(createBlockMap).mockReturnValue(instance);
+    const hit = { block: 3, range: [3, 4] as [number, number], completed: 1, total: 1 };
+    const { rerender } = render(<BlockMap totalBlocks={10} tooltip={() => "a"} />);
+    const passed = vi.mocked(createBlockMap).mock.calls[0][1].tooltip as (h: typeof hit) => string;
+    expect(passed(hit)).toBe("a");
+    rerender(<BlockMap totalBlocks={10} tooltip={() => "b"} />);
+    expect(createBlockMap).toHaveBeenCalledTimes(1);
+    expect(passed(hit)).toBe("b");
+    rerender(<BlockMap totalBlocks={10} />);
+    expect(createBlockMap).toHaveBeenCalledTimes(1);
+    expect(passed(hit)).toBe("Block 3 · complete");
+  });
+
+  it("recreates the map with tooltip false when the tooltip is toggled off", () => {
+    const instance = createInstance();
+    vi.mocked(createBlockMap).mockReturnValue(instance);
+    const { rerender } = render(<BlockMap totalBlocks={10} />);
+    expect(vi.mocked(createBlockMap).mock.calls[0][1].tooltip).toEqual(expect.any(Function));
+    rerender(<BlockMap totalBlocks={10} tooltip={false} />);
+    expect(createBlockMap).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(createBlockMap).mock.calls[1][1].tooltip).toBe(false);
   });
 });

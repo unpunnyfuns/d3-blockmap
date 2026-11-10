@@ -1,5 +1,5 @@
 import { createBlockMap } from "../blockMap";
-import type { BlockMapOptions } from "../blockMap";
+import type { BlockHit, BlockMapOptions } from "../blockMap";
 import { CSS_VAR_BRUSH } from "../constants";
 import type { ImageDataLike } from "../renderer";
 import {
@@ -603,9 +603,9 @@ describe("createBlockMap", () => {
     const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 100 });
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
-    expect(canvas.getAttribute("aria-label")).toBe("Download progress: 0 of 100 blocks (0%)");
+    expect(canvas.getAttribute("aria-label")).toBe("0 of 100 blocks complete (0%)");
     map.addBlocks(Array.from({ length: 43 }, (_, i) => i));
-    expect(canvas.getAttribute("aria-label")).toBe("Download progress: 43 of 100 blocks (43%)");
+    expect(canvas.getAttribute("aria-label")).toBe("43 of 100 blocks complete (43%)");
     map.destroy();
   });
 
@@ -616,7 +616,7 @@ describe("createBlockMap", () => {
     map.addBlocks(Array.from({ length: 43 }, (_, i) => i));
     map.removeBlocks([0, 1, 2]);
     expect(map.getProgress().completed).toBe(40);
-    expect(canvas.getAttribute("aria-label")).toBe("Download progress: 40 of 100 blocks (40%)");
+    expect(canvas.getAttribute("aria-label")).toBe("40 of 100 blocks complete (40%)");
     map.destroy();
     expect(() => map.removeBlocks([5])).not.toThrow();
   });
@@ -626,9 +626,7 @@ describe("createBlockMap", () => {
     const map = createBlockMap(container, { totalBlocks: 10_000_000 });
     map.addRanges([[0, 9_999_999]]);
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
-    expect(canvas.getAttribute("aria-label")).toBe(
-      "Download progress: 9,999,999 of 10,000,000 blocks (99%)",
-    );
+    expect(canvas.getAttribute("aria-label")).toBe("9,999,999 of 10,000,000 blocks complete (99%)");
     map.destroy();
   });
 
@@ -649,10 +647,10 @@ describe("createBlockMap", () => {
     const container = dom.mount();
     const map = createBlockMap(container, { totalBlocks: 100, initialBlocks: [0, 1] });
     const canvas = container.querySelector("canvas") as HTMLCanvasElement;
-    expect(canvas.getAttribute("aria-label")).toBe("Download progress: 2 of 100 blocks (2%)");
+    expect(canvas.getAttribute("aria-label")).toBe("2 of 100 blocks complete (2%)");
 
     map.addBlocks([2]);
-    expect(canvas.getAttribute("aria-label")).toBe("Download progress: 3 of 100 blocks (3%)");
+    expect(canvas.getAttribute("aria-label")).toBe("3 of 100 blocks complete (3%)");
     map.destroy();
   });
 
@@ -663,7 +661,7 @@ describe("createBlockMap", () => {
     map.destroy();
     map.addBlocks([0]);
     dom.flushFrames();
-    expect(canvas.getAttribute("aria-label")).toBe("Download progress: 0 of 100 blocks (0%)");
+    expect(canvas.getAttribute("aria-label")).toBe("0 of 100 blocks complete (0%)");
   });
 
   it("discrete mode removeRanges paints the missing colour for only the affected block", () => {
@@ -681,6 +679,62 @@ describe("createBlockMap", () => {
       expect(pixel(image, column)).toEqual(COMPLETE_RGBA);
     }
     map.destroy();
+  });
+
+  describe("tooltip option", () => {
+    it("creates no element and shows nothing when false", () => {
+      const container = dom.mount(5);
+      const map = createBlockMap(container, { totalBlocks: 100, tooltip: false });
+      dom.triggerResize(5);
+      expect(container.querySelector("[data-blockmap-tooltip]")).toBeNull();
+      expect(() => pointer(container, "pointermove", 0)).not.toThrow();
+      expect(() => fire(container, "pointerleave", at(container, 0))).not.toThrow();
+      expect(container.querySelector("[data-blockmap-tooltip]")).toBeNull();
+      expect(() => map.destroy()).not.toThrow();
+    });
+
+    it("passes the hit to a formatter and shows its text", () => {
+      const container = dom.mount(5);
+      const tooltip = vi.fn((_hit: BlockHit) => "custom");
+      const onBlockClick = vi.fn();
+      const map = createBlockMap(container, { totalBlocks: 100, tooltip, onBlockClick });
+      dom.triggerResize(5);
+      map.addRanges([[20, 25]]);
+      pointer(container, "pointermove", 1.2);
+      fire(container, "click", at(container, 1.2));
+      const el = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
+      expect(el.textContent).toBe("custom");
+      const { originalEvent: _ignored, ...clicked } = onBlockClick.mock.calls[0][0];
+      expect(tooltip).toHaveBeenLastCalledWith({
+        block: 20,
+        range: [20, 30],
+        completed: 5,
+        total: 10,
+      });
+      expect(tooltip.mock.calls.at(-1)?.[0]).toEqual(clicked);
+      map.destroy();
+    });
+
+    it("defaults to the single-block text when one block spans a column", () => {
+      const container = dom.mount(800);
+      const map = createBlockMap(container, { totalBlocks: 10 });
+      dom.triggerResize(800);
+      map.addBlocks([5]);
+      const el = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
+      pointer(container, "pointermove", 400);
+      expect(el.textContent).toBe("Block 5 · complete");
+      map.destroy();
+    });
+
+    it("keeps the single-block text under a zoom that gives each block several columns", () => {
+      const container = dom.mount(50);
+      const map = createBlockMap(container, { totalBlocks: 1000, view: { start: 500, end: 510 } });
+      dom.triggerResize(50);
+      const el = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
+      pointer(container, "pointermove", 0);
+      expect(el.textContent).toBe("Block 500 · missing");
+      map.destroy();
+    });
   });
 
   describe("onBlockClick", () => {

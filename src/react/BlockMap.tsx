@@ -9,8 +9,13 @@ import { useLayoutEffect, useImperativeHandle, useRef, useState } from "react";
 import type { CSSProperties, Ref } from "react";
 import type { AxisOptions } from "../axis";
 import type { PartialStyle } from "../colors";
-import { createBlockMap, defaultLabel } from "../blockMap";
-import type { BlockClickEvent, BlockMap as BlockMapInstance, BlockMapOptions } from "../blockMap";
+import { createBlockMap, defaultLabel, defaultTooltip } from "../blockMap";
+import type {
+  BlockClickEvent,
+  BlockHit,
+  BlockMap as BlockMapInstance,
+  BlockMapOptions,
+} from "../blockMap";
 import type { BlockRange, RangeInput } from "../ranges";
 import type { Progress } from "../state";
 import { createScale, fullView } from "../view";
@@ -30,6 +35,7 @@ export type BlockMapProps = {
   onBrushEnd?: (selection: BlockRange | null) => void;
   onBlockClick?: (event: BlockClickEvent) => void;
   label?: (progress: Progress) => string;
+  tooltip?: false | ((hit: BlockHit) => string);
   highlight?: boolean;
   className?: string;
   style?: CSSProperties;
@@ -44,7 +50,7 @@ export type BlockMapHandle = Omit<BlockMapInstance, "destroy">;
 type Callbacks = Pick<
   BlockMapProps,
   "onViewChange" | "onBrush" | "onBrushEnd" | "onBlockClick" | "label"
->;
+> & { tooltip?: (hit: BlockHit) => string };
 
 // Module-level fallbacks for the empty cases, so neither the push effect nor
 // the handle's getters allocate on every call.
@@ -66,6 +72,7 @@ export const BlockMap = ({
   onBrushEnd,
   onBlockClick,
   label,
+  tooltip,
   highlight,
   className,
   style,
@@ -78,7 +85,15 @@ export const BlockMap = ({
   // inline callback is never a changed dependency that tears the map down,
   // and adding or removing one after mount takes effect without a rebuild.
   const latest = useRef<Callbacks>({});
-  latest.current = { onViewChange, onBrush, onBrushEnd, onBlockClick, label };
+  const tooltipDisabled = tooltip === false;
+  latest.current = {
+    onViewChange,
+    onBrush,
+    onBrushEnd,
+    onBlockClick,
+    label,
+    ...(typeof tooltip === "function" ? { tooltip } : {}),
+  };
 
   /**
    * Layout effects throughout: the instance reaches the effects below through
@@ -103,6 +118,10 @@ export const BlockMap = ({
       onBlockClick: (event) => latest.current.onBlockClick?.(event),
       label: (progress) => (latest.current.label ?? defaultLabel)(progress),
     };
+    // Whether a tooltip exists is fixed at construction; its text is read live.
+    options.tooltip = tooltipDisabled
+      ? false
+      : (hit) => (latest.current.tooltip ?? defaultTooltip)(hit);
     if (partial) options.partial = partial;
     if (interactive !== undefined) options.interactive = interactive;
     if (view) options.view = view;
@@ -115,7 +134,7 @@ export const BlockMap = ({
       created.destroy();
       setInstance(null);
     };
-  }, [totalBlocks, partial, interactive, axis, brush]);
+  }, [totalBlocks, partial, interactive, axis, brush, tooltipDisabled]);
 
   // `ranges` wins when both props are given: it replaces the bitset, so the
   // loose blocks have to be added on top of it afterwards.

@@ -47,19 +47,21 @@ export type BlockMapOptions = {
   onBrush?: (selection: BlockRange | null) => void;
   onBrushEnd?: (selection: BlockRange | null) => void;
   label?: (progress: Progress) => string;
+  tooltip?: false | ((hit: BlockHit) => string);
 };
 
-// Reported from a click on the surface: block/range/completed/total mirror
-// whichever mode located the pointer, discrete block or binned column, and
-// originalEvent carries the native MouseEvent for modifier keys or
-// preventDefault.
-export type BlockClickEvent = {
+// What sits under the pointer: block/range/completed/total mirror whichever
+// mode located it, a discrete block or a binned column.
+export type BlockHit = {
   block: number;
   range: BlockRange;
   completed: number;
   total: number;
-  originalEvent: MouseEvent;
 };
+
+// Reported from a click on the surface; originalEvent carries the native
+// MouseEvent for modifier keys or preventDefault.
+export type BlockClickEvent = BlockHit & { originalEvent: MouseEvent };
 
 export type BlockMap = {
   setBlocks(indices: ArrayLike<number>): void;
@@ -95,8 +97,15 @@ export const defaultLabel = (progress: Progress): string => {
   const percent = Math.floor((progress.completed / progress.total) * PERCENT).toFixed(
     ARIA_LABEL_DEFAULT_PERCENT_DIGITS,
   );
-  return `Download progress: ${numberFormat.format(progress.completed)} of ${numberFormat.format(progress.total)} blocks (${percent}%)`;
+  return `${numberFormat.format(progress.completed)} of ${numberFormat.format(progress.total)} blocks complete (${percent}%)`;
 };
+
+// One block per hit reads as a single block's state, otherwise as a bin's
+// coverage count.
+export const defaultTooltip = (hit: BlockHit): string =>
+  hit.total === 1
+    ? formatBlockTooltip(hit.block, hit.completed === 1)
+    : formatBinTooltip(hit.range, hit.completed);
 
 // devicePixelRatio fires no change event, so the current ratio is watched as
 // a media query that stops matching when it moves.
@@ -169,7 +178,9 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
         })
       : undefined;
 
-  const tooltip = createTooltip(container);
+  // `tooltip: false` creates no element at all.
+  const tooltip = options.tooltip === false ? undefined : createTooltip(container);
+  const formatTooltip = options.tooltip || defaultTooltip;
 
   // `axis: true` means defaults, an object means those options, and both
   // false and absent mean no axis at all.
@@ -307,13 +318,6 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   });
   resizeObserver.observe(container);
 
-  type Hit = {
-    block: number;
-    range: BlockRange;
-    completed: number;
-    total: number;
-  };
-
   /**
    * Hit test shared by the tooltip and the click listener, mirroring how the
    * renderer chose to paint: fewer blocks than columns means each block spans
@@ -325,7 +329,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
    * since x scaled by dpr can round onto the column past the last one.
    * Returns undefined before the first layout too, when there are no bins.
    */
-  const locate = (x: number): Hit | undefined => {
+  const locate = (x: number): BlockHit | undefined => {
     const { binCount } = state;
     if (binCount === 0) return undefined;
     if (x < 0 || x >= cssWidth) return undefined;
@@ -363,18 +367,14 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     const x = canvasX(canvas, event);
     const hit = locate(x);
     if (!hit) {
-      tooltip.hide();
+      tooltip?.hide();
       return;
     }
 
-    const text =
-      viewLength(state.getView()) < state.binCount
-        ? formatBlockTooltip(hit.block, hit.completed === 1)
-        : formatBinTooltip(hit.range, hit.completed);
-    tooltip.show(x, text);
+    tooltip?.show(x, formatTooltip(hit));
   };
 
-  const onPointerLeave = (): void => tooltip.hide();
+  const onPointerLeave = (): void => tooltip?.hide();
 
   const onPointerDown = (event: PointerEvent): void => {
     downX = event.clientX;
@@ -418,7 +418,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
           panRequiresShift: () => overlay !== undefined,
           onDragStart: () => {
             dragging = true;
-            tooltip.hide();
+            tooltip?.hide();
           },
           onDragEnd: () => {
             dragging = false;
@@ -515,7 +515,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       detachInteraction?.();
 
       renderer.destroy();
-      tooltip.destroy();
+      tooltip?.destroy();
       axis?.destroy();
       overlay?.destroy();
       canvas.remove();
