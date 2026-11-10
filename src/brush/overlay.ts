@@ -8,28 +8,12 @@
 import { brushX } from "d3-brush";
 import type { BrushSelection, D3BrushEvent } from "d3-brush";
 import { select } from "d3-selection";
-import { BRUSH_FILL_OPACITY, DEFAULT_THEME } from "./constants";
-import { ensureRelative } from "./dom";
-import type { BlockRange } from "./ranges";
-import { createScale } from "./view";
-import type { BlockView } from "./view";
-
-export type BrushOverlayDeps = {
-  getView(): BlockView;
-  getWidth(): number;
-  getHeight(): number;
-  getTotalBlocks(): number;
-  onBrush(selection: BlockRange | null): void;
-  onBrushEnd(selection: BlockRange | null): void;
-};
-
-export type BrushOverlay = {
-  update(): void;
-  setSelection(selection: BlockRange | null): void;
-  getSelection(): BlockRange | null;
-  setColor(color: string): void;
-  destroy(): void;
-};
+import { BRUSH_FILL_OPACITY, DEFAULT_THEME } from "../constants";
+import { ensureRelative } from "../dom";
+import type { BlockRange } from "../ranges";
+import { createScale } from "../view";
+import type { BlockView } from "../view";
+import type { BrushFactory } from "./types";
 
 // A data attribute rather than a class, matching the axis, so consumers can
 // style or query the overlay without the library shipping any CSS.
@@ -116,10 +100,7 @@ const xSpan = (selection: BrushSelection | null): readonly [number, number] | nu
 const sameRange = (a: BlockRange | null, b: BlockRange | null): boolean =>
   a === b || (a !== null && b !== null && a[0] === b[0] && a[1] === b[1]);
 
-export const createBrushOverlay = (
-  container: HTMLElement,
-  deps: BrushOverlayDeps,
-): BrushOverlay => {
+export const createBrushOverlay: BrushFactory = (container, deps) => {
   ensureRelative(container);
 
   // Stretched over the container rather than sized in pixels, so a resize

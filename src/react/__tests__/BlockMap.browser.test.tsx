@@ -3,6 +3,7 @@ import { act, render } from "@testing-library/react";
 import { createRef } from "react";
 import { createBlockMap } from "../../blockMap";
 import type { BlockClickEvent, BlockMap as BlockMapInstance } from "../../blockMap";
+import { brush } from "../../brush";
 import { BlockMap } from "../BlockMap";
 import type { BlockMapHandle } from "../BlockMap";
 
@@ -253,11 +254,11 @@ describe("<BlockMap>", () => {
     vi.mocked(createBlockMap).mockReturnValueOnce(first).mockReturnValueOnce(second);
     const { rerender, container } = render(<BlockMap totalBlocks={10} />);
     expect(vi.mocked(createBlockMap).mock.calls[0][1]).not.toHaveProperty("brush");
-    rerender(<BlockMap totalBlocks={10} brush />);
+    rerender(<BlockMap totalBlocks={10} brush={brush} />);
     expect(first.destroy).toHaveBeenCalledTimes(1);
     expect(createBlockMap).toHaveBeenLastCalledWith(
       container.firstElementChild,
-      expect.objectContaining({ brush: true }),
+      expect.objectContaining({ brush }),
     );
     expect(second.setBlocks).toHaveBeenCalled();
   });
@@ -271,7 +272,7 @@ describe("<BlockMap>", () => {
     const { rerender } = render(
       <BlockMap
         totalBlocks={10}
-        brush
+        brush={brush}
         onBrush={firstBrush}
         onBrushEnd={firstEnd}
         onBlockClick={firstClick}
@@ -288,7 +289,7 @@ describe("<BlockMap>", () => {
     rerender(
       <BlockMap
         totalBlocks={10}
-        brush
+        brush={brush}
         onBrush={secondBrush}
         onBrushEnd={secondEnd}
         onBlockClick={secondClick}
@@ -334,7 +335,7 @@ describe("<BlockMap>", () => {
     const instance = createInstance();
     vi.mocked(createBlockMap).mockReturnValue(instance);
     const ref = createRef<BlockMapHandle>();
-    const { unmount } = render(<BlockMap ref={ref} totalBlocks={10} brush />);
+    const { unmount } = render(<BlockMap ref={ref} totalBlocks={10} brush={brush} />);
     act(() => ref.current?.setBrush([2, 5]));
     expect(instance.setBrush).toHaveBeenCalledWith([2, 5]);
     expect(ref.current?.getBrush()).toBeNull();

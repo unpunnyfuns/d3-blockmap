@@ -9,8 +9,7 @@
 import { createAxis } from "./axis";
 import type { Axis, AxisOptions } from "./axis";
 import { discreteBlock } from "./bins";
-import { createBrushOverlay } from "./brush";
-import type { BrushOverlay } from "./brush";
+import type { BrushFactory, BrushOverlay } from "./brush/types";
 import { createColorScale, highlightColor, readTheme, watchTheme } from "./colors";
 import type { PartialStyle, Theme } from "./colors";
 import {
@@ -41,7 +40,7 @@ export type BlockMapOptions = {
   view?: BlockView;
   interactive?: boolean;
   axis?: boolean | AxisOptions;
-  brush?: boolean;
+  brush?: BrushFactory;
   onViewChange?: (view: BlockView) => void;
   onBlockClick?: (event: BlockClickEvent) => void;
   onBrush?: (selection: BlockRange | null) => void;
@@ -166,17 +165,16 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   // tooltip and the axis so those keep painting over it. The committed view
   // is what the canvas shows, so the overlay projects against that rather
   // than a view change still waiting for its frame.
-  const overlay: BrushOverlay | undefined =
-    options.brush === true
-      ? createBrushOverlay(container, {
-          getView: () => state.getView(),
-          getWidth: () => cssWidth,
-          getHeight: () => cssHeight,
-          getTotalBlocks: () => state.totalBlocks,
-          onBrush: (selection) => options.onBrush?.(selection),
-          onBrushEnd: (selection) => options.onBrushEnd?.(selection),
-        })
-      : undefined;
+  const overlay: BrushOverlay | undefined = options.brush
+    ? options.brush(container, {
+        getView: () => state.getView(),
+        getWidth: () => cssWidth,
+        getHeight: () => cssHeight,
+        getTotalBlocks: () => state.totalBlocks,
+        onBrush: (selection) => options.onBrush?.(selection),
+        onBrushEnd: (selection) => options.onBrushEnd?.(selection),
+      })
+    : undefined;
 
   // `tooltip: false` creates no element at all.
   const tooltip = options.tooltip === false ? undefined : createTooltip(container);

@@ -60,7 +60,7 @@ export const Download = ({ totalBlocks }: { totalBlocks: number }) => {
 | `interactive` | `boolean` | `true` | Ctrl/⌘+wheel zooms, drag pans, double-click resets; keyboard controls when focused, see Behaviour. |
 | `onViewChange` | `(view) => void` | | Called when the view changes. |
 | `axis` | `boolean \| { format?, tickCount? }` | `false` | Tick labels under the bar. |
-| `brush` | `boolean` | `false` | A mouse or pen drag selects a block range; panning then needs Shift. See Behaviour. |
+| `brush` | `BrushFactory` | | Pass the `brush` export of `@unpunnyfuns/d3-blockmap/brush`: a mouse or pen drag then selects a block range, and panning needs Shift. See Behaviour. |
 | `onBrush` | `(selection) => void` | | Called on every brush move with the live `[start, end)` or `null`. |
 | `onBrushEnd` | `(selection) => void` | | Called when the gesture ends, with the snapped `[start, end)`, or `null` when it cleared the selection. A gesture that leaves the selection as it was fires nothing. |
 | `onBlockClick` | `(event) => void` | | Called on click with `{ block, range, completed, total, originalEvent }`. Works even when `interactive` is `false`. |
@@ -91,12 +91,20 @@ Ranges use exclusive ends: `[0, 10]` means blocks 0 through 9. Unsorted, overlap
 
 - The canvas is focusable (`tabindex="0"`) when `interactive` isn't `false`, and announces progress through `role="img"` plus an `aria-label`: `label` overrides the default `4,343,270 of 10,000,000 blocks complete (43%)` text.
 - With the canvas focused: `+`/`-` (or `=`/`_`) zoom in or out around the centre of the current view, arrow keys pan by 10% of the view length, Shift+arrow by 50%, and `Home` or `0` resets to the full range.
-- With `brush: true`, a mouse or pen drag selects a block range and Shift+drag pans; click an empty spot to clear. The brush is a mouse and pen gesture only, so a touch drag keeps panning and needs no modifier.
+- With a `brush`, a mouse or pen drag selects a block range and Shift+drag pans; click an empty spot to clear. The brush is a mouse and pen gesture only, so a touch drag keeps panning and needs no modifier.
+
+```ts
+import { createBlockMap } from '@unpunnyfuns/d3-blockmap';
+import { brush } from '@unpunnyfuns/d3-blockmap/brush';
+
+createBlockMap(container, { totalBlocks, brush, onBrushEnd: (selection) => {} });
+```
+
 - `onBlockClick` reports the block under the pointer, or the column's range when a column covers several blocks. It does not fire for a click that lands 3 px or more from where the press began, which is how a pan or a brush drag ends, nor for a click outside the canvas. A plain click with no selection present reports the block it hit; the click that clears an existing selection does not.
 
 ## React
 
-Props mirror the options, including `label`, `tooltip`, `brush`, `onBrush`, `onBrushEnd`, `onBlockClick`, plus `blocks`, `ranges`, `highlight`, `className`, `style`. `ref` is a plain prop exposing every method above except `destroy`, as `BlockMapHandle`.
+Props mirror the options, including `label`, `tooltip`, `brush` (the same `brush` factory from `/brush`), `onBrush`, `onBrushEnd`, `onBlockClick`, plus `blocks`, `ranges`, `highlight`, `className`, `style`. `ref` is a plain prop exposing every method above except `destroy`, as `BlockMapHandle`.
 
 - `blocks` and `ranges` apply when their identity changes, so keep the references stable.
 - `partial`, `interactive`, `axis`, and `brush` recreate the instance when they change; memoise an object `axis`.
@@ -128,7 +136,7 @@ The tooltip is a `div[data-blockmap-tooltip]`, ticks are `span[data-blockmap-tic
 - When the view is narrower than the pixel width, each block is drawn as a discrete segment.
 - The axis sits just below the container at `top: 100%`; don't clip it with `overflow: hidden`.
 - The built-in tooltip, label and axis text are English with en-US number grouping; `tooltip`, `label` and the axis `format` option replace them.
-- d3 packages are external imports, not bundled; they dedupe with your own D3.
+- d3 packages are external imports, not bundled; they dedupe with your own D3. `d3-brush` and `d3-selection` load only through the `/brush` subpath.
 - Editing a selection that is partly outside the view re-derives both edges from the visible span, so the off-screen edge snaps to the view bound.
 
 ## Development

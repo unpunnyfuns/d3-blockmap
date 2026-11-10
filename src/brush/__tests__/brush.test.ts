@@ -1,4 +1,4 @@
-import { toBlocks, toPixels } from "../brush";
+import { toBlocks, toPixels } from "../overlay";
 
 const VIEW = { start: 0, end: 10 };
 const WIDTH = 800;

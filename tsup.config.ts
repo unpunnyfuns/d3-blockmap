@@ -1,7 +1,9 @@
 import { defineConfig } from "tsup";
 
 export const config = defineConfig({
-  entry: { index: "src/index.ts", "react/index": "src/react/index.ts" },
+  entry: { index: "src/index.ts", "react/index": "src/react/index.ts",
+    "brush/index": "src/brush/index.ts",
+  },
   format: ["esm"],
   dts: true,
   clean: true,

@@ -1,4 +1,5 @@
 import { createBlockMap } from "../blockMap";
+import { brush } from "../brush";
 import { CSS_VAR_HIGHLIGHT } from "../constants";
 import type { ImageDataLike } from "../renderer";
 import {
@@ -125,7 +126,7 @@ describe("createBlockMap integration", () => {
 
   it("keeps a brush selection in block space across a zoom and a resize", () => {
     const container = dom.mount(800);
-    const map = createBlockMap(container, { totalBlocks: 10, brush: true });
+    const map = createBlockMap(container, { totalBlocks: 10, brush });
     dom.triggerResize(800, container);
     dom.flushFrames();
     map.setBrush([2, 4]);

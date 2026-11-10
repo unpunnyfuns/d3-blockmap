@@ -1,4 +1,5 @@
 import { createBlockMap } from "../blockMap";
+import { brush } from "../brush";
 import type { BlockHit, BlockMapOptions } from "../blockMap";
 import { CSS_VAR_BRUSH } from "../constants";
 import type { ImageDataLike } from "../renderer";
@@ -906,12 +907,12 @@ describe("createBlockMap", () => {
 
     const mountBrushed = (options: Partial<BlockMapOptions> = {}) => {
       const container = dom.mount(800);
-      const map = createBlockMap(container, { totalBlocks: 10, brush: true, ...options });
+      const map = createBlockMap(container, { totalBlocks: 10, brush, ...options });
       dom.triggerResize(800, container);
       return { container, map };
     };
 
-    it("renders no overlay unless brush is on", () => {
+    it("renders no overlay without a brush factory", () => {
       const container = dom.mount();
       const map = createBlockMap(container, { totalBlocks: 10 });
       dom.triggerResize(50);
@@ -977,7 +978,7 @@ describe("createBlockMap", () => {
 
     it("leaves panning to shift+drag while the brush owns a plain drag", () => {
       const container = dom.mount(100);
-      const map = createBlockMap(container, { totalBlocks: 1000, brush: true });
+      const map = createBlockMap(container, { totalBlocks: 1000, brush });
       dom.triggerResize(100, container);
       map.setView({ start: 200, end: 400 });
 
@@ -1079,7 +1080,7 @@ describe("createBlockMap", () => {
 
     it("refreshes the brush extent when only the height changes", () => {
       const container = dom.mount(800);
-      const map = createBlockMap(container, { totalBlocks: 10, brush: true });
+      const map = createBlockMap(container, { totalBlocks: 10, brush });
       dom.triggerResize(800, container, 24);
       expect(partOf(container, ".overlay").getAttribute("height")).toBe("24");
 
@@ -1091,7 +1092,7 @@ describe("createBlockMap", () => {
 
     it("pans a touch drag, which the brush leaves alone", () => {
       const container = dom.mount(100);
-      const map = createBlockMap(container, { totalBlocks: 1000, brush: true });
+      const map = createBlockMap(container, { totalBlocks: 1000, brush });
       dom.triggerResize(100, container);
       map.setView({ start: 200, end: 400 });
 
@@ -1113,7 +1114,7 @@ describe("createBlockMap", () => {
     it("paints the selection with the themed brush colour", () => {
       const container = dom.mount(800);
       container.style.setProperty(CSS_VAR_BRUSH, "#ff00ff");
-      const map = createBlockMap(container, { totalBlocks: 10, brush: true });
+      const map = createBlockMap(container, { totalBlocks: 10, brush });
       dom.triggerResize(800, container);
       map.setBrush([2, 5]);
       const rect = partOf(container, ".selection");

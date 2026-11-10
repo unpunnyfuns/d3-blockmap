@@ -68,6 +68,7 @@
 <script type="importmap">
 { "imports": {
   "@unpunnyfuns/d3-blockmap": "/dist/index.js",
+  "@unpunnyfuns/d3-blockmap/brush": "/dist/brush/index.js",
   "d3-array": "/node_modules/d3-array/dist/d3-array.mjs",
   "d3-brush": "/node_modules/d3-brush/dist/d3-brush.mjs",
   "d3-color": "/node_modules/d3-color/dist/d3-color.mjs",
@@ -82,6 +83,7 @@
 </script>
 <script type="module">
 import { createBlockMap } from "@unpunnyfuns/d3-blockmap";
+import { brush } from "@unpunnyfuns/d3-blockmap/brush";
 
 const BIG = 10_000_000;
 const SMALL = 40;
@@ -94,7 +96,7 @@ const rangeMap = createBlockMap(document.querySelector("#ranges"), {
   totalBlocks: BIG,
   partial: "coverage",
   axis: true,
-  brush: true,
+  brush,
   onViewChange: (view) => {
     document.querySelector("#view").textContent = `View ${fmt.format(view.start)}–${fmt.format(view.end - 1)}`;
   },

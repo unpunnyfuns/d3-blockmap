@@ -1,7 +1,7 @@
 import { select } from "d3-selection";
-import { createBrushOverlay } from "../brush";
-import type { BlockRange } from "../ranges";
-import type { BlockView } from "../view";
+import { createBrushOverlay } from "../overlay";
+import type { BlockRange } from "../../ranges";
+import type { BlockView } from "../../view";
 
 const WIDTH = 800;
 const HEIGHT = 40;

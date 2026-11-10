@@ -8,6 +8,7 @@
 import { useLayoutEffect, useImperativeHandle, useRef, useState } from "react";
 import type { CSSProperties, Ref } from "react";
 import type { AxisOptions } from "../axis";
+import type { BrushFactory } from "../brush/types";
 import type { PartialStyle } from "../colors";
 import { createBlockMap, defaultLabel, defaultTooltip } from "../blockMap";
 import type {
@@ -29,7 +30,7 @@ export type BlockMapProps = {
   view?: BlockView;
   interactive?: boolean;
   axis?: boolean | AxisOptions;
-  brush?: boolean;
+  brush?: BrushFactory;
   onViewChange?: (view: BlockView) => void;
   onBrush?: (selection: BlockRange | null) => void;
   onBrushEnd?: (selection: BlockRange | null) => void;
