@@ -1,3 +1,8 @@
+// The `buttons` bitmask for a pointer with nothing pressed and with the
+// primary button held: a helper move counts as part of a press until its up.
+const NO_BUTTONS = 0;
+const PRIMARY_BUTTONS = 1;
+
 const POINTER_EVENT_TYPES = new Set([
   "pointerdown",
   "pointermove",
@@ -7,6 +12,8 @@ const POINTER_EVENT_TYPES = new Set([
   "pointerenter",
   "pointerover",
   "pointerout",
+  "gotpointercapture",
+  "lostpointercapture",
 ]);
 
 export const fire = (
@@ -38,4 +45,10 @@ export const pointer = (
   offsetX: number,
   pointerId = 1,
   button = 0,
-): Event => fire(target, type, { button, pointerId, ...at(target, offsetX) });
+): Event =>
+  fire(target, type, {
+    button,
+    buttons: type === "pointerup" ? NO_BUTTONS : PRIMARY_BUTTONS,
+    pointerId,
+    ...at(target, offsetX),
+  });

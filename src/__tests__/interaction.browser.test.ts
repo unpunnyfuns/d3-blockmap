@@ -389,13 +389,14 @@ describe("attachInteraction", () => {
       touch("pointerup", 30, 1);
       expect(deps.onDragEnd).toHaveBeenCalledTimes(1);
       expect(surface.hasPointerCapture(1)).toBe(false);
-      expect(surface.hasPointerCapture(2)).toBe(false);
+      expect(surface.hasPointerCapture(2)).toBe(true);
 
       const before = calls.length;
       touch("pointermove", 90, 2);
       touch("pointermove", 10, 2);
       expect(calls.length).toBe(before);
       touch("pointerup", 10, 2);
+      expect(surface.hasPointerCapture(2)).toBe(false);
       expect(deps.onDragEnd).toHaveBeenCalledTimes(1);
       expect(deps.onDragStart).toHaveBeenCalledTimes(1);
     });
@@ -406,7 +407,8 @@ describe("attachInteraction", () => {
       startPinch(40, 60);
       touch("pointercancel", 60, 2);
       expect(deps.onDragEnd).toHaveBeenCalledTimes(1);
-      expect(surface.hasPointerCapture(1)).toBe(false);
+      expect(surface.hasPointerCapture(2)).toBe(false);
+      expect(surface.hasPointerCapture(1)).toBe(true);
       touch("pointermove", 10, 1);
       expect(calls).toEqual([]);
     });
@@ -518,5 +520,117 @@ describe("attachInteraction", () => {
       touch("pointermove", 70, 2);
       expect(calls.at(-1)).toEqual({ start: 380, end: 580 });
     });
+    it("a mouse press during an active touch drag changes nothing", () => {
+      const { deps, calls } = createDeps({ start: 400, end: 600 });
+      attachInteraction(surface, canvas, deps);
+      touch("pointerdown", 40, 1);
+      touch("pointermove", 50, 1);
+      expect(calls.at(-1)).toEqual({ start: 380, end: 580 });
+
+      fire(surface, "pointerdown", {
+        button: PRIMARY_BUTTON,
+        buttons: 1,
+        pointerId: 9,
+        pointerType: "mouse",
+        ...at(canvas, 10),
+      });
+      fire(surface, "pointerup", { pointerId: 9, pointerType: "mouse", ...at(canvas, 10) });
+      expect(surface.style.cursor).toBe("grabbing");
+
+      touch("pointermove", 60, 1);
+      expect(calls.at(-1)).toEqual({ start: 360, end: 560 });
+      touch("pointerup", 60, 1);
+      expect(deps.onDragStart).toHaveBeenCalledTimes(1);
+      expect(deps.onDragEnd).toHaveBeenCalledTimes(1);
+      expect(surface.style.cursor).toBe("");
+    });
+
+    it("a touch press replaces a mouse drag still under the threshold", () => {
+      const { deps, calls } = createDeps({ start: 400, end: 600 });
+      attachInteraction(surface, canvas, deps);
+      pointer(surface, "pointerdown", 50, 9, PRIMARY_BUTTON);
+      touch("pointerdown", 40, 1);
+      touch("pointermove", 50, 1);
+      expect(calls.at(-1)).toEqual({ start: 380, end: 580 });
+      expect(deps.onDragStart).toHaveBeenCalledTimes(1);
+      touch("pointerup", 50, 1);
+      expect(deps.onDragEnd).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps capture on the finger left down after a pinch", () => {
+      const { deps } = createDeps({ start: 400, end: 600 });
+      attachInteraction(surface, canvas, deps);
+      startPinch(40, 60);
+      touch("pointerup", 40, 1);
+      expect(surface.hasPointerCapture(1)).toBe(false);
+      expect(surface.hasPointerCapture(2)).toBe(true);
+    });
+
+    it("a lost capture forgets the spent finger, so a new pinch works", () => {
+      const { deps, calls } = createDeps({ start: 400, end: 600 });
+      attachInteraction(surface, canvas, deps);
+      startPinch(40, 60);
+      touch("pointerup", 40, 1);
+      fire(surface, "lostpointercapture", { pointerId: 2, pointerType: "touch" });
+
+      touch("pointerdown", 40, 3);
+      touch("pointerdown", 60, 4);
+      expect(deps.onDragStart).toHaveBeenCalledTimes(2);
+      touch("pointermove", 50, 3);
+      touch("pointermove", 70, 4);
+      expect(calls.at(-1)).toEqual({ start: 380, end: 580 });
+    });
+
+    it("ignores a lost capture that bubbles up from a child", () => {
+      const { deps, calls } = createDeps({ start: 400, end: 600 });
+      attachInteraction(surface, canvas, deps);
+      touch("pointerdown", 40, 1);
+      touch("pointermove", 50, 1);
+      fire(canvas, "lostpointercapture", { pointerId: 1, pointerType: "touch" });
+      expect(deps.onDragEnd).not.toHaveBeenCalled();
+      touch("pointermove", 60, 1);
+      expect(calls.at(-1)).toEqual({ start: 360, end: 560 });
+    });
+
+    it("a lost capture ends an active drag once", () => {
+      const { deps } = createDeps({ start: 400, end: 600 });
+      attachInteraction(surface, canvas, deps);
+      touch("pointerdown", 40, 1);
+      touch("pointermove", 50, 1);
+      fire(surface, "lostpointercapture", { pointerId: 1, pointerType: "touch" });
+      expect(deps.onDragEnd).toHaveBeenCalledTimes(1);
+      expect(surface.style.cursor).toBe("");
+      touch("pointerup", 50, 1);
+      expect(deps.onDragEnd).toHaveBeenCalledTimes(1);
+    });
+
+    it("a primary touch press starts cleanly over a stale spent finger", () => {
+      const { deps, calls } = createDeps({ start: 400, end: 600 });
+      attachInteraction(surface, canvas, deps);
+      startPinch(40, 60);
+      touch("pointerup", 40, 1);
+
+      fire(surface, "pointerdown", {
+        button: PRIMARY_BUTTON,
+        pointerId: 5,
+        pointerType: "touch",
+        isPrimary: true,
+        ...at(canvas, 40),
+      });
+      touch("pointermove", 50, 5);
+      expect(calls.at(-1)).toEqual({ start: 380, end: 580 });
+      expect(deps.onDragStart).toHaveBeenCalledTimes(2);
+      expect(surface.hasPointerCapture(2)).toBe(false);
+    });
+  });
+
+  it("a mouse move with no button held ends a drag instead of panning", () => {
+    const { deps, calls } = createDeps({ start: 100, end: 200 });
+    attachInteraction(surface, canvas, deps);
+    pointer(surface, "pointerdown", 50, 1, PRIMARY_BUTTON);
+    fire(surface, "pointermove", { pointerId: 1, buttons: 0, ...at(canvas, 60) });
+    fire(surface, "pointermove", { pointerId: 1, buttons: 1, ...at(canvas, 70) });
+    expect(calls).toEqual([]);
+    expect(deps.onDragStart).not.toHaveBeenCalled();
   });
 });

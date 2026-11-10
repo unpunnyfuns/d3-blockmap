@@ -1015,7 +1015,12 @@ describe("createBlockMap", () => {
       pointer(container, "pointerup", 60);
 
       fire(container, "pointerdown", { ...at(container, 50), pointerId: 1, shiftKey: true });
-      fire(container, "pointermove", { ...at(container, 60), pointerId: 1, shiftKey: true });
+      fire(container, "pointermove", {
+        ...at(container, 60),
+        pointerId: 1,
+        buttons: 1,
+        shiftKey: true,
+      });
       expect(map.getView()).toEqual({ start: 180, end: 380 });
       fire(container, "pointerup", { ...at(container, 60), pointerId: 1, shiftKey: true });
       map.destroy();

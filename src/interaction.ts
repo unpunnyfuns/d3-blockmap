@@ -2,11 +2,14 @@
  * Translates pointer, wheel and keyboard input into view changes:
  * ctrl/meta-wheel zooms, drag pans, double click resets, and the keys below
  * mirror those gestures for anyone who can't use a pointer. Two touch
- * pointers pinch: the spread zooms and the midpoint pans. One gesture owns
- * the surface at a time: while a drag or a pinch is under way, presses from
- * other pointers are ignored, and a finger still down after its pinch ends
- * does nothing until it lifts. Pointer, wheel
- * and dblclick listeners sit on the surface - the container - rather than
+ * pointers pinch: the spread zooms and the midpoint pans. An active drag or
+ * a pinch owns the surface, and presses from other pointers are ignored
+ * while it lasts; the one exception is a second finger during a touch drag,
+ * which turns the drag into a pinch. An inactive drag - pressed but not yet
+ * past the threshold - holds no capture, no cursor and has not called
+ * onDragStart, so it owns nothing: it is only a baseline, and any new press
+ * replaces it. A finger still down after its pinch ends does nothing until
+ * it lifts or loses capture. Pointer, wheel and dblclick listeners sit on the surface - the container - rather than
  * the canvas, so an overlay stacked above the canvas (the brush) cannot
  * swallow them; keydown stays on the canvas because that is the focusable
  * element. Positions therefore come from clientX minus the canvas rect
@@ -45,6 +48,7 @@ const PRIMARY_BUTTON = 0;
 const TOUCH_POINTER = "touch";
 const GRABBING = "grabbing";
 const NO_POINTER = -1;
+const NO_BUTTONS = 0;
 const HALF = 2;
 
 // `=` and `_` are the unshifted/shifted neighbours of `+` and `-` on a US
@@ -129,13 +133,20 @@ export const attachInteraction = (
       canvas.focus({ preventScroll: true });
     }
 
-    // A pinch owns the surface until it ends, whatever the new pointer is.
-    if (pinch) return;
+    const isTouch = event.pointerType === TOUCH_POINTER;
 
-    if (event.pointerType === TOUCH_POINTER) {
-      // A mouse or pen drag, even one still under the threshold, keeps the
-      // surface, and so does the leftover finger of an ended pinch.
-      if (drag && !touches.has(drag.pointerId)) return;
+    // The primary touch pointer is the first contact of a new touch
+    // sequence, so no other finger can still be down: whatever touch state
+    // is still recorded is stale, from pointers whose up never arrived.
+    if (isTouch && event.isPrimary) forgetTouches();
+
+    // A pinch or an active drag owns the surface. The one exception is a
+    // second finger during a touch drag, which goes on to start a pinch.
+    if (pinch) return;
+    const touchDrag = drag !== undefined && touches.has(drag.pointerId);
+    if (drag?.active && drag.pointerId !== event.pointerId && !(isTouch && touchDrag)) return;
+
+    if (isTouch) {
       if (spent.size > 0) return;
       touches.set(event.pointerId, canvasX(canvas, event));
       if (touches.size === PINCH_POINTERS) {
@@ -144,9 +155,13 @@ export const attachInteraction = (
       }
     }
 
+    // Any inactive drag left from another pointer is replaced, even by a
+    // press that goes on to claim nothing.
+    endDrag();
+
     // The brush only claims mouse and pen drags, so a touch drag is the only
     // pan a touch user has and never needs the modifier they cannot hold.
-    if (deps.panRequiresShift() && event.pointerType !== TOUCH_POINTER && !event.shiftKey) return;
+    if (deps.panRequiresShift() && !isTouch && !event.shiftKey) return;
 
     drag = {
       downX: canvasX(canvas, event),
@@ -176,6 +191,12 @@ export const attachInteraction = (
     if (!drag) return;
     // A drag follows only the pointer that started it.
     if (drag.pointerId !== NO_POINTER && event.pointerId !== drag.pointerId) return;
+    // A mouse or pen released outside the surface without capture never
+    // sends its up here; a move with no button held means the press is over.
+    if (!touches.has(drag.pointerId) && event.buttons === NO_BUTTONS) {
+      endDrag();
+      return;
+    }
 
     const dx = canvasX(canvas, event) - drag.downX;
     if (!drag.active) {
@@ -195,27 +216,23 @@ export const attachInteraction = (
   // Only a drag that became active took capture and changed the cursor, so
   // only that one has anything to undo. The optional-call guards cover
   // environments and test doubles without the pointer capture API.
-  const endDrag = (): void => {
-    if (!drag) return;
-
-    if (drag.active) {
-      const hasCapture =
-        drag.pointerId !== NO_POINTER && (surface.hasPointerCapture?.(drag.pointerId) ?? true);
-      if (typeof surface.releasePointerCapture === "function" && hasCapture) {
-        surface.releasePointerCapture(drag.pointerId);
-      }
-      surface.style.cursor = "";
-      deps.onDragEnd();
-    }
-
-    drag = undefined;
-  };
-
   const releaseCapture = (pointerId: number): void => {
     const hasCapture = surface.hasPointerCapture?.(pointerId) ?? true;
     if (typeof surface.releasePointerCapture === "function" && hasCapture) {
       surface.releasePointerCapture(pointerId);
     }
+  };
+
+  // The state is cleared before anything is undone, so a lostpointercapture
+  // dispatched by the release finds nothing left to end.
+  const endDrag = (): void => {
+    const ended = drag;
+    drag = undefined;
+    if (!ended?.active) return;
+
+    if (ended.pointerId !== NO_POINTER) releaseCapture(ended.pointerId);
+    surface.style.cursor = "";
+    deps.onDragEnd();
   };
 
   /**
@@ -266,31 +283,59 @@ export const attachInteraction = (
     deps.setView(panView(zoomed, -columnsToBlocks(midpoint - state.midpoint, zoomed), total));
   };
 
-  const endPinch = (): void => {
+  /**
+   * Releases capture only on the pointers given: the finger still down after
+   * the other lifts keeps its capture, so its own up or cancel still reaches
+   * the surface wherever it lifts. Teardown passes every pointer.
+   */
+  const endPinch = (released: readonly number[]): void => {
     if (!pinch) return;
-    pinch.pointerIds.forEach(releaseCapture);
     pinch = undefined;
+    released.forEach(releaseCapture);
     deps.onDragEnd();
   };
 
   /**
-   * Either pinch pointer lifting ends the pinch; the finger left down is
-   * spent and hands over to nothing, so it cannot jolt the view into a pan or
-   * pair with a new finger. A pointer that owns no gesture - a third finger,
-   * a press that was turned away - changes nothing.
+   * Forgets one pointer: up, cancel, or a lost capture on the surface itself.
+   * A spent finger releases the capture it kept. Either pinch pointer going ends the pinch; the finger left down is spent
+   * and hands over to nothing, so it cannot jolt the view into a pan or pair
+   * with a new finger. A pointer that owns no gesture - a third finger, a
+   * press that was turned away - changes nothing. Ending is idempotent, so
+   * the lostpointercapture that follows a normal up finds nothing to do.
    */
-  const onPointerEnd = (event: PointerEvent): void => {
-    touches.delete(event.pointerId);
-    spent.delete(event.pointerId);
+  const forgetPointer = (pointerId: number): void => {
+    touches.delete(pointerId);
+    if (spent.delete(pointerId)) releaseCapture(pointerId);
     if (pinch) {
-      if (!pinch.pointerIds.includes(event.pointerId)) return;
-      endPinch();
+      if (!pinch.pointerIds.includes(pointerId)) return;
+      endPinch([pointerId]);
       touches.forEach((_x, id) => spent.add(id));
       touches.clear();
       return;
     }
-    if (drag && drag.pointerId !== NO_POINTER && drag.pointerId !== event.pointerId) return;
+    if (drag && drag.pointerId !== NO_POINTER && drag.pointerId !== pointerId) return;
     endDrag();
+  };
+
+  const onPointerEnd = (event: PointerEvent): void => forgetPointer(event.pointerId);
+
+  // lostpointercapture bubbles, and a child such as the canvas loses the
+  // browser's implicit touch capture as soon as the surface takes it; only a
+  // loss on the surface itself means one of these gestures lost its pointer.
+  const onLostCapture = (event: PointerEvent): void => {
+    if (event.target !== surface) return;
+    forgetPointer(event.pointerId);
+  };
+
+  // Ends a pinch or touch drag still recorded and drops every tracked and
+  // spent finger, releasing whatever capture they still hold.
+  const forgetTouches = (): void => {
+    const held = [...touches.keys(), ...spent];
+    endPinch(held);
+    if (drag && touches.has(drag.pointerId)) endDrag();
+    spent.forEach(releaseCapture);
+    touches.clear();
+    spent.clear();
   };
 
   const onDblClick = (): void => deps.resetView();
@@ -337,6 +382,7 @@ export const attachInteraction = (
   surface.addEventListener("pointermove", onPointerMove);
   surface.addEventListener("pointerup", onPointerEnd);
   surface.addEventListener("pointercancel", onPointerEnd);
+  surface.addEventListener("lostpointercapture", onLostCapture);
   surface.addEventListener("dblclick", onDblClick);
   canvas.addEventListener("keydown", onKeyDown);
 
@@ -344,14 +390,13 @@ export const attachInteraction = (
   // grabbing cursor are released even if the map is destroyed mid-gesture.
   return () => {
     endDrag();
-    endPinch();
-    touches.clear();
-    spent.clear();
+    forgetTouches();
     surface.removeEventListener("wheel", onWheel);
     surface.removeEventListener("pointerdown", onPointerDown);
     surface.removeEventListener("pointermove", onPointerMove);
     surface.removeEventListener("pointerup", onPointerEnd);
     surface.removeEventListener("pointercancel", onPointerEnd);
+    surface.removeEventListener("lostpointercapture", onLostCapture);
     surface.removeEventListener("dblclick", onDblClick);
     canvas.removeEventListener("keydown", onKeyDown);
   };
