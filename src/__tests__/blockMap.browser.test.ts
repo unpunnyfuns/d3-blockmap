@@ -730,7 +730,7 @@ describe("createBlockMap", () => {
       map.destroy();
     });
 
-    it("defaults to the single-block text when one block spans a column", () => {
+    it("defaults to the single-block text when each block spans several columns", () => {
       const container = dom.mount(800);
       const map = createBlockMap(container, { totalBlocks: 10 });
       dom.triggerResize(800);
@@ -738,6 +738,19 @@ describe("createBlockMap", () => {
       const el = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
       pointer(container, "pointermove", 400);
       expect(el.textContent).toBe("Block 5 · complete");
+      map.destroy();
+    });
+
+    it("defaults to the single-block text when each column is a one-block bin", () => {
+      const container = dom.mount(50);
+      const map = createBlockMap(container, { totalBlocks: 100 });
+      dom.triggerResize(50);
+      map.addBlocks([50]);
+      const el = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
+      pointer(container, "pointermove", 25.2);
+      expect(el.textContent).toBe("Block 50 · complete");
+      pointer(container, "pointermove", 30.2);
+      expect(el.textContent).toBe("Block 60 · missing");
       map.destroy();
     });
 
