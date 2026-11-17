@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/unpunnyfuns/d3-blockmap/compare/v0.3.0...v0.4.0) (2026-11-17)
+
+
+### Features
+
+* mark ranges as pending ([9a5a28c](https://github.com/unpunnyfuns/d3-blockmap/commit/9a5a28cbb015b77beed39c0978a32f4836161ac5))
+
+
+### Bug Fixes
+
+* load the demo's assets by absolute path ([165cf25](https://github.com/unpunnyfuns/d3-blockmap/commit/165cf25796d7a54cbe18d61df98aea83fed94809))
+
 ## [0.3.0](https://github.com/unpunnyfuns/d3-blockmap/compare/v0.2.0...v0.3.0) (2026-11-10)
 
 
