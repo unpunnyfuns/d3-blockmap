@@ -26,6 +26,7 @@ export type BlockMapProps = {
   totalBlocks: number;
   blocks?: ArrayLike<number>;
   ranges?: RangeInput;
+  pending?: RangeInput;
   partial?: PartialStyle;
   view?: BlockView;
   interactive?: boolean;
@@ -45,7 +46,8 @@ export type BlockMapProps = {
 
 // Every instance method except destroy, because the component owns the
 // instance's lifetime. The data setters write through to the instance and
-// stay in effect until the `blocks` or `ranges` prop next changes identity.
+// stay in effect until the `blocks`, `ranges` or `pending` prop next changes
+// identity.
 export type BlockMapHandle = Omit<BlockMapInstance, "destroy">;
 
 type Callbacks = Pick<
@@ -56,6 +58,7 @@ type Callbacks = Pick<
 // Module-level fallbacks for the empty cases, so neither the push effect nor
 // the handle's getters allocate on every call.
 const EMPTY_BLOCKS: readonly number[] = [];
+const EMPTY_RANGES: readonly BlockRange[] = [];
 const EMPTY_PROGRESS = { completed: 0, total: 0 };
 const UNMEASURED_WIDTH = 0;
 
@@ -63,6 +66,7 @@ export const BlockMap = ({
   totalBlocks,
   blocks,
   ranges,
+  pending,
   partial,
   view,
   interactive,
@@ -150,6 +154,10 @@ export const BlockMap = ({
     instance.setBlocks(blocks ?? EMPTY_BLOCKS);
   }, [instance, ranges, blocks]);
 
+  useLayoutEffect(() => {
+    instance?.setPending(pending ?? EMPTY_RANGES);
+  }, [instance, pending]);
+
   // Leaving `view` undefined hands control to the map's own interaction.
   useLayoutEffect(() => {
     if (view !== undefined) instance?.setView(view);
@@ -171,6 +179,7 @@ export const BlockMap = ({
       setRanges: (next) => instance?.setRanges(next),
       addRanges: (next) => instance?.addRanges(next),
       removeRanges: (next) => instance?.removeRanges(next),
+      setPending: (next) => instance?.setPending(next),
       setView: (next) => instance?.setView(next),
       resetView: () => instance?.resetView(),
       getView: () => instance?.getView() ?? fullView(totalBlocks),

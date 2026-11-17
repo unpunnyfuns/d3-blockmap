@@ -316,4 +316,81 @@ describe("createBlockState", () => {
     expect(state.countRange(15, 56)).toBe(6);
     expect(state.countRange(20, 55)).toBe(0);
   });
+
+  describe("pending", () => {
+    it("counts pending blocks per bin, leaving out completed ones", () => {
+      const state = createBlockState(100);
+      state.resize(10);
+      state.addRanges([[10, 15]]);
+      const dirty = state.setPending([
+        [12, 25],
+        [70, 71],
+      ]);
+
+      expect(Array.from(dirty)).toEqual([1, 2, 7]);
+      expect(state.pendingOf(0)).toBe(0);
+      expect(state.pendingOf(1)).toBe(5);
+      expect(state.pendingOf(2)).toBe(5);
+      expect(state.pendingOf(7)).toBe(1);
+      expect(state.isPending(12)).toBe(false);
+      expect(state.isPending(15)).toBe(true);
+      expect(state.isPending(24)).toBe(true);
+      expect(state.isPending(25)).toBe(false);
+      expect(state.countPending(0, 100)).toBe(11);
+      expect(state.countPending(20, 71)).toBe(6);
+    });
+
+    it("reports the bins under the old and the new ranges as dirty", () => {
+      const state = createBlockState(100);
+      state.resize(10);
+      state.setPending([[0, 10]]);
+      expect(Array.from(state.setPending([[90, 100]]))).toEqual([0, 9]);
+      expect(state.pendingOf(0)).toBe(0);
+      expect(state.pendingOf(9)).toBe(10);
+      expect(Array.from(state.setPending([]))).toEqual([9]);
+      expect(state.pendingOf(9)).toBe(0);
+    });
+
+    it("follows completion through every mutator", () => {
+      const state = createBlockState(100);
+      state.resize(10);
+      state.setPending([[0, 40]]);
+
+      state.add([0, 1]);
+      expect(state.pendingOf(0)).toBe(8);
+      state.remove([0]);
+      expect(state.pendingOf(0)).toBe(9);
+      state.addRanges([[10, 20]]);
+      expect(state.pendingOf(1)).toBe(0);
+      state.removeRanges([[10, 15]]);
+      expect(state.pendingOf(1)).toBe(5);
+      state.replace([30]);
+      expect([0, 1, 2, 3].map(state.pendingOf)).toEqual([10, 10, 10, 9]);
+      state.replaceRanges([[0, 35]]);
+      expect([0, 1, 2, 3, 4].map(state.pendingOf)).toEqual([0, 0, 0, 5, 0]);
+    });
+
+    it("rebins on a view change and a resize, and survives being set before any bins exist", () => {
+      const state = createBlockState(100);
+      state.setPending([[10, 30]]);
+      state.resize(10);
+      expect([0, 1, 2, 3].map(state.pendingOf)).toEqual([0, 10, 10, 0]);
+
+      state.setView({ start: 0, end: 50 });
+      expect([1, 2, 3, 5, 6].map(state.pendingOf)).toEqual([0, 5, 5, 5, 0]);
+      state.resize(5);
+      expect([0, 1, 2, 3].map(state.pendingOf)).toEqual([0, 10, 10, 0]);
+    });
+
+    it("merges overlapping input and clamps it to the map", () => {
+      const state = createBlockState(100);
+      state.resize(10);
+      state.setPending([
+        [95, 200],
+        [90, 97],
+      ]);
+      expect(state.countPending(0, 100)).toBe(10);
+      expect(state.pendingOf(9)).toBe(10);
+    });
+  });
 });

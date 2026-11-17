@@ -1,6 +1,7 @@
 /**
- * The model: which blocks are complete (bitset), how they fold into the
- * current view's bins, and which bins changed. Deliberately free of DOM, D3
+ * The model: which blocks are complete (bitset), which are pending (a short
+ * list of ranges), how both fold into the current view's bins, and which
+ * bins changed. Deliberately free of DOM, D3
  * and canvas imports so it stays portable - it could run in a worker and
  * post dirty-bin arrays back to the renderer unchanged.
  */
@@ -31,7 +32,11 @@ export type BlockState = {
   replaceRanges(input: RangeInput): void;
   addRanges(input: RangeInput): Uint32Array;
   removeRanges(input: RangeInput): Uint32Array;
+  setPending(input: RangeInput): Uint32Array;
   has(index: number): boolean;
+  isPending(index: number): boolean;
+  pendingOf(bin: number): number;
+  countPending(start: number, end: number): number;
   fraction(bin: number): number;
   countOf(bin: number): number;
   countRange(start: number, end: number): number;
@@ -69,6 +74,66 @@ export const createBlockState = (totalBlocks: number): BlockState => {
 
   const inView = (index: number): boolean => index >= view.start && index < view.end;
 
+  // Pending ranges are kept normalised, and each bin caches how many of its
+  // blocks are pending and not yet complete, so a repaint never counts bits.
+  let pending: Uint32Array = EMPTY_DIRTY;
+  let pendingCounts = new Uint32Array(0);
+
+  /**
+   * Index of the first pending pair that ends after `index`, found by binary
+   * search over the pair ends; pairs are sorted and disjoint, so every pair
+   * from there on is the only candidate to overlap anything at or past
+   * `index`.
+   */
+  const firstPendingAfter = (index: number): number => {
+    let low = 0;
+    let high = pending.length / RANGE_PAIR;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (pending[middle * RANGE_PAIR + 1] > index) high = middle;
+      else low = middle + 1;
+    }
+    return low * RANGE_PAIR;
+  };
+
+  // A completed block is never pending, so each overlap gives up the blocks
+  // the bitset already holds.
+  const countPending = (start: number, end: number): number => {
+    let total = 0;
+    for (let i = firstPendingAfter(start); i < pending.length; i += RANGE_PAIR) {
+      const from = Math.max(start, pending[i]);
+      const to = Math.min(end, pending[i + 1]);
+      if (to <= from) break;
+      total += to - from - bitset.countRange(from, to);
+    }
+    return total;
+  };
+
+  const recountPending = (touched: Iterable<number>): void => {
+    for (const bin of touched) {
+      const [start, end] = bins.rangeOf(bin);
+      pendingCounts[bin] = countPending(start, end);
+    }
+  };
+
+  const pendingBins = (flat: Uint32Array, into: Set<number>): void => {
+    for (let i = 0; i < flat.length; i += RANGE_PAIR) {
+      for (const bin of bins.binsTouching(flat[i], flat[i + 1])) into.add(bin);
+    }
+  };
+
+  // After the bins were rebuilt or the completed set replaced: only bins
+  // under a pending range can hold a count, so the rest stay at zero.
+  const rebuildPending = (): void => {
+    pendingCounts = new Uint32Array(bins.binCount);
+    const touched = new Set<number>();
+    pendingBins(pending, touched);
+    recountPending(touched);
+  };
+
+  const sortedDirty = (dirty: Set<number>): Uint32Array =>
+    dirty.size === 0 ? EMPTY_DIRTY : Uint32Array.from(dirty).sort();
+
   /**
    * Incremental add of individual indices. bitset.set reports whether the bit
    * actually flipped, so an already-complete block costs no bin update and
@@ -90,7 +155,8 @@ export const createBlockState = (totalBlocks: number): BlockState => {
       dirty.add(bin);
     }
 
-    return dirty.size === 0 ? EMPTY_DIRTY : Uint32Array.from(dirty).sort();
+    recountPending(dirty);
+    return sortedDirty(dirty);
   };
 
   /**
@@ -116,7 +182,8 @@ export const createBlockState = (totalBlocks: number): BlockState => {
       dirty.add(bin);
     }
 
-    return dirty.size === 0 ? EMPTY_DIRTY : Uint32Array.from(dirty).sort();
+    recountPending(dirty);
+    return sortedDirty(dirty);
   };
 
   /**
@@ -151,7 +218,8 @@ export const createBlockState = (totalBlocks: number): BlockState => {
     bins.recountBins(dirty, bitset.countRange);
     bitset.setCount(bitset.count + delta);
 
-    return dirty.size === 0 ? EMPTY_DIRTY : Uint32Array.from(dirty).sort();
+    recountPending(dirty);
+    return sortedDirty(dirty);
   };
 
   return {
@@ -164,6 +232,7 @@ export const createBlockState = (totalBlocks: number): BlockState => {
     resize: (binCount) => {
       bins = createBins(view, binCount);
       bins.rebuild(bitset.countRange);
+      rebuildPending();
     },
 
     // Takes a view legalView has already checked, so the façade validates once
@@ -175,6 +244,7 @@ export const createBlockState = (totalBlocks: number): BlockState => {
       view = { ...next };
       bins = createBins(view, bins.binCount);
       bins.rebuild(bitset.countRange);
+      rebuildPending();
       return true;
     },
 
@@ -188,6 +258,7 @@ export const createBlockState = (totalBlocks: number): BlockState => {
       bitset.clear();
       bins.counts.fill(0);
       add(indices);
+      rebuildPending();
     },
 
     /**
@@ -206,12 +277,36 @@ export const createBlockState = (totalBlocks: number): BlockState => {
       }
 
       bitset.setCount(rangesLength(flat));
+      rebuildPending();
     },
 
     addRanges: (input) => applyRanges(input, true),
     removeRanges: (input) => applyRanges(input, false),
 
+    /**
+     * Replaces the pending ranges. The bins under the old ranges and under
+     * the new ones are the only ones whose pending count can have moved, so
+     * those are recounted and reported dirty.
+     */
+    setPending: (input) => {
+      const dirty = new Set<number>();
+      pendingBins(pending, dirty);
+      pending = normalizeRanges(input, totalBlocks);
+      pendingBins(pending, dirty);
+      recountPending(dirty);
+      return sortedDirty(dirty);
+    },
+
     has: bitset.has,
+
+    // In a pending range and not complete: completion always wins.
+    isPending: (index) => {
+      const i = firstPendingAfter(index);
+      return i < pending.length && pending[i] <= index && !bitset.has(index);
+    },
+
+    pendingOf: (bin) => pendingCounts[bin],
+    countPending,
 
     // Coverage in [0, 1], which is what the colour scale is indexed by.
     fraction: (bin) => {

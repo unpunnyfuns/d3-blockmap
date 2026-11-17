@@ -5,6 +5,7 @@
 
 const PACKAGE = "@unpunnyfuns/d3-blockmap";
 const GROUP_SIZE = 3;
+const PENDING_EXAMPLE = "[[4_096, 8_192]]";
 const CUSTOM_TOOLTIP = "({ completed, total }) => `${completed} / ${total}`";
 
 const CALLBACKS = [
@@ -23,6 +24,7 @@ const LIBRARY_THEME = {
   "--blockmap-partial-high": "#e0a500",
   "--blockmap-highlight": "#ff4d4f",
   "--blockmap-brush": "#ffffff",
+  "--blockmap-pending": "#3b82f6",
   "--blockmap-axis-color": "currentColor",
 };
 
@@ -58,6 +60,7 @@ export const vanillaSnippet = (config) => {
     ...options.map((line) => `  ${line}`),
     "});",
     config.highlight && "\nmap.setHighlight(true);",
+    config.pending && `\n// Ranges in flight; they show as complete once added.\nmap.setPending(${PENDING_EXAMPLE});`,
   ]
     .filter((line) => line !== false)
     .join("\n");
@@ -74,6 +77,7 @@ export const reactSnippet = (config) => {
     config.tooltip === "off" && "tooltip={false}",
     config.tooltip === "custom" && `tooltip={${CUSTOM_TOOLTIP}}`,
     config.highlight && "highlight",
+    config.pending && "pending={PENDING}",
     ...activeCallbacks(config).map(([name, arg]) => `${name}={(${arg}) => console.log(${arg})}`),
     'className="progress"',
   ].filter(Boolean);
@@ -82,7 +86,9 @@ export const reactSnippet = (config) => {
     `import { BlockMap } from '${PACKAGE}/react';`,
     config.brush && `import { brush } from '${PACKAGE}/brush';`,
     "",
-    stableAxis && `const AXIS = ${axisValue(config)};\n`,
+    stableAxis && `const AXIS = ${axisValue(config)};`,
+    config.pending && `const PENDING = ${PENDING_EXAMPLE};`,
+    (stableAxis || config.pending) && "",
     "export const Progress = () => (",
     "  <BlockMap",
     ...props.map((line) => `    ${line}`),

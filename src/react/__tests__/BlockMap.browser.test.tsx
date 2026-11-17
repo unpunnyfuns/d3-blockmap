@@ -23,6 +23,7 @@ const createInstance = (): BlockMapInstance => ({
   removeBlocks: vi.fn(),
   addRanges: vi.fn(),
   removeRanges: vi.fn(),
+  setPending: vi.fn(),
   setView: vi.fn(),
   resetView: vi.fn(),
   getView: vi.fn(() => ({ start: 0, end: 0 })),
@@ -301,6 +302,7 @@ describe("<BlockMap>", () => {
       block: 3,
       range: [3, 4],
       completed: 1,
+      pending: 0,
       total: 1,
       originalEvent: new MouseEvent("click"),
     };
@@ -360,7 +362,7 @@ describe("<BlockMap>", () => {
   it("reads an inline tooltip formatter live without recreating, and falls back to the default", () => {
     const instance = createInstance();
     vi.mocked(createBlockMap).mockReturnValue(instance);
-    const hit = { block: 3, range: [3, 4] as [number, number], completed: 1, total: 1 };
+    const hit = { block: 3, range: [3, 4] as [number, number], completed: 1, pending: 0, total: 1 };
     const { rerender } = render(<BlockMap totalBlocks={10} tooltip={() => "a"} />);
     const passed = vi.mocked(createBlockMap).mock.calls[0][1].tooltip as (h: typeof hit) => string;
     expect(passed(hit)).toBe("a");
@@ -380,5 +382,24 @@ describe("<BlockMap>", () => {
     rerender(<BlockMap totalBlocks={10} tooltip={false} />);
     expect(createBlockMap).toHaveBeenCalledTimes(2);
     expect(vi.mocked(createBlockMap).mock.calls[1][1].tooltip).toBe(false);
+  });
+
+  it("pushes the pending prop when its identity changes and clears it when removed", () => {
+    const instance = createInstance();
+    vi.mocked(createBlockMap).mockReturnValue(instance);
+    const pending: [number, number][] = [[2, 5]];
+    const ref = createRef<BlockMapHandle>();
+    const { rerender } = render(<BlockMap ref={ref} totalBlocks={10} pending={pending} />);
+    expect(instance.setPending).toHaveBeenLastCalledWith(pending);
+
+    rerender(<BlockMap ref={ref} totalBlocks={10} pending={pending} />);
+    expect(instance.setPending).toHaveBeenCalledTimes(1);
+
+    rerender(<BlockMap ref={ref} totalBlocks={10} />);
+    expect(instance.setPending).toHaveBeenLastCalledWith([]);
+
+    act(() => ref.current?.setPending([[7, 9]]));
+    expect(instance.setPending).toHaveBeenLastCalledWith([[7, 9]]);
+    expect(createBlockMap).toHaveBeenCalledTimes(1);
   });
 });

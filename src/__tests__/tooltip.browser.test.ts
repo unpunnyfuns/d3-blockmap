@@ -22,12 +22,19 @@ describe("formatBinTooltip", () => {
   it("shows <0.1% for sparse bin", () => {
     expect(formatBinTooltip([0, 2500], 1)).toBe("Blocks 0–2,499 · 1 / 2,500 (<0.1%)");
   });
+
+  it("appends the pending count when there is one", () => {
+    expect(formatBinTooltip([0, 2500], 1, 1200)).toBe(
+      "Blocks 0–2,499 · 1 / 2,500 (<0.1%) · 1,200 pending",
+    );
+  });
 });
 
 describe("formatBlockTooltip", () => {
   it("labels discrete blocks", () => {
-    expect(formatBlockTooltip(7, true)).toBe("Block 7 · complete");
-    expect(formatBlockTooltip(7, false)).toBe("Block 7 · missing");
+    expect(formatBlockTooltip(7, "complete")).toBe("Block 7 · complete");
+    expect(formatBlockTooltip(7, "missing")).toBe("Block 7 · missing");
+    expect(formatBlockTooltip(7, "pending")).toBe("Block 7 · pending");
   });
 });
 

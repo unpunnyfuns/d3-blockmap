@@ -1,5 +1,5 @@
 import { DEFAULT_THEME } from "../constants";
-import { createColorScale, highlightColor, readTheme, watchTheme } from "../colors";
+import { createColorScale, highlightColor, pendingColor, readTheme, watchTheme } from "../colors";
 import { TEST_THEME as theme } from "../testing";
 
 describe("createColorScale", () => {
@@ -86,8 +86,18 @@ describe("readTheme", () => {
       complete: "#123456",
       highlight: DEFAULT_THEME.highlight,
       brush: DEFAULT_THEME.brush,
+      pending: DEFAULT_THEME.pending,
     });
     el.remove();
+  });
+});
+
+describe("pendingColor", () => {
+  it("parses the theme's pending colour and falls back to the default", () => {
+    expect(Array.from(pendingColor(theme))).toEqual([0, 255, 255, 255]);
+    expect(Array.from(pendingColor({ ...theme, pending: "nope" }))).toEqual(
+      Array.from(pendingColor({ ...theme, pending: DEFAULT_THEME.pending })),
+    );
   });
 });
 

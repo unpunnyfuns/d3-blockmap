@@ -15,6 +15,7 @@ import {
   CSS_VAR_HIGHLIGHT,
   CSS_VAR_MISSING,
   CSS_VAR_PARTIAL,
+  CSS_VAR_PENDING,
   CSS_VAR_PARTIAL_HIGH,
   CSS_VAR_PARTIAL_LOW,
   DARK_SCHEME_QUERY,
@@ -31,6 +32,7 @@ export type Theme = {
   complete: string;
   highlight: string;
   brush: string;
+  pending: string;
 };
 
 export type ColorScale = (fraction: number) => Uint8ClampedArray;
@@ -45,6 +47,7 @@ const THEME_VARS: Record<keyof Theme, string> = {
   complete: CSS_VAR_COMPLETE,
   highlight: CSS_VAR_HIGHLIGHT,
   brush: CSS_VAR_BRUSH,
+  pending: CSS_VAR_PENDING,
 };
 
 // Entry 0 is reserved for "nothing complete" and the last entry for "all
@@ -90,6 +93,7 @@ export const readTheme = (el: HTMLElement): Theme => {
     complete: read("complete"),
     highlight: read("highlight"),
     brush: read("brush"),
+    pending: read("pending"),
   };
 };
 
@@ -139,12 +143,15 @@ export const createColorScale = (theme: Theme, partial: PartialStyle = "coverage
   };
 };
 
-// Standalone RGBA quad rather than a table entry: the highlight replaces a
-// bin's colour wholesale and so needs no ramp.
-export const highlightColor = (theme: Theme): Uint8ClampedArray => {
-  const color = rgb(parseOr(theme.highlight, DEFAULT_THEME.highlight));
+// Standalone RGBA quads rather than table entries: the highlight and the
+// pending colour each replace a bin's colour wholesale and so need no ramp.
+const solidColor = (theme: Theme, key: "highlight" | "pending"): Uint8ClampedArray => {
+  const color = rgb(parseOr(theme[key], DEFAULT_THEME[key]));
   return Uint8ClampedArray.of(color.r, color.g, color.b, OPAQUE_ALPHA);
 };
+
+export const highlightColor = (theme: Theme): Uint8ClampedArray => solidColor(theme, "highlight");
+export const pendingColor = (theme: Theme): Uint8ClampedArray => solidColor(theme, "pending");
 
 /**
  * Custom properties do not fire change events, so theme switches are

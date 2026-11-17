@@ -17,6 +17,7 @@ const PALETTES = {
     "--blockmap-partial-high": "#f0b429",
     "--blockmap-highlight": "#ff4d4f",
     "--blockmap-brush": "#9ecbff",
+    "--blockmap-pending": "#4c8dff",
     "--blockmap-axis-color": "#8b93a7",
   },
   light: {
@@ -27,6 +28,7 @@ const PALETTES = {
     "--blockmap-partial-high": "#ff8c00",
     "--blockmap-highlight": "#d4380d",
     "--blockmap-brush": "#0b63ce",
+    "--blockmap-pending": "#6aa5ff",
     "--blockmap-axis-color": "#5b6472",
   },
 };

@@ -10,7 +10,7 @@ import { createAxis } from "./axis";
 import type { Axis, AxisOptions } from "./axis";
 import { discreteBlock } from "./bins";
 import type { BrushFactory, BrushOverlay } from "./brush/types";
-import { createColorScale, highlightColor, readTheme, watchTheme } from "./colors";
+import { createColorScale, highlightColor, pendingColor, readTheme, watchTheme } from "./colors";
 import type { PartialStyle, Theme } from "./colors";
 import {
   ARIA_KEYSHORTCUTS,
@@ -32,6 +32,7 @@ import type { BlockRange, RangeInput } from "./ranges";
 import { createBlockState } from "./state";
 import type { Progress } from "./state";
 import { createTooltip, formatBinTooltip, formatBlockTooltip } from "./tooltip";
+import type { BlockStatus } from "./tooltip";
 import { createScale, fullView, legalView, sameView, viewLength } from "./view";
 import type { BlockScale, BlockView } from "./view";
 
@@ -39,6 +40,7 @@ export type BlockMapOptions = {
   totalBlocks: number;
   initialBlocks?: ArrayLike<number>;
   initialRanges?: RangeInput;
+  initialPending?: RangeInput;
   partial?: PartialStyle;
   view?: BlockView;
   interactive?: boolean;
@@ -53,11 +55,13 @@ export type BlockMapOptions = {
 };
 
 // What sits under the pointer: block/range/completed/total mirror whichever
-// mode located it, a discrete block or a binned column.
+// mode located it, a discrete block or a binned column. `pending` counts the
+// blocks in the range that are pending and not yet complete.
 export type BlockHit = {
   block: number;
   range: BlockRange;
   completed: number;
+  pending: number;
   total: number;
 };
 
@@ -72,6 +76,7 @@ export type BlockMap = {
   removeBlocks(indices: ArrayLike<number>): void;
   addRanges(ranges: RangeInput): void;
   removeRanges(ranges: RangeInput): void;
+  setPending(ranges: RangeInput): void;
   setView(view: BlockView): void;
   resetView(): void;
   getView(): BlockView;
@@ -102,12 +107,17 @@ export const defaultLabel = (progress: Progress): string => {
   return `${numberFormat.format(progress.completed)} of ${numberFormat.format(progress.total)} blocks complete (${percent}%)`;
 };
 
+const blockStatus = (hit: BlockHit): BlockStatus => {
+  if (hit.completed === 1) return "complete";
+  return hit.pending === 1 ? "pending" : "missing";
+};
+
 // One block per hit reads as a single block's state, otherwise as a bin's
 // coverage count.
 export const defaultTooltip = (hit: BlockHit): string =>
   hit.total === 1
-    ? formatBlockTooltip(hit.block, hit.completed === 1)
-    : formatBinTooltip(hit.range, hit.completed);
+    ? formatBlockTooltip(hit.block, blockStatus(hit))
+    : formatBinTooltip(hit.range, hit.completed, hit.pending);
 
 // devicePixelRatio fires no change event, so the current ratio is watched as
 // a media query that stops matching when it moves.
@@ -224,6 +234,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   const applyTheme = (): void => {
     theme = readTheme(container);
     renderer.setColors(createColorScale(theme, options.partial));
+    renderer.setPendingColor(pendingColor(theme));
     if (highlightOn) renderer.setHighlightColor(highlightColor(theme));
     overlay?.setColor(theme.brush);
   };
@@ -356,6 +367,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
         block,
         range: [block, block + 1],
         completed: state.has(block) ? 1 : 0,
+        pending: state.isPending(block) ? 1 : 0,
         total: 1,
       };
     }
@@ -365,6 +377,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
       block: start,
       range: [start, end],
       completed: state.countOf(column),
+      pending: state.pendingOf(column),
       total: end - start,
     };
   };
@@ -375,6 +388,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     block: start,
     range: [start, end],
     completed: state.countRange(start, end),
+    pending: state.countPending(start, end),
     total: end - start,
   });
 
@@ -479,6 +493,7 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
   // bitset, so the opposite order would discard the individual blocks.
   if (options.initialRanges) state.replaceRanges(options.initialRanges);
   if (options.initialBlocks) renderer.markDirty(state.add(options.initialBlocks));
+  if (options.initialPending) renderer.markDirty(state.setPending(options.initialPending));
   writeLabel();
 
   // Every mutating method runs through this, so a late async update from a
@@ -518,6 +533,12 @@ export const createBlockMap = (container: HTMLElement, options: BlockMapOptions)
     removeRanges: live((ranges) => {
       renderer.markDirty(state.removeRanges(ranges));
       writeLabel();
+    }),
+
+    // Pending ranges mark blocks as in flight without counting them as
+    // progress, so the label is left alone.
+    setPending: live((ranges) => {
+      renderer.markDirty(state.setPending(ranges));
     }),
 
     setView: live(setView),

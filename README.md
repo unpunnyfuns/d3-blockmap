@@ -55,6 +55,7 @@ export const Download = ({ totalBlocks }: { totalBlocks: number }) => {
 | `totalBlocks` | `number` | required | Number of blocks, up to 2^32 − 1. |
 | `initialBlocks` | `ArrayLike<number>` | | Indices already complete. |
 | `initialRanges` | `RangeInput` | | `[start, end)` tuples (or a flat `Uint32Array` of pairs) already complete. |
+| `initialPending` | `RangeInput` | | Ranges in flight, in the same shapes. See `setPending`. |
 | `partial` | `"coverage" \| "gradient"` | `"coverage"` | How partly filled columns are coloured. See Theming. |
 | `view` | `{ start, end }` | full range | Initial zoom window, `end` exclusive. |
 | `interactive` | `boolean` | `true` | Ctrl/⌘+wheel or a touch pinch zooms, drag pans, double-click resets; keyboard controls when focused, see Behaviour. |
@@ -63,9 +64,9 @@ export const Download = ({ totalBlocks }: { totalBlocks: number }) => {
 | `brush` | `BrushFactory` | | Pass the `brush` export of `@unpunnyfuns/d3-blockmap/brush`: a mouse or pen drag then selects a block range, and panning needs Shift. See Behaviour. |
 | `onBrush` | `(selection) => void` | | Called on every brush move with the live `[start, end)` or `null`. |
 | `onBrushEnd` | `(selection) => void` | | Called when the gesture ends, with the snapped `[start, end)`, or `null` when it cleared the selection. A gesture that leaves the selection as it was fires nothing. |
-| `onBlockClick` | `(event) => void` | | Called on click with `{ block, range, completed, total, originalEvent }`. Works even when `interactive` is `false`. |
+| `onBlockClick` | `(event) => void` | | Called on click with `{ block, range, completed, pending, total, originalEvent }`. Works even when `interactive` is `false`. |
 | `label` | `(progress) => string` | `N of T blocks complete (P%)` | Overrides the canvas `aria-label`. See Behaviour. |
-| `tooltip` | `false \| (hit) => string` | built-in text | Hover text from `{ block, range, completed, total }`; over a brush selection the hit is the whole selection. `false` creates no tooltip element. |
+| `tooltip` | `false \| (hit) => string` | built-in text | Hover text from `{ block, range, completed, pending, total }`; over a brush selection the hit is the whole selection. `false` creates no tooltip element. |
 
 ## Methods
 
@@ -77,6 +78,7 @@ export const Download = ({ totalBlocks }: { totalBlocks: number }) => {
 | `setRanges(ranges)` | Replace everything with a snapshot of ranges. |
 | `addRanges(ranges)` | Mark ranges complete. Overlap is fine and counted once. |
 | `removeRanges(ranges)` | Mark ranges missing again. |
+| `setPending(ranges)` | Replace the pending ranges; `[]` clears them. Pending blocks do not count as progress. |
 | `getProgress()` | `{ completed, total }`. |
 | `setView(view)` / `resetView()` / `getView()` | Zoom window control. |
 | `setBrush(selection)` | Select `[start, end)` blocks, or `null` to clear. Fires no callbacks. |
@@ -92,6 +94,7 @@ Ranges use exclusive ends: `[0, 10]` means blocks 0 through 9. Unsorted, overlap
 - The canvas is focusable (`tabindex="0"`) when `interactive` isn't `false`, and announces progress through `role="img"` plus an `aria-label`: `label` overrides the default `4,343,270 of 10,000,000 blocks complete (43%)` text.
 - With the canvas focused: `+`/`-` (or `=`/`_`) zoom in or out around the centre of the current view, arrow keys pan by 10% of the view length, Shift+arrow by 50%, and `Home` or `0` resets to the full range.
 - On touch, a pinch zooms around the fingers' midpoint and a one-finger horizontal drag pans; vertical swipes scroll the page (`touch-action: pan-y`). A non-interactive map sets no `touch-action` and intercepts no touch.
+- A block is missing, pending or complete. A pending block that completes shows as complete without `setPending` being called again. Zoomed out, a column takes the pending colour while it holds any pending block and is not fully complete, and the tooltip adds the count (`· 64 pending`).
 - With a `brush`, a mouse or pen drag selects a block range and Shift+drag pans; click an empty spot to clear. While a selection is dragged, and whenever the pointer is over one, the tooltip shows the selection's range and how much of it is complete. The brush is a mouse and pen gesture only, so a touch drag keeps panning and needs no modifier.
 
 ```ts
@@ -105,12 +108,12 @@ createBlockMap(container, { totalBlocks, brush, onBrushEnd: (selection) => {} })
 
 ## React
 
-Props mirror the options, including `label`, `tooltip`, `brush` (the same `brush` factory from `/brush`), `onBrush`, `onBrushEnd`, `onBlockClick`, plus `blocks`, `ranges`, `highlight`, `className`, `style`. `ref` is a plain prop exposing every method above except `destroy`, as `BlockMapHandle`.
+Props mirror the options, including `label`, `tooltip`, `brush` (the same `brush` factory from `/brush`), `onBrush`, `onBrushEnd`, `onBlockClick`, plus `blocks`, `ranges`, `pending`, `highlight`, `className`, `style`. `ref` is a plain prop exposing every method above except `destroy`, as `BlockMapHandle`.
 
-- `blocks` and `ranges` apply when their identity changes, so keep the references stable.
+- `blocks`, `ranges` and `pending` apply when their identity changes, so keep the references stable.
 - `partial`, `interactive`, `axis`, `brush`, and `tooltip` switching to or from `false` recreate the instance when they change; memoise an object `axis`.
 - `onViewChange`, `onBrush`, `onBrushEnd`, `onBlockClick`, `label`, and a `tooltip` function can be inline, added, or removed: the latest function is called without recreating the instance. A changed `label` applies on the next progress update.
-- `setBlocks` and `setRanges` on the ref hold until the `blocks` or `ranges` prop next changes.
+- `setBlocks`, `setRanges` and `setPending` on the ref hold until the matching prop next changes.
 - For high-frequency updates use the ref (`addBlocks`, `addRanges`) rather than props.
 
 ## Theming
@@ -125,6 +128,7 @@ Set these CSS custom properties on the container or an ancestor:
 | `--blockmap-partial-low` / `-high` | `#5b3a00` / `#e0a500` | the `gradient` style |
 | `--blockmap-highlight` | `#ff4d4f` | blinking incomplete columns |
 | `--blockmap-brush` | `#ffffff` | brush selection |
+| `--blockmap-pending` | `#3b82f6` | pending columns |
 | `--blockmap-axis-color` | `currentColor` | tick labels |
 
 `coverage` fades missing → partial → complete by how full a column is, so range edges look crisp. `gradient` fades low → high instead, which shows density when blocks arrive scattered.

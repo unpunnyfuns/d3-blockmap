@@ -35,6 +35,7 @@ export const CSS_VAR_PARTIAL = "--blockmap-partial";
 export const CSS_VAR_COMPLETE = "--blockmap-complete";
 export const CSS_VAR_HIGHLIGHT = "--blockmap-highlight";
 export const CSS_VAR_BRUSH = "--blockmap-brush";
+export const CSS_VAR_PENDING = "--blockmap-pending";
 
 export const DEFAULT_THEME = {
   missing: "#2b2b2b",
@@ -44,6 +45,7 @@ export const DEFAULT_THEME = {
   complete: "#2ecc71",
   highlight: "#ff4d4f",
   brush: "#ffffff",
+  pending: "#3b82f6",
 } as const;
 
 // The brush selection paints over the bar, so its fill stays translucent

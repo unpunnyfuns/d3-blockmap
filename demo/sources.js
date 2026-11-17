@@ -2,7 +2,8 @@
  * Data sources for the configurator. Each one fills the map up to a wanted
  * number of completed blocks, never past it, and owns a small model of what
  * it has marked so the page can replay it into a freshly built map when a
- * construction-time option changes.
+ * construction-time option changes. `pending(ahead)` names roughly the next
+ * `ahead` blocks the source will fill, as ranges for setPending.
  */
 
 const MAX_RANDOM_UNITS = 500_000;
@@ -13,6 +14,7 @@ const RUN_MAX = 400;
 const MIN_BLOCKS_PER_RUN = 10;
 const RUN_START_FRACTION = 1 / 500;
 const GROW_PASSES = 8;
+const MAX_PENDING_PIECES = 64;
 
 const randomInt = (limit) => Math.floor(Math.random() * limit);
 
@@ -50,7 +52,7 @@ const permutation = (size, seed) => {
 };
 
 /** One range growing from block 0: addRanges with a single delta. */
-const sequentialSource = () => {
+const sequentialSource = (total) => {
   let done = 0;
   return {
     advance: (map, want) => {
@@ -59,6 +61,7 @@ const sequentialSource = () => {
       done = want;
     },
     replay: (map) => map.setRanges([[0, done]]),
+    pending: (ahead) => [[done, Math.min(total, done + ahead)]],
   };
 };
 
@@ -68,7 +71,8 @@ const sequentialSource = () => {
  */
 const randomSource = (total) => {
   const unit = Math.ceil(total / MAX_RANDOM_UNITS);
-  const order = permutation(Math.ceil(total / unit), PERMUTATION_SEED);
+  const unitCount = Math.ceil(total / unit);
+  const order = permutation(unitCount, PERMUTATION_SEED);
   let done = 0;
   let fullUnits = 0;
   let partial = 0;
@@ -114,7 +118,16 @@ const randomSource = (total) => {
     add(map, pieces);
   };
 
-  return { advance, replay };
+  /** The pieces next in line, starting with what is left of the current one. */
+  const pending = (ahead) => {
+    const count = Math.min(MAX_PENDING_PIECES, Math.ceil(ahead / unit), unitCount - fullUnits);
+    return Array.from({ length: Math.max(0, count) }, (_, offset) => {
+      const start = unitStart(fullUnits + offset);
+      return [start, start + unitLength(start)];
+    });
+  };
+
+  return { advance, replay, pending };
 };
 
 /**
@@ -197,7 +210,16 @@ const rangesSource = (total) => {
     return Array.from({ length: edges.length / 2 }, (_, index) => [edges[index * 2], edges[index * 2 + 1]]);
   };
 
-  return { advance, replay: (map) => map.setRanges(covered()) };
+  /** Runs grow into the gaps, so the blocks next in line sit at each gap's eaten sides. */
+  const pending = (ahead) => {
+    const share = Math.ceil(ahead / (gaps.length * 2));
+    return gaps.flatMap(([start, end]) => [
+      start === 0 ? [start, start] : [start, Math.min(end, start + share)],
+      end === total ? [end, end] : [Math.max(start, end - share), end],
+    ]);
+  };
+
+  return { advance, replay: (map) => map.setRanges(covered()), pending };
 };
 
 const SOURCES = { sequential: sequentialSource, random: randomSource, ranges: rangesSource };

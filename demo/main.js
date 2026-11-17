@@ -12,6 +12,7 @@ const COPY_FEEDBACK_MS = 2000;
 const MS_PER_SECOND = 1000;
 const MAX_FRAME_MS = 250;
 const DEFAULT_DURATION_S = 60;
+const PENDING_LOOKAHEAD_MS = 2000;
 const CALLBACK_NAMES = ["onViewChange", "onBrush", "onBrushEnd", "onBlockClick"];
 const REBUILD_KEYS = ["totalBlocks", "source", "partial", "interactive", "axis", "tickCount", "brush", "tooltip"];
 
@@ -20,6 +21,7 @@ const PRESET_BASE = {
   height: 24,
   interactive: true,
   highlight: false,
+  pending: false,
   axis: false,
   tickCount: "",
   brush: false,
@@ -39,6 +41,7 @@ const PRESETS = {
     ...PRESET_BASE,
     totalBlocks: 10_000_000,
     source: "ranges",
+    pending: true,
     axis: true,
     brush: true,
     onViewChange: true,
@@ -66,8 +69,8 @@ const FORMATTERS = {
   onViewChange: (view) => `{ start: ${fmt(view.start)}, end: ${fmt(view.end)} }`,
   onBrush: formatRange,
   onBrushEnd: formatRange,
-  onBlockClick: ({ block, range, completed, total }) =>
-    `{ block: ${fmt(block)}, range: ${formatRange(range)}, completed: ${fmt(completed)}, total: ${fmt(total)} }`,
+  onBlockClick: ({ block, range, completed, pending, total }) =>
+    `{ block: ${fmt(block)}, range: ${formatRange(range)}, completed: ${fmt(completed)}, pending: ${fmt(pending)}, total: ${fmt(total)} }`,
 };
 
 let config;
@@ -96,6 +99,7 @@ const readConfig = () => ({
   height: Number(fields.height.value),
   interactive: fields.interactive.checked,
   highlight: fields.highlight.checked,
+  pending: fields.pending.checked,
   axis: fields.axis.checked,
   tickCount: fields.axis.checked ? fields.tickCount.value : "",
   brush: fields.brush.checked,
@@ -190,7 +194,19 @@ const schedule = () => {
   const durationMs = config.duration * MS_PER_SECOND;
   const phase = durationMs === 0 ? 1 : Math.min(1, elapsed / durationMs);
   const target = (config.targetFill / PERCENT) * config.totalBlocks;
-  return { phase, want: Math.round(phase * target) };
+  return { phase, want: Math.round(phase * target), target: Math.round(target) };
+};
+
+/**
+ * The blocks the source will fill over the next couple of seconds, shown as
+ * pending. Nothing past the target is ever marked, so the marks clear when
+ * the run ends.
+ */
+const showPending = (target, completed) => {
+  const durationMs = config.duration * MS_PER_SECOND;
+  const perLookahead = durationMs === 0 ? 0 : Math.ceil((target * PENDING_LOOKAHEAD_MS) / durationMs);
+  const ahead = Math.max(0, Math.min(perLookahead, target - completed));
+  map.setPending(config.pending && ahead > 0 ? source.pending(ahead) : []);
 };
 
 const update = () => {
@@ -297,8 +313,9 @@ let lastFrame = performance.now();
 const frame = (now) => {
   if (running) elapsed += Math.min(now - lastFrame, MAX_FRAME_MS);
   lastFrame = now;
-  const { phase, want } = schedule();
+  const { phase, want, target } = schedule();
   if (running && map.getProgress().completed < want) source.advance(map, want, phase);
+  showPending(target, map.getProgress().completed);
   if (now - lastProgress >= PROGRESS_INTERVAL_MS) {
     showProgress();
     lastProgress = now;

@@ -7,6 +7,7 @@ import {
   COMPLETE_RGBA,
   HIGHLIGHT_RGBA,
   MISSING_RGBA,
+  PENDING_RGBA,
   at,
   ctrlWheel,
   fire,
@@ -724,6 +725,7 @@ describe("createBlockMap", () => {
         block: 20,
         range: [20, 30],
         completed: 5,
+        pending: 0,
         total: 10,
       });
       expect(tooltip.mock.calls.at(-1)?.[0]).toEqual(clicked);
@@ -1030,6 +1032,7 @@ describe("createBlockMap", () => {
         block: 200,
         range: [200, 500],
         completed: 100,
+        pending: 0,
         total: 300,
       });
       map.destroy();
@@ -1272,6 +1275,101 @@ describe("createBlockMap", () => {
       const { container, map } = mountBrushed();
       map.destroy();
       expect(overlayOf(container)).toBeNull();
+    });
+  });
+
+  describe("pending ranges", () => {
+    it("paints unfinished pending bins in the pending colour and finished ones as complete", () => {
+      const container = dom.mount();
+      const map = createBlockMap(container, { totalBlocks: 100 });
+      dom.triggerResize(5);
+      map.addRanges([[0, 20]]);
+      map.setPending([[10, 45]]);
+      dom.flushFrames();
+
+      const image = dom.puts.at(-1) as ImageDataLike;
+      expect(pixel(image, 1)).toEqual(COMPLETE_RGBA);
+      expect(pixel(image, 2)).toEqual(PENDING_RGBA);
+      expect(pixel(image, 4)).toEqual(PENDING_RGBA);
+      expect(pixel(image, 5)).toEqual(MISSING_RGBA);
+      expect(map.getProgress()).toEqual({ completed: 20, total: 100 });
+      map.destroy();
+    });
+
+    it("drops the pending colour once the blocks complete or the ranges are replaced", () => {
+      const container = dom.mount();
+      const map = createBlockMap(container, { totalBlocks: 100, initialPending: [[20, 60]] });
+      dom.triggerResize(5);
+      dom.flushFrames();
+      expect(pixel(dom.puts.at(-1) as ImageDataLike, 2)).toEqual(PENDING_RGBA);
+
+      map.addRanges([[20, 40]]);
+      dom.flushFrames();
+      expect(pixel(dom.puts.at(-1) as ImageDataLike, 2)).toEqual(COMPLETE_RGBA);
+      expect(pixel(dom.puts.at(-1) as ImageDataLike, 4)).toEqual(PENDING_RGBA);
+
+      map.setPending([]);
+      dom.flushFrames();
+      expect(pixel(dom.puts.at(-1) as ImageDataLike, 4)).toEqual(MISSING_RGBA);
+      map.destroy();
+    });
+
+    it("holds the pending colour steady under the highlight", () => {
+      const container = dom.mount();
+      const map = createBlockMap(container, { totalBlocks: 100 });
+      dom.triggerResize(5);
+      map.setPending([[0, 5]]);
+      map.setHighlight(true);
+      dom.flushFrames();
+
+      const image = dom.puts.at(-1) as ImageDataLike;
+      expect(pixel(image, 0)).toEqual(PENDING_RGBA);
+      expect(pixel(image, 1)).toEqual(HIGHLIGHT_RGBA);
+      map.destroy();
+    });
+
+    it("marks single blocks when each block spans several columns", () => {
+      const container = dom.mount(800);
+      const map = createBlockMap(container, { totalBlocks: 10 });
+      dom.triggerResize(800);
+      map.addBlocks([2]);
+      map.setPending([[2, 4]]);
+      dom.flushFrames();
+
+      const image = dom.puts.at(-1) as ImageDataLike;
+      expect(pixel(image, 400)).toEqual(COMPLETE_RGBA);
+      expect(pixel(image, 560)).toEqual(PENDING_RGBA);
+      expect(pixel(image, 720)).toEqual(MISSING_RGBA);
+
+      pointer(container, "pointermove", 280);
+      const el = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
+      expect(el.textContent).toBe("Block 3 · pending");
+      map.destroy();
+    });
+
+    it("reports the pending count in the hit and the default tooltip", () => {
+      const container = dom.mount();
+      const onBlockClick = vi.fn();
+      const map = createBlockMap(container, { totalBlocks: 100, onBlockClick });
+      dom.triggerResize(5);
+      map.addRanges([[20, 25]]);
+      map.setPending([[22, 32]]);
+
+      pointer(container, "pointermove", 1.2);
+      fire(container, "click", at(container, 1.2));
+
+      const el = container.querySelector("[data-blockmap-tooltip]") as HTMLElement;
+      expect(el.textContent).toBe("Blocks 20–29 · 5 / 10 (50.0%) · 5 pending");
+      expect(onBlockClick.mock.calls[0][0]).toMatchObject({ completed: 5, pending: 5, total: 10 });
+      map.destroy();
+    });
+
+    it("ignores setPending after destroy", () => {
+      const container = dom.mount();
+      const map = createBlockMap(container, { totalBlocks: 100 });
+      dom.triggerResize(5);
+      map.destroy();
+      expect(() => map.setPending([[0, 10]])).not.toThrow();
     });
   });
 });

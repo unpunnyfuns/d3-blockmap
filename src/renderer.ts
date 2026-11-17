@@ -28,6 +28,8 @@ export type RenderSource = {
   getView(): BlockView;
   fraction(bin: number): number;
   has(index: number): boolean;
+  pendingOf(bin: number): number;
+  isPending(index: number): boolean;
 };
 
 // request must call back later, never during the call itself, as
@@ -45,6 +47,7 @@ export type IntervalTimer = {
 
 export type Renderer = {
   setColors(scale: ColorScale): void;
+  setPendingColor(color: Uint8ClampedArray): void;
   setHighlight(on: boolean, color: Uint8ClampedArray, blink: boolean): void;
   setHighlightColor(color: Uint8ClampedArray): void;
   markDirty(bins: ArrayLike<number>): void;
@@ -81,6 +84,7 @@ export const createRenderer = (
   let frame = NO_FRAME;
   let allDirty = false;
   let highlight: Uint8ClampedArray | undefined;
+  let pendingColor: Uint8ClampedArray | undefined;
   let phase = false;
   let blinkId = NO_TIMER;
   const dirty = new Set<number>();
@@ -99,13 +103,21 @@ export const createRenderer = (
   };
 
   /**
-   * While the highlight is on and the blink phase is lit, unfinished bins are
-   * painted in the highlight colour; completed bins keep their real colour so
-   * progress stays readable underneath. With blinking disabled, phase stays
-   * true for the lifetime of the highlight and it simply holds steady.
+   * A finished bin always shows as complete. An unfinished one with pending
+   * blocks takes the pending colour whole, so a few in-flight blocks stay
+   * visible in a column that covers thousands. While the highlight is on and
+   * the blink phase is lit, the remaining unfinished bins are painted in the
+   * highlight colour; pending bins hold steady through it. With blinking
+   * disabled, phase stays true for the lifetime of the highlight.
    */
-  const colorFor = (colors: ColorScale, fraction: number): Uint8ClampedArray =>
-    highlight && phase && fraction < COMPLETE ? highlight : colors(fraction);
+  const colorFor = (colors: ColorScale, fraction: number, pending: boolean): Uint8ClampedArray => {
+    if (fraction >= COMPLETE) return colors(fraction);
+    if (pending && pendingColor) return pendingColor;
+    return highlight && phase ? highlight : colors(fraction);
+  };
+
+  const binColor = (colors: ColorScale, bin: number): Uint8ClampedArray =>
+    colorFor(colors, source.fraction(bin), source.pendingOf(bin) > 0);
 
   const writeColumn = (target: ImageDataLike, column: number, color: Uint8ClampedArray): void => {
     target.data.set(color, column * BYTES_PER_PIXEL);
@@ -113,8 +125,8 @@ export const createRenderer = (
 
   /**
    * Zoomed in past one block per column: each block owns a span of columns,
-   * so iterate blocks and paint their span. The colour is binary - a block is
-   * either present or not.
+   * so iterate blocks and paint their span. A block is complete, pending or
+   * missing, never in between.
    */
   const paintDiscrete = (target: ImageDataLike, colors: ColorScale): void => {
     const { binCount } = source;
@@ -122,7 +134,8 @@ export const createRenderer = (
     const length = viewLength(view);
 
     for (let block = 0; block < length; block += 1) {
-      const color = colorFor(colors, source.has(view.start + block) ? COMPLETE : 0);
+      const index = view.start + block;
+      const color = colorFor(colors, source.has(index) ? COMPLETE : 0, source.isPending(index));
       const start = discreteColumn(block, length, binCount);
       const end = discreteColumn(block + 1, length, binCount);
       for (let column = start; column < end; column += 1) writeColumn(target, column, color);
@@ -135,13 +148,13 @@ export const createRenderer = (
   const paintBins = (target: ImageDataLike, colors: ColorScale): void => {
     if (allDirty) {
       for (let bin = 0; bin < source.binCount; bin += 1)
-        writeColumn(target, bin, colorFor(colors, source.fraction(bin)));
+        writeColumn(target, bin, binColor(colors, bin));
       return;
     }
 
     for (const bin of dirty) {
       if (bin >= target.width) continue;
-      writeColumn(target, bin, colorFor(colors, source.fraction(bin)));
+      writeColumn(target, bin, binColor(colors, bin));
     }
   };
 
@@ -188,6 +201,11 @@ export const createRenderer = (
   return {
     setColors: (next) => {
       scale = next;
+      markAllDirty();
+    },
+
+    setPendingColor: (color) => {
+      pendingColor = color;
       markAllDirty();
     },
 

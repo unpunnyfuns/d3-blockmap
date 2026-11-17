@@ -83,6 +83,8 @@ describe("createRenderer", () => {
       getView: () => ({ start: 0, end: 8 }),
       fraction: () => 0.5,
       has: () => false,
+      pendingOf: () => 0,
+      isPending: () => false,
     };
     const { ctx, puts } = createStubContext();
     const { scheduler, flush } = createManualScheduler();
@@ -103,6 +105,8 @@ describe("createRenderer", () => {
       getView: () => ({ start: 0, end: 10 }),
       fraction: () => 0,
       has: () => false,
+      pendingOf: () => 0,
+      isPending: () => false,
     };
     const { ctx, puts } = createStubContext();
     const { scheduler, flush, pending } = createManualScheduler();

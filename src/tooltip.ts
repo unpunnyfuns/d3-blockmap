@@ -54,19 +54,23 @@ const formatPercent = (count: number, size: number): string => {
 
 // Ranges are half-open, so the label's last block is end - 1, and a bin that
 // covers a single block is named rather than given a degenerate range.
-export const formatBinTooltip = ([start, end]: BlockRange, count: number): string => {
+export const formatBinTooltip = ([start, end]: BlockRange, count: number, pending = 0): string => {
   const size = end - start;
   const label =
     size === 1
       ? `Block ${countFormat.format(start)}`
       : `Blocks ${countFormat.format(start)}${EN_DASH}${countFormat.format(end - 1)}`;
-  return `${label}${SEPARATOR}${countFormat.format(count)} / ${countFormat.format(size)} (${formatPercent(count, size)})`;
+  const coverage = `${countFormat.format(count)} / ${countFormat.format(size)} (${formatPercent(count, size)})`;
+  const suffix = pending > 0 ? `${SEPARATOR}${countFormat.format(pending)} pending` : "";
+  return `${label}${SEPARATOR}${coverage}${suffix}`;
 };
 
-// Used when zoomed in far enough that a column is one block, where coverage
-// is binary and a percentage would be noise.
-export const formatBlockTooltip = (index: number, complete: boolean): string =>
-  `Block ${countFormat.format(index)}${SEPARATOR}${complete ? "complete" : "missing"}`;
+export type BlockStatus = "complete" | "pending" | "missing";
+
+// Used when zoomed in far enough that a column is one block, where a block
+// is in exactly one state and a percentage would be noise.
+export const formatBlockTooltip = (index: number, status: BlockStatus): string =>
+  `Block ${countFormat.format(index)}${SEPARATOR}${status}`;
 
 export const createTooltip = (container: HTMLElement): Tooltip => {
   // translateY(-100%) lifts the box clear of the canvas, and pointerEvents

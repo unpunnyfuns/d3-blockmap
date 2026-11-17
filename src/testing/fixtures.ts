@@ -10,6 +10,7 @@ export const TEST_THEME: Theme = {
   complete: "#ffffff",
   highlight: "#00ff00",
   brush: "#ff00ff",
+  pending: "#00ffff",
 };
 
 export const rgba = (css: string): number[] => {
@@ -20,3 +21,4 @@ export const rgba = (css: string): number[] => {
 export const COMPLETE_RGBA = rgba(DEFAULT_THEME.complete);
 export const MISSING_RGBA = rgba(DEFAULT_THEME.missing);
 export const HIGHLIGHT_RGBA = rgba(DEFAULT_THEME.highlight);
+export const PENDING_RGBA = rgba(DEFAULT_THEME.pending);
