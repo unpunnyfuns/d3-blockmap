@@ -78,12 +78,69 @@ const writeColor = (table: Uint8ClampedArray, index: number, css: string): void 
   table.set([color.r, color.g, color.b, OPAQUE_ALPHA], offset);
 };
 
-// Reads the theme off the element's computed style, so a cascade change or a
-// dark-mode switch is picked up without the caller passing colours in.
+const COLOR_PROPERTY = "color";
+const PROBE_TAG = "span";
+const PROBE_SIZE = 1;
+const CONTEXT_ID = "2d";
+const TRANSPARENT = 0;
+
+let probeContext: OffscreenCanvasRenderingContext2D | null | undefined;
+
+// One shared pixel, created on first use so importing the module touches no
+// canvas.
+const probePixel = (): OffscreenCanvasRenderingContext2D | null => {
+  if (probeContext === undefined) {
+    probeContext = new OffscreenCanvas(PROBE_SIZE, PROBE_SIZE).getContext(CONTEXT_ID, {
+      willReadFrequently: true,
+    });
+  }
+  return probeContext;
+};
+
+/**
+ * Lets the browser do the colour maths d3-color cannot: light-dark(),
+ * color-mix(), oklch(), currentColor and the rest. A hidden child of the
+ * element takes the value as its `color`, which resolves anything that
+ * depends on the cascade - the inherited colour and colour scheme - and the
+ * computed result is then painted onto one canvas pixel and read back as
+ * sRGB bytes. CSS.supports is asked first because an invalid `color` would
+ * otherwise quietly inherit the element's text colour. Returns undefined
+ * for anything that is not a colour, or is fully transparent.
+ */
+const resolveColor = (el: HTMLElement, value: string): string | undefined => {
+  if (!CSS.supports(COLOR_PROPERTY, value)) return undefined;
+
+  const probe = document.createElement(PROBE_TAG);
+  probe.style.display = "none";
+  probe.style.color = value;
+  el.append(probe);
+  const computed = getComputedStyle(probe).color;
+  probe.remove();
+
+  const ctx = probePixel();
+  if (!ctx || !computed) return undefined;
+
+  ctx.clearRect(0, 0, PROBE_SIZE, PROBE_SIZE);
+  ctx.fillStyle = computed;
+  ctx.fillRect(0, 0, PROBE_SIZE, PROBE_SIZE);
+  const [red, green, blue, alpha] = ctx.getImageData(0, 0, PROBE_SIZE, PROBE_SIZE).data;
+  return alpha === TRANSPARENT ? undefined : rgb(red, green, blue).formatRgb();
+};
+
+/**
+ * Reads the theme off the element's computed style, so a cascade change or a
+ * dark-mode switch is picked up without the caller passing colours in. A
+ * value d3-color parses is kept as written; anything else is handed to the
+ * browser to resolve, and what neither understands falls back to the default.
+ */
 export const readTheme = (el: HTMLElement): Theme => {
   const style = getComputedStyle(el);
-  const read = (key: keyof Theme): string =>
-    style.getPropertyValue(THEME_VARS[key]).trim() || DEFAULT_THEME[key];
+  const read = (key: keyof Theme): string => {
+    const value = style.getPropertyValue(THEME_VARS[key]).trim();
+    if (!value) return DEFAULT_THEME[key];
+    if (rgb(value).displayable()) return value;
+    return resolveColor(el, value) ?? DEFAULT_THEME[key];
+  };
 
   return {
     missing: read("missing"),

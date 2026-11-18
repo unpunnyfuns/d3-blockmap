@@ -92,6 +92,60 @@ describe("readTheme", () => {
   });
 });
 
+describe("readTheme with colours only the browser can resolve", () => {
+  const mount = (): HTMLElement => {
+    const el = document.createElement("div");
+    document.body.append(el);
+    return el;
+  };
+
+  it("resolves modern colour functions to sRGB", () => {
+    const el = mount();
+    el.style.setProperty("--blockmap-complete", "oklch(1 0 0)");
+    el.style.setProperty("--blockmap-missing", "color-mix(in srgb, #ff0000, #0000ff)");
+    el.style.setProperty("--blockmap-pending", "rgb(0 128 255 / 100%)");
+    const theme = readTheme(el);
+    expect(theme.complete).toBe("rgb(255, 255, 255)");
+    expect(theme.missing).toBe("rgb(128, 0, 128)");
+    expect(theme.pending).toBe("rgb(0, 128, 255)");
+    el.remove();
+  });
+
+  it("follows the element's colour scheme through light-dark()", () => {
+    const el = mount();
+    el.style.setProperty("--blockmap-complete", "light-dark(#ffffff, #000000)");
+    el.style.colorScheme = "light";
+    expect(readTheme(el).complete).toBe("rgb(255, 255, 255)");
+    el.style.colorScheme = "dark";
+    expect(readTheme(el).complete).toBe("rgb(0, 0, 0)");
+    el.remove();
+  });
+
+  it("resolves currentColor and a reference to another variable", () => {
+    const el = mount();
+    el.style.color = "#102030";
+    el.style.setProperty("--brand", "hsl(120deg 100% 50%)");
+    el.style.setProperty("--blockmap-highlight", "currentColor");
+    el.style.setProperty("--blockmap-complete", "var(--brand)");
+    const theme = readTheme(el);
+    expect(theme.highlight).toBe("rgb(16, 32, 48)");
+    expect(theme.complete).toBe("rgb(0, 255, 0)");
+    el.remove();
+  });
+
+  it("falls back to the default for a non-colour or a fully transparent one, and leaves no probe behind", () => {
+    const el = mount();
+    el.style.color = "#102030";
+    el.style.setProperty("--blockmap-complete", "12px");
+    el.style.setProperty("--blockmap-missing", "rgb(0 0 0 / 0)");
+    const theme = readTheme(el);
+    expect(theme.complete).toBe(DEFAULT_THEME.complete);
+    expect(theme.missing).toBe(DEFAULT_THEME.missing);
+    expect(el.childElementCount).toBe(0);
+    el.remove();
+  });
+});
+
 describe("pendingColor", () => {
   it("parses the theme's pending colour and falls back to the default", () => {
     expect(Array.from(pendingColor(theme))).toEqual([0, 255, 255, 255]);

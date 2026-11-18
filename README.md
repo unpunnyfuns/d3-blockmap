@@ -131,6 +131,8 @@ Set these CSS custom properties on the container or an ancestor:
 | `--blockmap-pending` | `#3b82f6` | pending columns |
 | `--blockmap-axis-color` | `currentColor` | tick labels |
 
+Any CSS colour works, including `light-dark()`, `color-mix()`, `oklch()`, `currentColor` and references to other variables; the browser resolves it to sRGB. A value that is not a colour, or is fully transparent, falls back to the default. Colours are re-read when `class`, `style` or `data-theme` changes on `<html>` and when the OS colour scheme changes.
+
 `coverage` fades missing → partial → complete by how full a column is, so range edges look crisp. `gradient` fades low → high instead, which shows density when blocks arrive scattered.
 
 The tooltip is a `div[data-blockmap-tooltip]`, ticks are `span[data-blockmap-tick]` inside `div[data-blockmap-axis]`, and the brush overlay is an `svg[data-blockmap-brush]`; style them with CSS.
