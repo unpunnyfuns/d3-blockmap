@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/unpunnyfuns/d3-blockmap/compare/v0.4.0...v0.5.0) (2026-11-18)
+
+
+### Features
+
+* accept any CSS colour in the theme variables ([553d679](https://github.com/unpunnyfuns/d3-blockmap/commit/553d6799a47972484a5e941e3f48617154dbd1b4))
+
 ## [0.4.0](https://github.com/unpunnyfuns/d3-blockmap/compare/v0.3.0...v0.4.0) (2026-11-17)
 
 
